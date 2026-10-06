@@ -681,6 +681,7 @@ Baseline B = 협조 O · 히스테리시스 X / Proposed
 actuator_workspace/
 ├── README.md                          ← 이 문서 (프로젝트 개요)
 ├── SETUP.md                           ← 🖥️ RTX 5070 Ti PC 환경 구성 가이드 (clone 후 여기부터)
+├── CLAUDE.md                          ← AI 코딩 도우미용 프로젝트 규칙 · 참고 순서
 ├── requirements.txt                   # 고속 모드 · 분석용 Python 패키지
 ├── docs/
 │   ├── README.md                      # 문서 인덱스

@@ -1,0 +1,208 @@
+# SETUP — RTX 5070 Ti PC 개발 환경 구성 가이드
+
+> 작성 2026-10-06 · 기획 v3.4 기준 · 대상: Isaac Sim이 설치될 **RTX 5070 Ti 데스크톱**
+> 이 저장소를 `git clone`한 뒤 **이 문서부터** 따라 하세요. 끝나면 [`docs/weekly/W02`](docs/weekly/W02_2026-09-14_개발환경구축및아키텍처설계.md)의 완료 기준(DoD)을 확인할 수 있는 상태가 됩니다.
+
+---
+
+## 0. 지금 저장소에 있는 것 / 없는 것
+
+| 있음 | 없음 (이 PC에서 새로 만든다) |
+|---|---|
+| 기획 · 설계 문서 `docs/` (범위 · 시나리오 40개 · 규칙/모드/이벤트 · 신호 → 액추에이터 지도) | Isaac Sim Scene (`worlds/`), 3D 자산 (`assets/`) |
+| 설정 파일 `config/thresholds.yaml` (시스템 상수) · `config/user_modes.yaml` (사용자 모드) | ROS 2 노드 · 제어기 코드 (`scripts/`), 런치 파일 (`launch/`) |
+| 주차 계획 `docs/weekly/W01–W15` | 시나리오 정의 `config/scenario_profiles.yaml`, 실험 결과 (`results/`) |
+
+목표 폴더 구조는 [`README.md` §10](README.md)에 있습니다.
+
+---
+
+## 1. 권장 구성 (2026-10 기준)
+
+| 항목 | 권장 | 비고 |
+|---|---|---|
+| OS | **Ubuntu 24.04 LTS** | Windows 11도 지원되지만 ROS 2 연동이 번거롭다(§9). 듀얼 부팅 권장 |
+| GPU | GeForce RTX 5070 Ti (Blackwell · 16 GB) | 아래 참고 |
+| NVIDIA 드라이버 | **595.58.03 이상** (Linux) / 595.97 이상 (Windows) | Isaac Sim 6.x 요구 버전. RTX 50 시리즈는 구버전 드라이버에서 인식 안 됨 |
+| Isaac Sim | **6.1.0** (작성 시점 최신 · pip 설치) | 설치 직전 [릴리스 노트](https://docs.isaacsim.omniverse.nvidia.com/latest/overview/release_notes.html)로 최신 안정판 확인 |
+| Python | **3.12** | Isaac Sim 6.x 런타임 · Ubuntu 24.04 · ROS 2 Jazzy가 모두 3.12 → 한 버전으로 통일 |
+| ROS 2 | **Jazzy** | Ubuntu 24.04 권장 조합 · 통신은 기본 Fast DDS |
+| RAM / 저장공간 | 32 GB 이상 / SSD 50 GB 이상 (권장 500 GB) | Isaac Sim 캐시 · 셰이더 캐시가 크다 |
+
+> **RTX 5070 Ti와 공식 사양:** Isaac Sim 6.x 문서의 최소 GPU는 RTX 4080(16 GB)입니다. 5070 Ti는 VRAM은 같고 성능은 비슷하거나 조금 낮습니다.
+> 원룸 Scene 하나는 충분하지만, 렌더 해상도와 레이 트레이싱 품질은 낮춰 두는 편이 안전합니다.
+> 이 프로젝트의 시나리오 대부분(32개)은 **Isaac Sim 없이 도는 고속 모드**라 GPU 영향을 거의 받지 않습니다([`docs/03` §5.3](docs/03_scenarios.md)).
+
+**버전은 설치 후 §10 기록표에 실제 값을 적고 팀원 모두 같은 조합을 씁니다.**
+
+---
+
+## 2. 사전 확인
+
+```bash
+nvidia-smi                       # 드라이버 버전 · GPU 인식 · CUDA 버전
+ldd --version | head -1          # GLIBC 2.35 이상 (pip 설치 조건)
+python3.12 --version             # Ubuntu 24.04 기본 탑재
+df -h ~                          # 여유 공간 50 GB 이상
+```
+
+드라이버가 낮으면 Ubuntu "추가 드라이버" 또는 `sudo ubuntu-drivers install`로 595 이상 production 브랜치를 설치하고 재부팅합니다.
+
+---
+
+## 3. 저장소 받기
+
+```bash
+mkdir -p ~/workspace && cd ~/workspace
+git clone <GitHub 저장소 URL> actuator_workspace
+cd actuator_workspace
+git config core.quotepath false   # 한글 파일명(docs/weekly)이 깨져 보이지 않게
+```
+
+---
+
+## 4. Isaac Sim 설치 (pip · 가상환경)
+
+```bash
+cd ~/workspace
+python3.12 -m venv env_isaacsim
+source env_isaacsim/bin/activate
+pip install --upgrade pip
+
+pip install "isaacsim[all,extscache]==6.1.0.0" --extra-index-url https://pypi.nvidia.com
+
+export OMNI_KIT_ACCEPT_EULA=YES                 # 첫 실행 전 EULA 동의 (~/.bashrc 에 추가 권장)
+isaacsim isaacsim.exp.compatibility_check       # 호환성 검사 앱 — GPU · 드라이버 판정 확인
+isaacsim                                        # 첫 실행은 셰이더 컴파일로 수 분 걸린다
+```
+
+- 대안: [워크스테이션 설치(zip)](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_workstation.html) → `./isaac-sim.sh` 실행, `./python.sh 스크립트.py`로 내장 Python 사용
+- `env_isaacsim/`은 저장소 **밖**(`~/workspace/`)에 둡니다 — `.gitignore`에도 등록되어 있지만, 저장소 안에 두면 검색 · 동기화가 느려집니다
+
+---
+
+## 5. ROS 2 Jazzy 설치 + Isaac Sim 브릿지
+
+공식 절차: [ROS 2 Jazzy — Ubuntu (deb)](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)
+
+```bash
+# 공식 절차대로 저장소 등록 후
+sudo apt install ros-jazzy-desktop ros-dev-tools
+sudo apt install ros-jazzy-vision-msgs ros-jazzy-ackermann-msgs   # Isaac Sim 예제가 쓰는 메시지
+
+echo 'source /opt/ros/jazzy/setup.bash' >> ~/.bashrc
+echo 'export ROS_DOMAIN_ID=7' >> ~/.bashrc                 # 팀 내 다른 PC와 충돌 방지 (임의 값)
+echo 'export RMW_IMPLEMENTATION=rmw_fastrtps_cpp' >> ~/.bashrc
+```
+
+**Isaac Sim 쪽:** `Window → Extensions`에서 **`isaacsim.ros2.bridge`** 활성화 (기본 활성).
+Ubuntu 24.04에서는 ROS를 source하지 않아도 Isaac Sim이 **내장 Jazzy 라이브러리**를 자동으로 씁니다.
+시스템 ROS 2를 source한 터미널에서 Isaac Sim을 실행해도 됩니다 — Python 3.12로 버전이 같기 때문입니다.
+
+**확인**
+```bash
+# 터미널 1: Isaac Sim 실행 → 빈 Stage에서 Play
+# 터미널 2:
+ros2 topic list          # /clock 등 Isaac Sim 토픽이 보이면 성공
+```
+
+---
+
+## 6. 프로젝트 Python 패키지 (고속 모드 · 분석)
+
+ROS 2 노드와 고속 모드 하네스는 **시스템 Python 3.12**(ROS 2 Jazzy와 같은 인터프리터)에서 돌립니다. Isaac Sim 가상환경과 분리합니다.
+
+```bash
+cd ~/workspace/actuator_workspace
+python3.12 -m venv --system-site-packages .venv     # rclpy(ROS 2)를 그대로 보이게
+source .venv/bin/activate
+pip install -r requirements.txt
+python -c "import yaml; yaml.safe_load(open('config/thresholds.yaml')); print('config ok')"
+```
+
+---
+
+## 7. 첫날 검증 체크리스트 (W02 리스크 항목)
+
+| # | 확인 | 방법 | 실패 시 |
+|---|---|---|---|
+| 1 | 드라이버 · GPU | `nvidia-smi` · 호환성 검사 앱 | 드라이버 595+ 재설치 |
+| 2 | Isaac Sim 실행 | 빈 Stage → Play, 큐브 낙하 | 셰이더 캐시 삭제 후 재실행 · 로그(`~/.nvidia-omniverse/logs`) 확인 |
+| 3 | ROS 2 브릿지 | `ros2 topic list`에 `/clock` | `isaacsim.ros2.bridge` 활성화 · `ROS_DOMAIN_ID` 일치 확인 |
+| 4 | ⚠️ **Effort Sensor API** | 아래 스크립트 | **센서리스 창문 제어의 전제** — 대체 API로 검증 ([`docs/04`](docs/04_sensorless_window_control.md)) |
+| 5 | 브릿지 PoC | 토픽으로 큐브 하나 움직이기 (`scripts/poc_bridge.py`) | 실패 원인 기록 → 파일 · 소켓 IPC 대체안 |
+
+**4번 — Effort Sensor 확인** (Isaac Sim `Window → Script Editor`에서 실행)
+```python
+import omni.kit.app
+mgr = omni.kit.app.get_app().get_extension_manager()
+print(sorted(e["id"] for e in mgr.get_extensions() if "sensor" in e["id"]))
+# 기대: isaacsim.sensors.experimental.physics (또는 이름이 바뀐 physics 센서 확장)
+```
+- 확장 이름이 바뀌었으면 **실제 경로를 §10 기록표와 [`docs/04`](docs/04_sensorless_window_control.md)에 적습니다**
+- 대체안: Articulation의 `get_measured_joint_efforts()` (DOF 힘 센서 활성화 필요)
+- 최소 검증: Prismatic 조인트를 벽에 밀었을 때 힘 값이 올라가는지
+
+---
+
+## 8. 작업 시작 — 폴더 만들기와 순서
+
+```bash
+cd ~/workspace/actuator_workspace
+mkdir -p worlds assets scripts/controller launch results
+```
+
+| 순서 | 내용 | 근거 문서 |
+|---|---|---|
+| ① | 환경 구성 · 검증 (이 문서) | W02 |
+| ② | 원룸 Scene (3.5 × 5 m) · 창문 랙-피니언 · 문 · 존 | W03 · [`docs/02`](docs/02_scope_definition.md) |
+| ③ | 액추에이터 모듈 · 조인트 구동 · 센서 측정점 | W04 · W05 |
+| ④ | **고속 모드 환경 모델 + 하네스를 먼저** — 시나리오 대부분이 여기서 돈다 (일정 최대 리스크) | W08 · W10 · [`docs/00`](docs/00_project_schedule.md) 리스크 1 |
+| ⑤ | 가상 센서 노드 → 제어기(모드 · 규칙 · 이벤트 · 중재) | W06–W09 · [`docs/07`](docs/07_modes_rules_events.md) |
+
+> 일정상 오늘(2026-10-06)은 W05입니다. 환경 구성이 끝나면 [`docs/00_project_schedule.md`](docs/00_project_schedule.md)의 W02–W05 항목을 함께 따라잡습니다.
+
+**처음 읽을 문서:** [`README.md`](README.md) → [`docs/09_signal_actuator_map.md`](docs/09_signal_actuator_map.md) (한 장 요약) → [`docs/02`](docs/02_scope_definition.md) (토픽 52개 · 가정) → [`docs/07`](docs/07_modes_rules_events.md) (규칙 · 이벤트) → [`docs/03`](docs/03_scenarios.md) (시나리오 · 판정 기준)
+
+---
+
+## 9. Windows 11에서 할 경우 (대안)
+
+- Isaac Sim 6.x는 Windows 11을 지원합니다(Windows 10 미지원). 드라이버 595.97 이상
+- ROS 2는 **Pixi 기반 Jazzy**가 공식 권장 경로입니다 — [Isaac Sim ROS 2 설치 문서](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_ros.html)의 Windows 절
+- WSL2 + Humble 방식은 공식 문서에서 **사용 중단 예정(deprecated)** 으로 표시되어 있어 권장하지 않습니다
+- 셸 예시는 `export` 대신 `set` (`set OMNI_KIT_ACCEPT_EULA=YES`)
+
+---
+
+## 10. 버전 기록표 — 설치 후 실제 값으로 채운다
+
+| 항목 | 값 | 확인일 · 담당 |
+|---|---|---|
+| OS / 커널 | | |
+| NVIDIA 드라이버 / CUDA | | |
+| Isaac Sim | | |
+| Python (Isaac Sim / 시스템) | | |
+| ROS 2 배포판 · RMW | | |
+| Effort Sensor 확장 경로 | | |
+| 호환성 검사 결과 | | |
+
+---
+
+## 11. 자주 막히는 곳
+
+| 증상 | 원인 · 해결 |
+|---|---|
+| Isaac Sim 시작 직후 CUDA · RTX 초기화 오류 | 드라이버가 Blackwell을 지원하지 않는 버전 → 595+ 설치 |
+| `ros2 topic list`에 아무것도 안 보임 | 브릿지 확장 비활성 · `ROS_DOMAIN_ID` 불일치 · 방화벽(DDS 포트) |
+| 브릿지가 라이브러리를 못 찾음 | 내장 라이브러리 사용 시 `LD_LIBRARY_PATH`에 `<isaac_sim 경로>/exts/isaacsim.ros2.core/jazzy/lib` 추가 |
+| 한글 파일명이 `\354\236...`로 보임 | `git config core.quotepath false` |
+| `config/*.yaml` 수정 후 ROS 2 파라미터 로드 실패 | 키가 숫자로 시작하거나 `null` 값이 있음 — `thresholds.yaml`은 ROS 2 규칙(숫자 키 금지 · null 대신 -1.0)을 지킨다 |
+
+---
+
+**참고 (설치 문서):**
+[Isaac Sim 요구 사양](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/requirements.html) ·
+[Isaac Sim pip 설치](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_python.html) ·
+[Isaac Sim ROS 2 설치](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_ros.html) ·
+[ROS 2 Jazzy 설치](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)

@@ -1,0 +1,27 @@
+# 로컬 보관 (옛 발표 구성안 · 부품 사진) — 저장소에서 제외
+_archive/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+env_isaacsim/
+.pytest_cache/
+
+# 실험 산출물 (용량이 커서 별도 공유)
+results/
+logs/
+*.log
+*.bag
+*.mcap
+
+# Isaac Sim · USD 임시 파일
+*.usd.bak
+.thumbs/
+
+# 편집기 · OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

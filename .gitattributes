@@ -1,0 +1,11 @@
+# Windows에서 작성하고 Ubuntu에서 실행하므로 텍스트는 LF로 통일
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.usd binary
+*.usdc binary
+
+# 3D 자산이 커지면 Git LFS 사용 (git lfs install 후 주석 해제)
+# *.usd  filter=lfs diff=lfs merge=lfs -text
+# *.usdc filter=lfs diff=lfs merge=lfs -text

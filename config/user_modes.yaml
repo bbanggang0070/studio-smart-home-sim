@@ -1,0 +1,167 @@
+# ============================================================================
+#  사용자 모드 설정 (User Modes)  --  v1.0 (2026-10-05) · 기획 v3.0
+# ----------------------------------------------------------------------------
+#  설계 근거: docs/07_modes_rules_events.md §2
+#
+#  ★ 이 파일은 "사용자가 바꿔도 되는 것"만 담는다.
+#    안전 · 결로 · 기기 보호 · 재실 중 최소 환기 하한 등 바꾸면 안 되는 값은 thresholds.yaml 에 있다.
+#    (파일을 물리적으로 분리해 "사용자가 바꿀 수 없는 것"을 구조로 보장한다)
+#
+#  ★ ROS 2 파라미터 파일이 아니다. mode_manager.py 가 일반 YAML로 읽는다.
+#    로드 시 각 값은 `editable_ranges` 범위로 클램프되고, 벗어나면 경고를 발행한다.
+#
+#  [주의] YAML 1.1에서 on/off/yes/no 는 boolean으로 파싱된다. 키 이름으로 쓰지 않는다.
+# ============================================================================
+
+version: 1
+
+# ---- 현재 모드 / 전환 정책 ---------------------------------------------------
+active_mode: AUTO                  # NORMAL | STUDY | NIGHT | SLEEP | AWAY | AUTO
+
+switching:
+  priority: [manual, schedule, auto]   # 수동 > 스케줄 > AUTO
+  manual_hold_until: next_schedule_boundary_or_departure
+  auto_hysteresis_min: 10.0        # 자동 전환에만 적용 (수동은 즉시)
+  away_auto_enabled: true          # 무재실 지속 시 AWAY 자동 전환 (E8)
+  away_after_vacancy_min: 15.0    # [v3.2] 폴백 전용 — 정상일 때는 문 닫힘 후 판정 창(3분)에서 외출 확정 (thresholds occupancy.door_gating)
+  return_to_previous_on_arrival: true   # 귀가(E7) 시 직전 모드로 복귀
+  precool_before_arrival_min: 30.0      # 귀가 예약 시 프리쿨링 (AWAY)
+  arrival_schedule: null                # 예: "18:30" (시뮬레이션에서는 시나리오 입력)
+
+# ---- 에너지 옵션 (v3.1) --------------------------------------------------------
+energy:
+  comfort_weight: 1.0              # 프리쿨링 기대비용의 쾌적 가중치 λ (클수록 일찍 켬 — 에너지↑ 쾌적↑)
+  precool_quantile_fallback: 0.2   # 예측 데이터가 부족한 초기에만 쓰는 고정 분위수 규칙
+  away_strategy: auto              # auto(T* 기반 셋백/끄기) | setback | off
+  progressive_tariff_guard: false  # 하계 누진 구간 방어 (선택)
+  power_limit_w: 3000.0            # 우리 집 전력 한도 — 계약전력 · 차단기에 맞게
+
+# ---- 소음 등급 → 장치별 상한 ------------------------------------------------
+#  모드는 장치별 상한 대신 등급 하나만 지정한다. N3은 이벤트(요리) 전용.
+noise_grades:
+  N0:   # 수면
+    exhaust_fan_max_rpm: 600.0
+    intake_fan_max_rpm: 700.0      # ≈ 21 m3/h — 수면 기본 환기 16 m3/h 충분 [v3.4]
+    ceiling_fan_max_speed: low
+    ac_fan_max: low
+    purifier_max_level: 1
+    dehumidifier_allowed: false
+    range_hood_max_level: 0
+  N1:   # 조용
+    exhaust_fan_max_rpm: 1000.0
+    intake_fan_max_rpm: 1200.0
+    ceiling_fan_max_speed: low
+    ac_fan_max: mid
+    purifier_max_level: 2
+    dehumidifier_allowed: false
+    range_hood_max_level: 1
+  N2:   # 보통
+    exhaust_fan_max_rpm: 1400.0
+    intake_fan_max_rpm: 2000.0
+    ceiling_fan_max_speed: high
+    ac_fan_max: auto
+    purifier_max_level: 3
+    dehumidifier_allowed: true
+    range_hood_max_level: 1
+  N3:   # 제한 없음 — 모드로 선택 불가, E1(요리) 중 임시 적용
+    exhaust_fan_max_rpm: 2000.0
+    intake_fan_max_rpm: 2000.0
+    ceiling_fan_max_speed: high
+    ac_fan_max: high
+    purifier_max_level: 3
+    dehumidifier_allowed: true
+    range_hood_max_level: 2
+    selectable_as_mode: false
+
+# ---- 모드 정의 ---------------------------------------------------------------
+modes:
+
+  NORMAL:
+    label: "일반"
+    lighting: { target: ceiling, lux: 400.0, cct_k: 4000.0 }
+    cooling_setpoint_c: 26.0
+    humidity_range_pct: [40.0, 60.0]
+    base_vent_m3h: 25.0            # [v3.4] 재실 기본 환기 (1인 기준) — CO2 상한 대체
+    noise_grade: N2
+    window_policy: normal          # normal | prefer | close
+    blind_policy: daylight         # daylight | glare_cut | privacy | night_cooling | default
+    forbidden: []
+
+  STUDY:
+    label: "공부"
+    lighting: { target: desk, lux: 600.0, cct_k: 5500.0, ceiling_lux: 300.0 }
+    cooling_setpoint_c: 25.0
+    humidity_range_pct: [40.0, 60.0]
+    base_vent_m3h: 40.0            # 집중 — 800 ppm 상당 (Satish et al. 2012)
+    noise_grade: N2
+    window_policy: normal
+    blind_policy: glare_cut
+    forbidden: []
+
+  NIGHT:
+    label: "야간"
+    lighting: { target: room, lux: 150.0, cct_k: 3000.0 }
+    cooling_setpoint_c: 26.0
+    humidity_range_pct: [40.0, 60.0]
+    base_vent_m3h: 25.0
+    noise_grade: N1
+    window_policy: normal
+    blind_policy: privacy          # 닫힘. 단 결로 경고 시 슬랫 45°, 위험 시 0° (thresholds.yaml events.condensation)
+    forbidden: [range_hood_high]
+
+  SLEEP:
+    label: "수면"
+    lighting: { target: room, lux: 30.0, cct_k: 2700.0, off_after_min: 15.0 }
+    cooling_setpoint_c: 27.0
+    ceiling_fan: { direction: forward, speed: low }   # 냉방 시즌에만
+    humidity_range_pct: [45.0, 60.0]
+    base_vent_m3h: 16.0            # N0 흡기 상한 안 · 미달 시 E4 (thresholds.yaml)
+    noise_grade: N0
+    window_policy: prefer          # 소음 회피 — 팬보다 창문 우선
+    blind_policy: night_cooling    # 여름 야간 복사냉각 시 개방, 그 외 닫힘
+    forbidden: [dehumidifier, range_hood, purifier_level_2_plus]
+
+  AWAY:
+    label: "외출"
+    lighting: { target: none, lux: 0.0, cct_k: 0.0 }
+    cooling_setpoint_c: null       # 냉방 정지 (귀가 예약 시 precool_before_arrival_min 전 기동)
+    humidity_range_pct: [null, 70.0]   # 곰팡이 방지 상한만
+    base_vent_m3h: 0.0             # 무재실 — 결로 · 곰팡이 방지만
+    noise_grade: null
+    window_policy: close           # 보안
+    blind_policy: default          # 30°
+    forbidden: [humidifier, lights, ceiling_fan, purifier]
+
+  AUTO:
+    label: "자동"
+    # 시스템이 위 5개 중 하나를 고른다 (v2.1 자동 판정 계승)
+    rules:
+      - select: STUDY
+        when: { occupied: true, zone: desk, time: ["08:00", "22:00"] }
+      - select: SLEEP
+        when: { occupied: true, zone: bed, time: ["23:00", "07:00"] }
+      - select: NIGHT
+        when: { occupied: true, zone_not: desk, time: ["21:00", "24:00"] }
+      - select: AWAY
+        when: { event: DEPARTURE }
+      - select: NORMAL
+        when: { default: true }
+
+# ---- 스케줄 (선택) -----------------------------------------------------------
+schedule:
+  enabled: false
+  entries:
+    - { days: [mon, tue, wed, thu, fri], at: "23:30", mode: SLEEP }
+    - { days: [mon, tue, wed, thu, fri], at: "07:00", mode: NORMAL }
+
+# ---- 사용자 설정 가능 범위 (로드 시 클램프) -----------------------------------
+editable_ranges:
+  cooling_setpoint_c: [24.0, 28.0]
+  sleep_cooling_setpoint_c: [25.0, 28.0]
+  base_vent_m3h: [15.0, 50.0]      # [v3.4] 하한 15는 thresholds.yaml base_ventilation.hard_min_m3h
+  humidity_low_pct: [30.0, 50.0]
+  humidity_high_pct: [50.0, 65.0]  # 가습은 결로 규칙 I4가 추가로 제한
+  lux_scale: [0.7, 1.3]
+  cct_k: [2700.0, 6500.0]
+  noise_grade_selectable: [N0, N1, N2]
+  auto_time_step_min: 30

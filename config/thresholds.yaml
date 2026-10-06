@@ -1,0 +1,673 @@
+# ============================================================================
+#  제어 기준값 (Control Thresholds)  --  T1.3 산출물 / v3.1 (2026-10-05)
+# ----------------------------------------------------------------------------
+#  W01 프로젝트 발표 피드백 3건 반영 개정판.
+#    ① 시나리오 재설계(16->17) → 습도 정책 / 우천·미세먼지 인터록 / 제어 가능성 판정
+#    ② 센서 최소화              → PIR+mmWave 융합 파라미터, 책상 조도 추정 모델
+#    ③ 센서리스 창문 제어        → window_safety(초음파) 삭제, window_sensorless 신설
+#
+#  사용:  ros2 run <pkg> smart_home_controller_node --ros-args --params-file config/thresholds.yaml
+#
+#  [원칙] 제어 상수는 코드에 하드코딩하지 않는다. 값 변경은 이 파일에서만 한다.
+#  v2.1 추가 — 선행연구 정리 문서 반영
+#    · 안전 로직 2계층 분리 (로컬 엣지 즉시 반응)
+#    · 모드를 전역 목표값 세트로 승격 (조명 전용 -> 전 장치)
+#    · 외기 미세먼지 등급 제약 (에어코리아 API, 부품비 0원)
+#    · 2단 제어 주기 (안전 20Hz / 환경 정책 저속)
+#    · 설치 환경 프로파일 (방위/반지하) 보정 -- 구조만, 기본 비활성
+#
+#  v3.0 추가 — 가전 편입 재설계 (docs/06_appliance_integration.md · docs/07_modes_rules_events.md)
+#    · 센서 +2 (CO2 NDIR · PM2.5 레이저) / 액추에이터 +6 (가전 편입)
+#    · 이벤트 9종 · 상호작용 규칙 I1-I7 · 수단 사다리 · 6계층 중재
+#    · 생활 모드 → config/user_modes.yaml 로 이동 (사용자 설정 / 시스템 상수 분리)
+#    · ★ 이 파일의 값은 사용자가 바꿀 수 없다 (안전 · 결로 · 기기 보호 · 재실 중 최소 환기)
+#
+#  v3.1 추가 — 피드백 2 반영 (docs/08_multisignal_energy.md)
+#    · 재실 = mmWave + 휴대폰 Wi-Fi + 가전 전력 (PIR 제거)
+#    · 가상 CO2 (NDIR은 보정용) · 가상 조도 (페일세이프) · 쿡탑 전력 요리 선제 감지
+#  [v3.4] CO2 측정 · 계산 폐지 → 재실 기본 환기 · E3 샤워 · E4 기본 환기 미달 · I10 이슬점 비교 환기 제습 · 회복 원칙
+#    · 전력 상태 머신 · 이벤트 E10-E13 · 규칙 I8 I9 · 우선 목표 + 허용 손실 예산 · 30분 예측 검사
+#    · 에너지 예측 · 프리쿨링 · 셋백 vs 끄기 · 전력 한도 · 2R2C 열모델 · 빨래 건조 모델 · 제습기 잠열 정정
+#
+#  [상태] draft — W09(통합 제어기) / W10(센서리스) / W11-W12(시나리오)에서 튜닝 후 확정한다.
+# ============================================================================
+
+smart_home_controller:
+  ros__parameters:
+
+    # ---- 제어 루프 (2단 주기) ---------------------------------------------
+    #  [v2.1] 안전과 환경 정책의 주기를 분리한다.
+    #  근거: 온도·습도는 느린 물리량이라 고속 판단이 불필요하고, 느린 주기가 채터링을 줄인다.
+    #        안전만 빨라야 한다.
+    safety_rate_hz: 20.0         # 안전 계층 — 끼임·우천·미세먼지 인터록
+    policy_rate_hz: 1.0          # 환경 정책 계층 — 온도·습도·조도 판단 (1초 주기)
+    current_sample_rate_hz: 50.0 # 모터 전류 샘플링 (리플 카운팅 입력)
+    control_rate_hz: 20.0        # (하위호환) 안전 계층과 동일
+
+    # ---- 조도 (Illuminance) ---------------------------------------------
+    illuminance:
+      light_on_lux: 250.0        # 이하 → 재실 시 조명 점등 개시
+      light_off_lux: 320.0       # 이상 → 조명 소등 (데드밴드 70 lux)
+      over_bright_lux: 700.0     # 이상 → 블라인드 차광 시작
+      shade_release_lux: 620.0   # 이하 → 차광 해제 (데드밴드 80 lux)
+      comfort_min_lux: 250.0     # 평가 지표용 목표 범위 하한
+      comfort_max_lux: 700.0     # 평가 지표용 목표 범위 상한
+
+    # ---- 온도 (Temperature) ---------------------------------------------
+    temperature:
+      vent_on_c: 28.0            # 이상 → 환기 제어 시작
+      vent_off_c: 25.0           # 이하 → 환기 종료 (히스테리시스 폭 3.0 °C)
+      comfort_min_c: 22.0
+      comfort_max_c: 28.0
+      min_state_hold_s: 30.0     # 환기 ON/OFF 최소 유지 시간 (채터링 2차 방지)
+
+    # ---- 습도 (Humidity) ------------------------------------------------
+    #  [신설 v2.0] 시나리오 C1(고온다습) / C6(결로 방지)를 위해 추가.
+    humidity:
+      vent_on_pct: 70.0          # 이상 → 제습 환기 시작
+      vent_off_pct: 60.0         # 이하 → 종료 (데드밴드 10 %RH)
+      comfort_min_pct: 40.0
+      comfort_max_pct: 70.0
+      condensation_risk_pct: 80.0  # 이상 + 저온 → C6 간헐 환기 모드
+      min_state_hold_s: 60.0
+
+    # ---- 외부 기상 (Weather) --------------------------------------------
+    #  [신설 v2.0] 시뮬레이션에서는 시나리오 입력, 실제 구현 시 기상청 단기예보 API.
+    #  조도 센서로는 알 수 없는 정보이므로 창문 제어의 독립 입력으로 둔다.
+    weather:
+      rain_interlock_enabled: true   # 강우 시 창문 개방 금지
+      rain_close_delay_s: 5.0        # 강우 감지 → 폐쇄 개시까지
+      rain_clear_hold_s: 300.0       # 비 그친 후 재개방까지 대기 (오판 방지)
+
+    # ---- 외기 공기질 (Outdoor Air Quality) -------------------------------
+    #  [신설 v2.1] 시나리오 C8. 에어코리아 대기오염정보 API — 부품비 0원.
+    #  [개정 v3.0] 실내 PM2.5 센서(PMS7003) 도입. 외기 등급은 API + 실측 교차 확인.
+    #              필터 흡기팬으로 양압 환기가 가능해졌다 (규칙 I7) — v2.1 '팬 정지 = 수단 소진' 해소.
+    #
+    #  ★ 우천과 결정적으로 다른 점: 팬이 대체 수단이 되지 못한다.
+    #    배기팬만 돌리면 실내가 음압이 되어 창틀·문틈으로 오염 외기가 유입된다.
+    #    즉 팬을 돌릴수록 악화된다. C1(우천)에서는 팬이 역할을 인수했지만 여기서는 정반대다.
+    air_quality:
+      enabled: true
+      source: 'airkorea_api'        # 시뮬레이션에서는 시나리오 입력
+      # 등급별 창문 개방 상한 / 팬 RPM 상한 (등급형 제약 — 이진이 아니다)
+      #  fan_max_rpm = 배기팬. 단 급기 없는 배기는 bad 이상에서 금지 (I7)
+      grade_policy:
+        good:      { window_max_pct: 100.0, fan_max_rpm: 2000.0, require_positive_pressure: false }
+        moderate:  { window_max_pct:  40.0, fan_max_rpm: 1400.0, require_positive_pressure: false }
+        bad:       { window_max_pct:   0.0, fan_max_rpm:  600.0, require_positive_pressure: true }
+        very_bad:  { window_max_pct:   0.0, fan_max_rpm:    0.0, require_positive_pressure: true }
+      grade_bounds_ugm3: [15.0, 35.0, 75.0]   # 환경부 PM2.5 예보 등급 (좋음|보통|나쁨|매우나쁨 경계)
+      cross_check_with_indoor: true           # API 등급 급변 시 실내 센서 추세로 교차 확인
+      grade_debounce_s: 60.0        # 등급 변동 채터링 방지
+      improve_hold_s: 300.0         # 등급 개선 후 완화까지 대기 (오판 방지)
+
+    # ---- 창문 센서리스 제어 (Window Sensorless Anti-pinch) ---------------
+    #  [전면 개정 v2.0] 초음파 HC-SR04 제거. 전류 리플 기반으로 전환.
+    #  설계 근거: docs/04_sensorless_window_control.md
+    #
+    #  ⚠️ 안전 개념이 바뀌었다: "접촉 전 예방"이 아니라 "접촉 후 피해 최소화"다.
+    #     따라서 목표 지표는 인터록 반응시간이 아니라 최대 접촉 반력이다.
+    window_sensorless:
+
+      # -- 기구 제원 (랙-피니언 / KR20090056308A 방식) --------------------
+      mechanism: 'rack_and_pinion'      # 창틀 하부 랙 + 패널 모터·피니언
+      pinion_radius_m: 0.010            # 피니언 유효 반경
+      gear_ratio: 30.0                  # 감속비
+      commutator_ripple_per_rev: 10     # 정류자 리플 수/회전 (5극 × 2)
+      torque_constant_nm_per_a: 0.012   # 모터 토크 상수 K_t
+      mechanical_efficiency: 0.65       # 기어 + 랙피니언 효율
+      travel_length_m: 0.70             # 창문 유효 이동 거리
+      no_load_current_a: 0.12           # 무부하 전류 I_0
+      # → 리플 1개당 이동량 = 2*pi*r/(G*N_c) = 0.209 mm, 전 행정 약 3,350 리플
+
+      # -- 위치 구간별 토크 프로파일 (Zone A~D) ---------------------------
+      #  "처음엔 토크를 크게, 서서히 작게" + 엔드존 램프 보상
+      torque_profile:
+        start_zone_pct: [0.0, 5.0]      # A 기동: 정지마찰 극복
+        run_zone_pct: [5.0, 85.0]       # B 주행: 감지 활성 구간
+        endzone_pct: [85.0, 97.0]       # C 엔드존: 씰 접근, 임계값 보상
+        seal_zone_pct: [97.0, 100.0]    # D 밀착: 폐쇄 방향만, 감지 비활성
+
+        start_torque_pct: 100.0
+        run_torque_start_pct: 100.0     # B 구간 시작 토크
+        run_torque_end_pct: 55.0        # B 구간 종료 토크 (선형 점감)
+        endzone_torque_pct: 70.0        # C 구간 재상승
+        seal_torque_pct: 100.0
+
+        start_blanking_ms: 150          # A 구간 감지 블랭킹 (오검출 방지)
+        seal_zone_applies_to: 'closing' # D는 폐쇄 방향에만 적용
+
+      # -- 끼임 판정 -------------------------------------------------------
+      pinch_detection:
+        delta_i_threshold_run_a: 0.25      # B 구간 전류 초과 허용량
+        delta_i_threshold_endzone_a: 0.45  # C 구간 (씰 마찰 보상)
+        speed_drop_ratio: 0.35             # 기준 속도 대비 35% 이상 감속 시
+        debounce_ms: 30                    # 판정 지속 시간
+        max_contact_force_n: 100.0         # 목표 상한 (FMVSS 118 참조 기준)
+        reverse_distance_m: 0.050          # 끼임 후 반전 거리
+        repeat_lock_count: 2               # 동일 위치 2회 끼임 → 방향 잠금
+
+      # -- 엔드존 램프 검출 -------------------------------------------------
+      #  끼임(급격한 계단) vs 씰 압착(완만한 램프) 구분
+      endzone_detection:
+        position_gate_pct: 85.0         # 위치 조건
+        min_ramp_distance_m: 0.020      # 램프가 20 mm 이상 지속되어야 엔드존
+        max_pinch_rise_distance_m: 0.005 # 5 mm 이내 급상승은 끼임으로 판정
+
+      # -- 적응형 임계값 ----------------------------------------------------
+      #  온도·마모·씰 경화에 따른 정상 전류 드리프트를 보상
+      adaptive_threshold:
+        enabled: true
+        learn_window: 5                 # 정상 완주 최근 N회로 학습
+        alpha: 0.2                      # 지수이동평균 계수
+        position_bin_m: 0.020           # 위치 bin 크기
+        exclude_pinch_runs: true        # 끼임 발생 주행은 학습 제외
+
+      # -- 리플 추정 모델 (시뮬레이션 전용) -----------------------------------
+      #  ⚠️ 리플 주파수 239 Hz > 물리 스텝. 해석적으로 합성한다.
+      #     위치 추정은 ground truth에 불확실성을 주입해 모사한다.
+      ripple_estimation:
+        oversample: 8                   # 물리 1스텝을 N등분해 리플 합성
+        ripple_amplitude: 0.15          # 리플 진폭 비율 A_r
+        current_noise_sigma_a: 0.02     # 전류 측정 노이즈
+        miscount_rate_pct: 0.3          # 리플 미스카운트율 (드리프트 원인)
+        position_noise_sigma_m: 0.00015
+        resync_at_hard_stop: true       # 완전 개폐 시 카운터 재동기화
+        # [백업 플랜 B-4] W10에서 위치 오차가 목표(5 mm)를 넘으면 홀센서(A3144)+자석
+        #   2개(약 3,000원)를 완전개방/폐쇄 지점에 추가해 기준점을 확보한다.
+        #   선행연구(저비용 설계정리 §2-3)의 방식. 채택 시 아래를 true로.
+        hall_reference_enabled: false
+        hall_reference_cost_krw: 3000
+
+      # -- 안전 계층 분리 (A-2) ---------------------------------------------
+      #  [신설 v2.1] 선행연구 원칙: "안전 로직은 통신 왕복 없이 액추에이터 컨트롤러에서 즉시 처리"
+      #
+      #  로컬 계층 : isaac_actuator_bridge 내부 (물리 스텝 안) — ROS 2 왕복 없음
+      #             → 전류 임계 초과 시 즉시 모터 정지. 반응 시간 = 물리 스텝 1회
+      #  상위 계층 : smart_home_controller (ROS 2)
+      #             → SAFETY_HOLD 진입 · 반전 시퀀스 · 역할 재분배 · 방향 잠금 판정
+      #
+      #  이유: 상위 계층만 두면 ROS 2 토픽 왕복(측정 100 ms 이하)이 안전 반응 경로에 들어간다.
+      layered_safety:
+        local_cutoff_enabled: true       # 브릿지 단 즉시 차단 활성
+        local_cutoff_current_a: 1.80     # 로컬 하드 컷오프 (상위 판정보다 보수적)
+        local_cutoff_force_n: 120.0      # 반력 기준 백업 컷오프
+        local_acts_in_physics_step: true # 물리 콜백 내부에서 실행 (통신 없음)
+        report_only_upstream: true       # 로컬은 정지만, 정책 판단은 상위가 담당
+        upstream_timeout_ms: 500         # 상위 응답 없으면 로컬이 정지 유지
+
+      # -- 페일세이프 -------------------------------------------------------
+      fail_safe:
+        on_current_signal_loss: 'hold'  # 전류 신호 유실 시 창문 이동 금지
+        max_run_time_s: 20.0            # 워치독: 이 시간 초과 시 강제 정지
+        stall_timeout_ms: 500           # 속도 0 지속 시 정지
+
+    # ---- 재실 / 절전 (Occupancy) ----------------------------------------
+    #  [개정 v2.0] PIR 단독 → PIR+mmWave 융합. "PIR-validates, mmWave-holds"
+    occupancy:
+      #  [개정 v3.1] PIR 제거. Wi-Fi · 가전 전력이 mmWave 오검출을 교차 검증한다 (docs/08 §1)
+      fusion_strategy: 'wifi_power_validate_mmwave_holds'
+      wifi_presence:
+        evidence_valid_min: 30.0       # Wi-Fi 단독 증거 유효 시간 — 휴대폰을 두고 나간 경우 대비
+        sim_arrival_delay_s: [-30.0, 60.0]   # 시뮬레이션: 귀가 시 접속 지연 (음수 = 복도에서 먼저 접속)
+        sim_doze_rate_per_h: 0.3       # 절전 끊김 발생률 (수면 중 0.6)
+        sim_doze_duration_min: [1.0, 10.0]
+        sim_phone_left_prob: 0.02
+      power_evidence_devices: [cooktop, pc, washer]   # '사람이 켜는' 기기의 전력 변화 = 재실 증거
+      departure_confirm_min: 15.0      # [v3.2] 폴백 전용 — 세 신호 모두 없음 15분 → 외출 확정 (수면 모드 제외)
+      #  [신설 v3.2] 문 이벤트 기반 판정 (호텔 객실 로직, docs/08 §1.0)
+      #  재실 상태는 문이 열릴 때만 바뀐다. 문이 닫힌 직후 판정 창에서 사람 증거를 확인해 다음 문 열림까지 고정.
+      door_gating:
+        enabled: true
+        sensor: 'reed_switch'            # reed_switch | doorlock_event
+        open_angle_deg: 5.0              # Isaac Sim entrance_door 개방 각도 > 5° = 열림
+        judge_window_s: 180.0            # 문 닫힘 후 판정 창 3분
+        judge_evidence: ['mmwave_moving', 'mmwave_static', 'person_appliance_power', 'manual_control']
+        #  [v3.2.1] 판정 창 증거 강도 — 외출 직후 벽 너머(옆집) 오검출 방지 (docs/08 §1.0)
+        evidence_strength:
+          strong: ['inner_gate_moving', 'inner_gate_static_60s', 'person_appliance_power', 'manual_control']
+          weak: ['wall_gate_static', 'wall_gate_moving']
+          inner_static_hold_s: 60.0
+          weak_only_extend_max_s: 600.0      # 약한 증거만이면 판정 창을 최대 10분까지 연장
+          wifi_disconnect_is_vacancy_evidence: true
+        wifi_counts_as_evidence: false   # 휴대폰을 두고 나간 경우를 걸러내기 위해 판정 창 증거에서 제외
+        door_left_open_fallback_min: 10.0
+        vacant_mmwave_poll_hz: 0.1       # 빈방 고정 중 mmWave는 문 센서 감시용으로만 저속 판독
+        fault_detection:
+          contradiction: 'vacant_latched_and_mmwave_moving_and_person_power'
+          missing_events_hours: 24.0     # Wi-Fi 접속/해제는 있는데 문 이벤트가 없음
+          wifi_transitions_min: 2
+        fallback: 'fusion_24h'           # 고장 · 문 열어 둠 → v3.1 융합 규칙
+      vacancy_timeout_s: 60.0      # [변경] 300 → 60초.
+                                   #   v1.0의 300초는 "PIR이 정지 인체를 놓치므로" 보정용이었다.
+                                   #   mmWave가 정지 인체를 잡으므로 단축 가능.
+                                   #   현재 목적은 오검출 채터링 억제다.
+      # pir_debounce_s — v3.1 PIR 제거로 삭제
+      mmwave_hold_s: 3.0           # mmWave 신호 유실 허용 시간
+      require_all_clear: true      # 퇴실 판정에 mmWave · Wi-Fi · 전력 모두 클리어 요구
+
+      # -- mmWave 거리 게이트 → 영역 매핑 (센서 1개로 영역 구분) --------------
+      zone_gates:
+        desk: [2, 3]               # 1.5 ~ 3.0 m
+        bed: [5, 6]                # 3.75 ~ 5.25 m
+      gate_size_m: 0.75            # LD2410 게이트 단위 (0-8번, 최대 약 6 m)
+      #  [신설 v3.2.1] mmWave 자동 보정 — 사용자는 숫자를 넣지 않는다 (docs/08 §1.0)
+      mmwave_calibration:
+        room_depth_m: 5.25               # 걷기 보정 전 기본값 → 감지 거리 상한 = 6번 구간
+        walk_calibration: { enabled: true, max_duration_s: 60.0, rerun_on: 'user_request' }
+        vacant_calibration:
+          trigger_vacant_min: 120.0      # 빈방 고정 2시간 이상 이어질 때마다
+          sessions_kept: 6
+          min_sessions_to_apply: 2
+          require_time_bands: ['day', 'night']
+          percentile: 99.0
+          margin: 10.0                   # LD2410 에너지 단위 (0-100)
+          max_step_per_update: 15.0
+          zone_gate_cap: 60.0            # 책상 · 침대 구간 감도 상한 — 사람을 못 잡게 되는 것 방지
+          discard_if_inner_energy_gt: 40.0
+        apply_as: 'software_threshold'   # 센서에 쓰지 않음 — 판정 창은 보수적, 수면 판단은 민감하게 별도 적용
+      zone_debounce_s: 2.0         # 영역 전환 채터링 방지
+
+      saving_fan_rpm: 0.0          # 절전 모드 팬 (0 = 정지)
+
+    # ---- 조명 모델 및 캘리브레이션 (Lighting Model) ------------------------
+    #  [신설 v2.0] Light Prim의 intensity는 lux가 아니라 렌더러 상대 단위다.
+    #  intensity ↔ lux 매핑을 여기서 정의한다. W05 캘리브레이션으로 확정.
+    lighting_model:
+      ceiling_lux_at_full: 380.0   # 천장등 100% 시 바닥 중앙 조도 [lux]  (TBD W05)
+      desk_lux_at_full: 520.0      # 스탠드 100% 시 책상면 조도 [lux]    (TBD W05)
+      distance_falloff: 'inverse_square'
+      ceiling_to_desk_k_geo: 0.72  # 천장 조도 → 책상면 기하 계수 (센서 없이 추정)
+      outdoor_transmittance_open: 0.85   # 블라인드 개방 시 창 투과율
+      outdoor_transmittance_shaded: 0.12 # 차광 시
+      camera_validation_enabled: false   # W12 오프라인 대조 시에만 true
+
+    # ---- 생활 모드 → config/user_modes.yaml ----------------------------------
+    #  [v3.0 이동] 모드는 사용자가 설정한다 (NORMAL/STUDY/NIGHT/SLEEP/AWAY/AUTO).
+    #  v2.1의 자동 판정(STUDY/RELAX/SLEEP/OFF)은 AUTO 모드로 계승된다.
+    #  모드 목표값 · 소음 등급 · 스케줄 · 사용자 설정 범위는 user_modes.yaml 에 있다.
+    user_modes_file: 'config/user_modes.yaml'
+
+    # ---- 설치 환경 프로파일 (Installation Profile) -------------------------
+    #  [신설 v2.1 · 구조만] 선행연구(저비용 설계정리 §2-4): 반지하/남향/북향에 따라
+    #  목표 조도 기준을 보정한다. 같은 제어기가 다른 환경에서도 동작하는지 = 일반화 검증.
+    #  ⚠️ 기본 비활성. W12에 여유가 있을 때만 남향/북향 2종으로 추가 실험한다.
+    installation_profile:
+      enabled: false
+      orientation: 'south'           # south | north | east | west | semi_basement
+      lux_target_scale:              # 목표 조도 보정계수
+        south: 1.0
+        north: 0.85                  # 자연광이 적어 목표를 낮게 잡는다
+        east: 0.95
+        west: 0.95
+        semi_basement: 0.70          # 과도한 블라인드 개방 방지
+      solar_gain_scale:              # 일사열 유입 보정
+        south: 1.0
+        north: 0.45
+        east: 0.75
+        west: 0.85
+        semi_basement: 0.30
+
+    # ---- 액추에이터 목표값 (Actuator Setpoints) --------------------------
+    setpoints:
+      ceiling_light_max_pct: 100.0    # 천장 조명 상한 (C4에서 동적 제한)
+      ceiling_light_thermal_cap_pct: 60.0  # 고온 시 발열 억제 상한 (시나리오 C4)
+      blind_shade_angle_deg: 75.0     # 차광 시
+      blind_open_angle_deg: 0.0       # 채광 시
+      blind_default_angle_deg: 30.0   # 무재실 기본 위치
+      blind_night_cooling_deg: 0.0    # 야간 복사냉각 개방 (시나리오 X1)
+      window_vent_ratio_pct: 40.0     # 자연 환기 시 개방률
+      window_pulse_ratio_pct: 20.0    # 간헐 환기 개방률 (시나리오 C6)
+      window_pulse_duration_s: 60.0   # 간헐 환기 1회 개방 시간
+      window_pulse_interval_s: 300.0  # 간헐 환기 주기
+      fan_low_rpm: 600.0              # 자연 환기 병행 시 저속
+      fan_high_rpm: 1400.0            # 창문 차단 시 강제 환기 고속
+      fan_max_rpm: 2000.0             # 우천 등 창문 완전 불가 시 (시나리오 C1)
+      fan_stop_on_very_bad_air: true  # [v2.1] 미세먼지 매우나쁨 → 배기팬 정지 (음압 유입 방지, C8)
+      intake_on_bad_air: true         # [v3.0] 대신 필터 흡기로 양압 환기 (I7)
+
+    # ---- 제어 우선순위 — 6계층 중재 (docs/07 §5) -------------------------------
+    #  [개정 v3.0] 건강·재산 이벤트를 절전보다 위에 둔다.
+    #    무재실이면 환기는 필요 없지만, 결로는 사람이 없어도 진행되기 때문이다.
+    #  병합: force = 상위 계층 우선 / cap = 최솟값 (L2는 L4 cap 완화 가능) / need = 최댓값
+    priority:
+      local_hard_protection: 0   # L0 끼임 정지 · 압축기 보호 · 실링팬 방향 전환 대기 (상위 명령 무시)
+      safety_interlock: 1        # L1 우천 · 외기 PM · 상호배제 · 가전 무응답 · 센서 고장
+      health_property_event: 2   # L2 요리 · 샤워 · 기본 환기 미달 · 결로 위험
+      energy_saving: 3           # L3 무재실 절전 · 외출
+      mode_constraint: 4         # L4 소음 등급 · 금지 장치 · 조명 정책
+      comfort_control: 5         # L5 온도 · 습도 · 기본 환기 · 결로 경고
+      lighting_control: 6        # L6 조도
+      merge_policy: { force: 'highest_layer', cap: 'min', need: 'max', l2_may_relax_l4_cap: true }
+
+    # ---- 가상 센서 — [신설 v3.1] (docs/08 §2) ---------------------------------
+    virtual_sensors:
+      #  [v3.4] 가상 CO2 폐지 — 사람 수를 모르므로 추정 불가. 재실 기본 환기(base_ventilation)로 대체.
+      lux:
+        role: 'failsafe'                 # BH1750 무효 시 태양 위치 · 날씨 · 블라인드로 계산해 계속 제어 (X3)
+        crosscheck_deviation_ratio: 0.5  # 실측과 50 % 이상 차이 지속 → 센서 가림 · 오염 경고
+
+    # ---- 전력 상태 판정 — [신설 v3.1] (docs/08 §3) ------------------------------
+    #  측정 수단(CT 클램프 / 계량 스마트 플러그)과 무관하게 '기기별 전력 신호'로 추상화한다.
+    power_monitor:
+      devices: [ac, dehumidifier, humidifier, cooktop, washer]   # pc 는 선택
+      enter_hold_s: 3.0
+      off_hold_s: 10.0
+      moving_avg_s: 10.0
+      states_w:                          # 예시 — 실측 교정
+        ac: { off_lt: 10.0, fan_only: [20.0, 100.0], run_gt: 250.0 }
+        dehumidifier: { off_lt: 3.0, standby: [3.0, 30.0], run_gt: 120.0 }
+        humidifier: { off_lt: 2.0, run_gt: 15.0 }
+        cooktop: { off_lt: 20.0, heat_gt: 300.0 }
+        washer: { off_lt: 5.0, spin_gt: 300.0 }
+      tank_full_rule: 'command_on_and_standby_and_rh_high'
+      efficiency_drop_rule: 'power_normal_but_effect_below_50pct'
+
+    # ---- 에너지 예측 · 전략 — [신설 v3.1] (docs/08 §5) ---------------------------
+    energy:
+      #  [v3.1 개정] 질문별 모델 분리 (docs/08 §5.1) — LSTM은 검토 후 제외
+      arrival_model: 'quantile_gbm'      # quantile_gbm | empirical (데이터 부족 초기 폴백)
+      arrival_quantiles: [0.1, 0.2, 0.5, 0.8]
+      thermal_identification: { model: '2R2C', train_days: 14, refit: 'nightly' }   # 참값은 3R3C
+      consumption_model: 'change_point'  # 일 kWh = a + b·max(0, T_out - T_base)
+      anomaly: { method: 'residual_cusum', k_sigma: 3.0 }
+      precool_optimizer: { method: 'expected_cost_grid', grid_min: 5.0, samples: 100, comfort_weight_by_mode: true }
+      occupancy_generator: 'inhomogeneous_markov'
+      synthetic_weeks: { train: 8, val: 2, test: 2 }
+      personas: ['commuter', 'irregular', 'home']
+      away_strategy:                     # 셋백 vs 끄기 — T*는 EXP-1 결과로 채운다
+        setback_c: 2.0
+        t_star_min_by_outdoor_c: { t28: -1.0, t32: -1.0, t35: -1.0 }   # -1 = EXP-1 결과로 채움 (ROS 2 파라미터는 null 불가)
+        sleep_policy: 'keep_setpoint'
+      power_limit_w: 3000.0              # 가정 A17 — 원룸마다 다름
+      progressive_tariff:                # 선택 · 기본 비활성 (user_modes.yaml 에서 켬)
+        summer_tiers_kwh: [300.0, 450.0]
+        guard_setpoint_relax_c: 0.5
+
+    # ---- 열 · 건조 모델 — [신설 v3.1] (계수는 environment_model.yaml, W08 확정) ----
+    thermal_model:
+      structure: '2R2C'                  # 공기 노드 + 축열 질량 노드 — 셋백 vs 끄기 실험의 전제
+      inverter_cop_curve: 'part_load'    # PLR 0.3-0.5 최대 · 0.2 미만 단속 운전 급감
+    laundry_model:
+      initial_moisture_kg: 2.0
+      calibration: '24C_60pct_no_wind_10h'
+      air_speed_gain: 0.6
+
+    # ---- 재실 기본 환기 — [v3.4] CO2 (NDIR · 가상) 대체 · docs/07 §3.3 ----------
+    #  CO2를 재거나 계산하지 않고 1인 기준 필요 환기량을 재실 중 상시 공급한다.
+    #  모드별 값은 user_modes.yaml (base_vent_m3h). 여기는 사용자가 바꿀 수 없는 하한 · 수단.
+    base_ventilation:
+      enabled: true
+      hard_min_m3h: 15.0               # 재실 중 하한 — 사용자 변경 불가
+      design_occupants: 1              # 사람 수를 세지 않는다 (원룸 1인 가구 설계 기준, 한계 #16)
+      assumed_infiltration_ach: 0.15   # 틈새 바람 하한만 인정 (보수적)
+      means: ['window_crack', 'intake_fan']
+      window_crack_pct: 10.0
+      window_outdoor_temp_range_c: [15.0, 28.0]
+      exempt_from_I10: true            # 건강 최소량 — 바깥이 더 습해도 유지, 습기는 에어컨 · 제습기가 처리
+      shortfall:                       # E4
+        hold_s: 600.0
+        release_hold_s: 300.0
+        noise_relax_steps: 1           # N0 -> N1 까지만
+        filter_flow_loss_at_replace: 0.4   # 필터 교체 시점 유량 감소율 (누적 가동 시간 선형)
+    verification_co2:                  # 시뮬레이션 참값 — 제어기는 구독하지 않는다 (지표 #9 · EXP-3)
+      outdoor_ppm: 420.0
+      reference_ppm: { study: 800.0, other: 1000.0 }
+
+    # ---- 실내 PM2.5 (레이저) — [신설 v3.0] ------------------------------------
+    indoor_pm:
+      sensor_model: 'PMS7003'
+      target_ugm3: 15.0
+      bad_ugm3: 35.0
+      recovery_target_ugm3: 35.0       # 지표 #10 회복 기준
+
+    # ---- 결로 (Condensation) — [신설 v3.0] --------------------------------------
+    #  T_s = T_in - (R_si / (R_si + R_rest)) * (T_in - T_out),  Δ = T_s - T_dew
+    condensation:
+      magnus_b: 17.62
+      magnus_c: 243.12
+      window_u_w_m2k: 2.8              # 복층유리 가정
+      r_rest_m2k_w: 0.247              # 1/U - 0.11
+      r_si_m2k_w:
+        default: 0.11
+        ceiling_fan_reverse: 0.08      # 표면 대류 증가 → 표면온도 상승
+        blind_closed: 0.20             # 유리-블라인드 사이 공기 정체 → 표면온도 하강
+        blind_slat_45: 0.14
+      warn_margin_c: 2.0               # Δ < 2.0 → 경고 (L5)
+      critical_margin_c: 0.5           # Δ < 0.5 → 위험 (L2)
+      release_margin_c: 3.0
+      release_hold_s: 600.0
+      humidify_margin_c: 2.0           # I4: 가습 상한 = T_dew <= T_s - 2.0 인 최대 RH
+      blind_slat_on_warn_deg: 45.0     # 시선 차단 유지 + 공기 순환
+      blind_slat_on_critical_deg: 0.0
+
+    # ---- 공기 수지 (Air Balance) — [신설 v3.0] -----------------------------------
+    air_balance:
+      room_volume_m3: 42.0
+      base_infiltration_ach: 0.3       # 민감도 분석 대상
+      penetration_factor: 0.8          # 틈새 유입 PM 침투율
+      min_net_supply_when_exhaust_m3h: -50.0   # I3: 기계 배기 시 허용 최소 순급기 (외기 양호 시)
+
+    # ---- 이벤트 (Events) — [신설 v3.0] · docs/07 §3 -----------------------------
+    events:
+      cooking:                         # E1
+        slope_ugm3_per_60s: 25.0
+        residual_min_ugm3: 20.0        # 실측 - 외기 유입 예측
+        require_occupied: true
+        confidence_base: 0.6
+        confidence_thermal_bonus: 0.2  # dT_5min >= 0.5 또는 dRH_5min >= 5
+        confidence_zone_bonus: 0.2     # 주방 게이트
+        release_above_baseline_ugm3: 10.0
+        release_hold_s: 300.0
+        hood_post_run_s: 300.0
+        noise_grade_override: 'N3'
+        cooktop_power_trigger_w: 300.0  # [v3.1] 쿡탑 가열 진입 = 요리 즉시 감지 · 후드 선제 기동 (플러그형만)
+        #  [v3.3] 후드 아래 온도 — 가스 · 빌트인 포함 요리 감지 1순위 (docs/08 §2.3)
+        trigger_any: ['hood_temperature', 'cooktop_power']
+        hood_temp_delta_vs_room_c: 8.0
+        hood_temp_rise_c_per_min: 3.0
+        hood_temp_end_delta_c: 3.0
+        pm_role: 'intensity_and_source_check'
+        hood_requires_heat: true         # 열 + 연기일 때만 후드 — 열 없는 미세먼지(가습기 물방울 등)에 후드를 켜 음압을 만들지 않음
+        source_classification:
+          heat_and_pm: 'cooking'
+          heat_only: 'steam'             # 후드 약 · 청정기 그대로
+          pm_with_humidifier: 'humidifier_mist'
+          pm_with_outdoor: 'infiltration'
+          pm_other: 'unknown_no_heat'     # [v3.4] 원인 미상 — 후드 끔 · 청정기
+        hood_level_selection: 'predictive'   # {0,1,2} 3안을 10분 앞까지 예측해 PM 피크 최소안
+        hood_prediction_horizon_s: 600.0
+      condensation: { layer_warn: 5, layer_critical: 2 }   # E2 — 수치는 condensation 블록
+      shower:                          # E3 [v3.4] — docs/07 §3.4
+        rh_rise_pct_in_5min: 8.0
+        require_no_hood_heat: true     # 후드 아래 온도 정상 (요리 수증기와 구분)
+        require_humidifier_off: true   # 가습기 전력으로 확인
+        require_occupied: true
+        radar_silence_bonus_s: 300.0   # 재실 고정 중 레이더 무신호 = 욕실 사용 → 신뢰도 가산
+        release_dewpoint_above_pre_c: 1.0
+        max_duration_min: 40.0
+        noise_grade_override: 'N2'     # 수면 모드면 N1
+        exhaust_level: 'high'
+        overrides: ['I6']
+        budget: { indoor_temp_change_c: 1.0, noise_grade: 'N2' }
+        layer: 2
+      vent_shortfall: { layer: 2 }                          # E4 [v3.4] — 수치는 base_ventilation.shortfall
+      rain: { layer: 1 }                                    # E5 — weather 블록
+      outdoor_pm: { layer: 1, min_grade: 'bad' }            # E6
+      arrival: { source: 'pir_entrance', only_in_mode: 'AWAY' }               # E7
+      departure: { vacancy_min: 30.0 }                                        # E8
+      appliance_no_response: { max_resend: 2, layer: 1, power_confirm_s: 10.0 }  # E9 — v3.1 전력 1차 확인
+      laundry_drying:                  # E10 [v3.1]
+        trigger: ['washer_spin_end', 'user_declare']
+        rh_rise_pct_per_h: 3.0
+        rh_rise_hold_min: 60.0
+        done_remaining_moisture: 0.05
+        max_duration_h: 8.0
+        layer: 4.5
+        primary_goal: 'drying_time'
+        budget: { indoor_temp_rise_c: 1.0, indoor_temp_rise_away_c: 3.0, noise_grade: 'N2', extra_energy_wh: -1.0 }   # -1 = 상한 없음
+        overrides: ['I6']
+      power_limit: { enter_ratio: 0.90, release_ratio: 0.75, release_hold_s: 300.0, layer: 1 }   # E11
+      manual_override: { hold_min: 30.0, layer: 4 }                                              # E12
+      precool: { quantile: 0.2, margin_min: 5.0, timeout_after_pred_min: 60.0, layer: 3 }       # E13
+      unattended_cooking: { layer: 1, plug_cooktop_cutoff: true, gas_alert_only: true }          # E15 [v3.3]
+
+    # ---- 가전 (Appliances) — [신설 v3.0] · docs/06 §3 ---------------------------
+    #  정격값은 모델 가정이다. 환경 효과 계수는 config/environment_model.yaml (W08 확정).
+    appliances:
+      profile: 'full'                  # core | std | full
+      #  ceiling_light = 천장 조명 채널. full 에서는 조명 일체형 실링팬의 조명부, core 에서는 일반 천장등
+      #  dehumidifier / humidifier 는 별개 액추에이터 (I1 상호배제로 연결)
+      profiles:
+        core: [ceiling_light, desk_lamp, exhaust_fan, blind, window]
+        std:  [ceiling_light, desk_lamp, exhaust_fan, blind, window, ac, range_hood]
+        full: [ceiling_light, desk_lamp, exhaust_fan, blind, window,
+               ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood]
+      ac:
+        interface: 'ir'
+        setpoint_range_c: [18.0, 30.0]
+        cooling_kw: 2.3
+        dry_g_per_h: 500.0
+        power_w: 700.0
+        compressor_min_off_s: 180.0
+        compressor_min_on_s: 300.0
+        verify_cool_window_s: 300.0    # IR 역확인 — 5분 내 -0.3 °C
+        verify_cool_delta_c: 0.3
+        verify_dry_window_s: 600.0     # 10분 내 -3 %p
+        verify_dry_delta_pct: 3.0
+      dehumidifier:
+        interface: 'relay'
+        rated_g_per_h: 417.0           # 10 L/day @27 °C, 60 %
+        low_temp_derate: { at_27c: 1.0, at_18c: 0.5 }
+        heat_w_electric: 200.0         # [v3.1 정정] 발열 = 전력 + 응축 잠열 ≈ 200 + 417 g/h × 0.68 Wh/g ≈ 480 W
+        latent_heat_wh_per_g: 0.68
+        power_w: 200.0
+        compressor_min_off_s: 180.0
+        compressor_min_on_s: 300.0
+      humidifier:
+        interface: 'relay'
+        rated_g_per_h: 300.0
+        power_w: 30.0
+        type: 'ultrasonic'               # [v3.3] ultrasonic | impeller | steam — 초음파 + 수돗물은 PM 발생원 (impeller ≈ 1/3, steam ≈ 0)
+        pm_emission_relative: { ultrasonic: 1.0, impeller: 0.33, steam: 0.0 }
+      ceiling_fan:
+        interface: 'relay'
+        relay_channels: [power, direction, speed]   # 팬부만 릴레이. 조명부는 ceiling_light (PWM 디밍)
+        integrated_light: true
+        perceived_cooling_c: { low: 0.8, high: 1.5 }
+        direction_change_wait_s: 10.0
+        power_w: { low: 30.0, high: 50.0 }
+      intake_fan:
+        interface: 'pwm'
+        max_m3h: 60.0
+        max_rpm: 2000.0
+        filter_efficiency_pm25: 0.90
+        filter_replace_hours: 2000.0
+        power_w: 5.0
+      exhaust_fan:                     # v2.1 '환기팬'
+        max_m3h: 50.0
+        max_rpm: 2000.0
+        power_w: 3.0
+      purifier:
+        interface: 'ir'
+        cadr_m3h: { l1: 70.0, l2: 130.0, l3: 200.0 }   # ROS 2 파라미터 이름은 숫자로 시작할 수 없다
+        power_w: { l1: 10.0, l2: 20.0, l3: 40.0 }
+        verify_window_s: 180.0
+        verify_min_pm_ugm3: 20.0       # 이보다 깨끗하면 UNVERIFIABLE (실패로 세지 않음)
+      range_hood:
+        interface: 'relay'
+        flow_m3h: { l1: 300.0, l2: 450.0 }
+        capture_efficiency: 0.6
+        power_w: { l1: 80.0, l2: 150.0 }
+      ir:
+        shared_emitter: [ac, purifier] # IR 송신부 1개 공유
+        sim_miss_probability: 0.02     # 시뮬레이션 주입 (X7에서 1.0)
+
+    # ---- 상호작용 규칙 I1-I7 — [신설 v3.0] · docs/07 §4.2 -------------------------
+    interaction_rules:
+      I1_dehum_hum_mutex: true
+      I2_ac_cooling_window_max_pct: 10.0
+      I3_exhaust_requires_supply:
+        good_air_window_pct: [10.0, 20.0]
+        bad_air_intake_pct: 100.0
+        window_blocked_by: ['rain', 'outdoor_pm_bad', 'ac_cooling', 'away']   # [v3.4] 창문 불가 → 흡기팬(필터) 급기
+        window_blocked_intake: 'match_exhaust'
+      I4_humidify_cap_by_dew_margin: true
+      I5_ceiling_fan_setpoint_relax_c: 1.0
+      I6_dehumidify_means_by_season: { summer: 'ac_dry', winter: 'dehumidifier', mid: 'ventilation_first', overridable_by_primary_goal: true, overridable_by_events: ['laundry_drying', 'shower'] }
+      I8_power_shed_order: ['humidifier', 'dehumidifier', 'purifier_step_down', 'ac_setpoint_plus_1', 'ac_fan_low']
+      I8_never_shed: ['range_hood_while_cooking', 'window_safety', 'sensors']
+      I9_manual_respect: { hold_min: 30.0, offset_step_c: 0.5, offset_max_c: 1.5 }
+      look_ahead_check: { horizon_s: 1800.0, step_s: 10.0, applies_to: 'all_ladder_rungs' }   # R-P 30분 예측 검사
+      I7_no_exhaust_only_when_outdoor_bad: true
+      I10_vent_dehumidify_requires_drier_outside:   # [v3.4] "비 오면 배기 정지" 대체 — 바깥 이슬점 비교
+        enter_margin_c: 2.0            # 바깥 이슬점 < 실내 이슬점 - 2 °C 일 때만 배기 · 창문으로 제습
+        exit_margin_c: 1.0             # 차이 < 1 °C → 배기 중단, 에어컨 · 제습기로 이관
+        outdoor_dewpoint_source: 'kma_api'
+        exempt: ['base_ventilation']
+    # ---- 실내 환경 회복 — [v3.4] docs/07 §3.5 ---------------------------------
+    recovery:
+      principles: ['source_capture', 'balanced_supply', 'dewpoint_gated_exhaust', 'indoor_treatment_first_when_blocked']
+      ac_dry_boost_setpoint_c: -1.0    # 회복 중 에어컨 제습 강화
+      precondition_on_event_start: true   # 비 오는 날 요리 · 샤워 시작과 함께 제습 앞당김
+      dehumidifier_after_cooking_if_power_tight: true   # 인덕션 + 에어컨 + 제습기 동시 → 요리 후 투입
+      recovery_target: { rh_above_pre_pct: 5.0, rh_abs_max_pct: 60.0, within_min: 30.0 }   # 지표 #14
+
+    # ---- 수단 사다리 — [신설 v3.0] · docs/06 §4 ---------------------------------
+    #  목표별 수단을 비용(에너지·소음) 순으로 나열. 제약이 칸을 지우면 다음 칸으로 오른다.
+    means_ladder:
+      cooling:    [blind_shade, window, ceiling_fan_forward, exhaust_plus_intake, ac_cool]
+      dehumidify: [window_if_drier_outside, exhaust_plus_intake_if_drier_outside, seasonal_dehumidifier]   # [v3.4] I10
+      humidify:   [humidifier]
+      base_vent:  [window_crack, intake_fan, intake_plus_exhaust]   # [v3.4] CO2 수요 환기 대체
+      pm_remove:  [dilution_if_cleaner_outside, purifier, range_hood]
+      anti_condensation: [ceiling_fan_reverse, blind_open, dehumidifier, pulse_vent_if_drier_outside]
+      window_cooling_requires_outdoor_below_c: 1.0   # 외기 < 실내 - 1 °C
+      base_vent_window_outdoor_temp_range_c: [15.0, 28.0]  # 이 범위 밖이면 기본 환기에 창문을 쓰지 않음
+
+    # ---- 제어 가능성 판정 (Control Feasibility) ---------------------------
+    #  [신설 v2.0] 시나리오 X2 — 모든 수단이 제약될 때 "불가"를 판정하고 보고한다.
+    #  무의미한 반복 구동을 막는 것이 목적이다.
+    feasibility:
+      enabled: true
+      degraded_after_s: 120.0    # 목표 미달 지속 → DEGRADED
+      infeasible_after_s: 300.0  # 가용 수단 소진 + 목표 미달 → INFEASIBLE
+      suppress_futile_actuation: true  # 불가 판정 시 헛구동 중단
+
+    # ---- 센서 페일세이프 (시나리오 X3) --------------------------------------
+    sensor_failsafe:
+      hold_last_valid_s: 10.0    # 무효값 시 마지막 유효값 유지 시간
+      illuminance_valid_range: [0.0, 2000.0]
+      temperature_valid_range: [-10.0, 60.0]
+      humidity_valid_range: [0.0, 100.0]
+      pm25_valid_range: [0.0, 1000.0]        # [v3.0]
+      on_timeout: 'freeze_policy' # 해당 정책만 동결. 안전·온도 정책은 계속 동작
+
+    # ---- 평가 지표 목표 (W13 판정 기준) ----------------------------------
+    targets:
+      pinch_detection_rate_pct: 100.0     # 끼임 감지 성공률
+      false_trigger_rate_pct: 0.0         # 정상 주행 중 오검출률
+      max_contact_force_n: 100.0          # 최대 접촉 반력 (FMVSS 118 참조)
+      ripple_position_error_m: 0.005      # 리플 위치 추정 오차 (1회 왕복 누적)
+      actuation_count_reduction_pct: 50.0 # 히스테리시스 적용 후 불필요 구동 감소율
+      energy_time_reduction_pct: 20.0     # 조명·팬 가동 시간 감소율
+      light_response_time_s: 1.0          # 조명 응답 시간 상한
+      window_response_time_s: 5.0         # 창문 응답 시간 상한
+      blind_tracking_error_deg: 3.0       # 블라인드 추종 오차
+      window_tracking_error_pct: 2.0      # 창문 추종 오차
+      air_grade_compliance_pct: 100.0     # [v2.1] 미세먼지 등급별 상한 준수율 (C8)
+      futile_actuation_count: 0           # [v2.1] 불가 상황에서의 헛구동 횟수 (C8·X2)
+      energy_wh_reduction_pct: 20.0       # [v3.0] 지표 #7 — 가동시간 → 추정 Wh
+      base_vent_compliance_pct: 95.0      # [v3.4] 지표 #9 — 기본 환기 충족률
+      verification_co2_compliance_pct: 95.0   # [v3.4] 지표 #9 — 참값 CO2 기준 이하 비율 (제어 미사용)
+      pm_peak_reduction_pct: 30.0         # [v3.0] 지표 #10 (Baseline A 대비)
+      pm_recovery_time_s: 1200.0          # [v3.0] 지표 #10
+      condensation_exposure_s: 0.0        # [v3.0] 지표 #11
+      rule_violation_count: 0             # [v3.0] 지표 #12
+      appliance_state_accuracy_pct: 95.0  # [v3.1] 지표 #13
+      manual_detect_rate_pct: 90.0        # [v3.1] 지표 #13
+      humidity_recovery_min: 30.0         # [v3.4] 지표 #14 — 샤워 · 요리 후 습도 회복 시간
+      arrival_comfort_rate_pct: 90.0      # [v3.1] 지표 #15
+      budget_violation_count: 0           # [v3.1] 지표 #16
+      laundry_drying_time_h: 4.0          # [v3.1] C15

@@ -237,6 +237,32 @@
 | F21 | 초음파 가습기 수돗물 → 실내 PM (University of Alberta 2020 · *Sci. Total Environ.* 2022) · National Academies 실내 PM2.5 보고서 | 실내 PM 발생원은 요리 외에도 가습기 · 향초 · 흡연 · 청소 — **미세먼지 원인 구분 · 센서 유지** 근거 |
 | F18 | Google Home presence sensing · ecobee · Aqara FP300 (PIR + mmWave) | 상용 스마트홈의 재실 융합 방식 — 휴대폰 위치 + 기기 조작 + 센서, 센서가 휴대폰보다 우선 |
 
+### 4.9 에너지 제어 방식 비교 연구 — 질문별 모델 vs LSTM vs 강화학습 (v3.4 추가 · 논문용)
+
+> 실험 계획 · 비교 축 · 공정성 설계: [`10_energy_control_comparison_study.md`](10_energy_control_comparison_study.md) · 실험 EXP-5([`03` §5.2](03_scenarios.md) · [`08` §5.8](08_multisignal_energy.md))
+> ⚠️ 표시는 초록 · 요약만 확인 — 인용 전 원문 확인
+
+| # | 자료 | 활용 |
+|---|---|---|
+| G1 | Wang 외, *Applied Thermal Engineering* 228, 2023 | RL 3종(DDPG · DDQN · SAC) vs RC 기반 MPC를 **같은 가상 건물(BOPTEST)**에서 비교 — 비교 실험 설계의 기본 틀 |
+| G2 | ⚠️ Mulayim 외, arXiv:2510.01475, 2025 (심사 중) | **실제 주택** RL vs MPC 각 1개월 — 절감 MPC 18.1 % · RL 20.9 %, RL 불쾌 신고 3건 · 개발 노력 비교 |
+| G3 | Arroyo, Spiessens, Helsen, *Frontiers in Built Environment* 8, 2022 | MPC · RL · 혼합 방식 비교 |
+| G4 | ⚠️ Kumkam 외, *Journal of Building Engineering* 112, 2025 | RL vs MPC 비교 (상세 미확인) |
+| G5 | Vivian 외, *Journal of Building Engineering* 84, 2024 | 회색상자 vs 신경망(LSTM) 실내온도 예측 — **설정온도가 학습과 달라지면 LSTM 성능 급락**, 회색상자 안정 → `08` §5.2 LSTM 제외 근거의 검증 |
+| G6 | ⚠️ Stoffel, Berktold, Müller, *Energy and Buildings* 305, 2024 | 실건물에서 여러 기계학습 모델을 MPC 예측 모델로 비교 — LSTM + MPC 구성 |
+| G7 | Esrafilian-Najafabadi, Haghighat, *Energy and Buildings* 252, 2021 | 주거용 미리 공조 시작 시각을 딥러닝으로 추정 — **LSTM 방식의 기준** (F11과 같은 문헌) |
+| G8 | ⚠️ Hou, Cheng, Ma 외, *Building and Environment* 284, 2025 | LSTM 재실 예측 + Dueling DQN — LSTM과 RL의 결합 |
+| G9 | Esrafilian-Najafabadi, Haghighat, *Building and Environment* 226, 2022 | G7 저자의 후속 RL 연구 — 같은 문제를 LSTM과 RL로 푼 짝 |
+| G10 | McKee 외, *IEEE PES General Meeting*, 2020 | 주거용 · 재실 고려 심층 RL (ORNL) |
+| G11 | Wang, Lin, *Building and Environment* 244, 2023 | 주거용에서 데이터로 학습 환경 구성 후 RL (MF²) |
+| G12 | Chen, Cai, Bergés, *ACM BuildSys*, 2019 | Gnu-RL — MPC 구조를 RL 정책에 넣어 적은 데이터로 학습 |
+| G13 | Arroyo 외, *Applied Energy* 309, 2022 | RL-MPC — 순수 RL의 제약 위반 · 혼합 방식의 안전성 |
+| G14 | Blum 외, *Journal of Building Performance Simulation* 14, 2021 | BOPTEST — 제어 방식 비교용 표준 가상 건물 · 지표 |
+| G15 | Drgoňa 외, *Annual Reviews in Control* 50, 2020 | MPC 리뷰 |
+| G16 | Wang, Hong, *Applied Energy* 269, 2020 | RL 리뷰 — 데이터 효율 · 안전 · 학습 환경 |
+| G17 | Zhang 외, *IEEE Access* 10, 2022 | MPC + RL 서베이 |
+| G18 | Jiménez-Raboso 외, *ACM BuildSys*, 2021 | Sinergym — RL 학습 환경 구성 참고 |
+
 ---
 
 ## 5. 인용 시 유의사항
@@ -295,6 +321,27 @@
 26. ASHRAE Standard 55, "Thermal Environmental Conditions for Human Occupancy."
 27. Winsen, "MH-Z19C NDIR CO2 Sensor Datasheet" · Plantower, "PMS7003 Datasheet."
 
+### v3.4 추가 (에너지 제어 방식 비교 연구 — §4.9)
+
+28. Wang, D., Zheng, W., Wang, Z. et al., "Comparison of reinforcement learning and model predictive control for building energy system optimization," *Applied Thermal Engineering*, 228, 120430, 2023. doi:10.1016/j.applthermaleng.2023.120430
+29. Mulayim, O. B., Pergantis, E. N., Reyes Premer, L. D., Chen, B., Qu, G., Kircher, K. J., Bergés, M., "Comparative Field Deployment of Reinforcement Learning and Model Predictive Control for Residential HVAC," arXiv:2510.01475, 2025 (preprint).
+30. Arroyo, J., Spiessens, F., Helsen, L., "Comparison of Optimal Control Techniques for Building Energy Management," *Frontiers in Built Environment*, 8, 849754, 2022. doi:10.3389/fbuil.2022.849754
+31. Kumkam, S., Trinuruk, P., Chaiwiwatworakul, P., Saito, K., "A comparative analysis of reinforcement learning and model predictive control for HVAC system optimization," *Journal of Building Engineering*, 112, 113776, 2025. doi:10.1016/j.jobe.2025.113776
+32. Vivian, J., Prataviera, E., Gastaldello, N., Zarrella, A., "A comparison between grey-box models and neural networks for indoor air temperature prediction in buildings," *Journal of Building Engineering*, 84, 108583, 2024. doi:10.1016/j.jobe.2024.108583
+33. Stoffel, P., Berktold, M., Müller, D., "Real-life data-driven model predictive control for building energy systems comparing different machine learning models," *Energy and Buildings*, 305, 113895, 2024. doi:10.1016/j.enbuild.2024.113895
+34. Esrafilian-Najafabadi, M., Haghighat, F., "Occupancy-based HVAC control using deep learning algorithms for estimating online preconditioning time in residential buildings," *Energy and Buildings*, 252, 111377, 2021. doi:10.1016/j.enbuild.2021.111377
+35. Hou, F., Cheng, J. C. P., Ma, J. et al., "Occupancy-driven HVAC control optimization via LSTM and deep reinforcement learning for enhanced indoor air quality, thermal comfort and energy efficiency," *Building and Environment*, 284, 113501, 2025. doi:10.1016/j.buildenv.2025.113501
+36. Esrafilian-Najafabadi, M., Haghighat, F., "Towards self-learning control of HVAC systems with the consideration of dynamic occupancy patterns: Application of model-free deep reinforcement learning," *Building and Environment*, 226, 109747, 2022. doi:10.1016/j.buildenv.2022.109747
+37. McKee, E., Du, Y., Li, F. et al., "Deep Reinforcement Learning for Residential HVAC Control with Consideration of Human Occupancy," *2020 IEEE PES General Meeting*, 1–5, 2020. doi:10.1109/PESGM41954.2020.9281893
+38. Wang, M., Lin, B., "MF²: Model-free reinforcement learning for modeling-free building HVAC control with data-driven environment construction in a residential building," *Building and Environment*, 244, 110816, 2023. doi:10.1016/j.buildenv.2023.110816
+39. Chen, B., Cai, Z., Bergés, M., "Gnu-RL: A precocial reinforcement learning solution for building HVAC control using a differentiable MPC policy," *Proc. ACM BuildSys 2019*, 316–325, 2019. doi:10.1145/3360322.3360849
+40. Arroyo, J., Manna, C., Spiessens, F., Helsen, L., "Reinforced model predictive control (RL-MPC) for building energy management," *Applied Energy*, 309, 118346, 2022. doi:10.1016/j.apenergy.2021.118346
+41. Blum, D., Arroyo, J., Huang, S. et al., "Building optimization testing framework (BOPTEST) for simulation-based benchmarking of control strategies in buildings," *Journal of Building Performance Simulation*, 14(5), 586–610, 2021. doi:10.1080/19401493.2021.1986574
+42. Drgoňa, J., Arroyo, J., Cupeiro Figueroa, I. et al., "All you need to know about model predictive control for buildings," *Annual Reviews in Control*, 50, 190–232, 2020. doi:10.1016/j.arcontrol.2020.09.001
+43. Wang, Z., Hong, T., "Reinforcement learning for building controls: The opportunities and challenges," *Applied Energy*, 269, 115036, 2020. doi:10.1016/j.apenergy.2020.115036
+44. Zhang, H., Seal, S., Wu, D. et al., "Building Energy Management With Reinforcement Learning and Model Predictive Control: A Survey," *IEEE Access*, 10, 27853–27862, 2022. doi:10.1109/ACCESS.2022.3156581
+45. Jiménez-Raboso, J., Campoy-Nieves, A., Manjavacas-Lucas, A. et al., "Sinergym: a building simulation and control framework for training reinforcement learning agents," *Proc. ACM BuildSys 2021*, 319–323, 2021. doi:10.1145/3486611.3488729
+
 ---
 
 ## 변경 이력
@@ -304,3 +351,4 @@
 | 2026-09-12 | v1.0 | 신규 작성. 국내외 학술 문헌 9편 · 특허 3건 · 표준 5건 정리. 선행연구 대비표 및 학술적 기여 3가지 명시 |
 | 2026-10-05 | **v1.2** | **피드백 2 반영** — §4.8 다중 신호 · 에너지 참고자료 13건 (웹 확인 완료) |
 | 2026-10-05 | **v1.1** | **기획 v3.0 반영** — §4.7 공기질 · 결로 · 열쾌적 참고자료 10건, 참고문헌 18–27 추가 · 에어코리아 API 용도 갱신. ⚠️ 서지사항(권·호·면)은 W14 최종 보고서 작성 시 원문으로 재확인 |
+| 2026-10-07 | **v1.3** | **§4.9 에너지 제어 방식 비교 연구 (논문용)** — 질문별 모델 vs LSTM vs 강화학습 벤치마킹 문헌 G1–G18 · 참고문헌 28–45 (Crossref · arXiv로 서지 확인, ⚠️ 4건은 원문 미확인) |

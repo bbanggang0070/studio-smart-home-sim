@@ -865,6 +865,7 @@ scenarios:
 | `pass_criteria` 문법 | `<식>` · `for all t` · `during <label>` · `when <조건>` · `within N after <앵커>`(구간 안에 한 번이라도) · **`by N after <앵커>`(그 시각에 참 — 회복 판정용)** · `event_entered('E')` · `value_at('<별칭>', 앵커)` · `baseline_X.<지표>` — 상세: `scripts/harness/criteria.py` |
 | `baseline_a.auto_appliances` | Baseline A 에서 '사용자가 켜 둔' 가전 — 내장 자동이 도는 가전 목록 (없으면 initial 에서 켜진 가전) |
 | `ratio(<조건>)` | 판정 함수 — 조건이 참인 시각의 비율 (체류율, C14) |
+| 지표 `actuation_count` (#8) · `base_vent_compliance` · `co2_compliance` (#9) | 하네스가 계산 — 장치 전환 횟수 · 재실 중 기본 환기 충족률 · 참값 CO₂ 기준 이하 비율 |
 | `expect.<별칭>.settle_s` | 구간 시작 N 초 뒤부터 판정 — 감지 지연 허용 (C9: E1 진입 허용 90 s 와 맞춤) |
 | 판정 상태 | PASS · FAIL · **PENDING**(비교할 baseline 결과 없음) · **ERROR**(문법 · 열 없음) · **N/A**(baseline X 자신의 실행에서 `baseline_X.*` 비교) |
 | 미지원 주입 | 하네스가 아직 처리하지 못하는 주입(레이더 · Wi-Fi · 고장 등)은 무시하지 않고 `summary.csv` 의 `notes` 에 남긴다 |
@@ -924,3 +925,4 @@ scenarios:
 | 2026-10-09 | v2.11 | **지표 #10 · C9 목표 개정** — PM 피크 Baseline A 대비 −30 % → **−15 % 이상 + 추정 소비전력량 A 이하** (참값 모델 결과 반영) |
 | 2026-10-09 | v2.12 | §8 `baseline_a.auto_appliances` · `ratio()` · 시나리오 B8 · B9 · C1 · C5 · C10 · C13 · C14 를 scenario_profiles 에 수록 |
 | 2026-10-10 | v2.13 | **C1 · C13 습도 판정 완화** — C1 30분 내 RH ≤ 60 % → **60분 내 ≤ 72 %**, C13 30분 → **60분 내 ≤ 60 %** (에어컨 제습 0.5 L/h · 비 오는 날 흡기 습기 부하로 30분 목표 도달 불가) |
+| 2026-10-10 | v2.14 | C6 · C8 · C11 · C12 를 scenario_profiles 에 수록 · 지표 #8 (장치 전환 횟수) · #9 (기본 환기 충족 · 참값 CO₂) 하네스 구현 |

@@ -93,10 +93,11 @@ smart_home_controller:
       # 등급별 창문 개방 상한 / 팬 RPM 상한 (등급형 제약 — 이진이 아니다)
       #  fan_max_rpm = 배기팬. 단 급기 없는 배기는 bad 이상에서 금지 (I7)
       grade_policy:
-        good:      { window_max_pct: 100.0, fan_max_rpm: 2000.0, require_positive_pressure: false }
-        moderate:  { window_max_pct:  40.0, fan_max_rpm: 1400.0, require_positive_pressure: false }
-        bad:       { window_max_pct:   0.0, fan_max_rpm:  600.0, require_positive_pressure: true }
-        very_bad:  { window_max_pct:   0.0, fan_max_rpm:    0.0, require_positive_pressure: true }
+        #  purifier_min_level [v3.4.3] — 외기 등급만으로 미리 돌리는 청정기 단수 (C8 매우나쁨 → 2단)
+        good:      { window_max_pct: 100.0, fan_max_rpm: 2000.0, require_positive_pressure: false, purifier_min_level: 0 }
+        moderate:  { window_max_pct:  40.0, fan_max_rpm: 1400.0, require_positive_pressure: false, purifier_min_level: 0 }
+        bad:       { window_max_pct:   0.0, fan_max_rpm:  600.0, require_positive_pressure: true,  purifier_min_level: 0 }
+        very_bad:  { window_max_pct:   0.0, fan_max_rpm:    0.0, require_positive_pressure: true,  purifier_min_level: 2 }
       grade_bounds_ugm3: [15.0, 35.0, 75.0]   # 환경부 PM2.5 예보 등급 (좋음|보통|나쁨|매우나쁨 경계)
       grade_representative_ugm3: { good: 10.0, moderate: 25.0, bad: 55.0, very_bad: 100.0 }   # [v3.4.3] draft — 등급만 받을 때 예측(후드 3안)에 쓰는 대표값
       cross_check_with_indoor: true           # API 등급 급변 시 실내 센서 추세로 교차 확인
@@ -652,12 +653,14 @@ smart_home_controller:
       cooling_on_above_setpoint_c: 0.5     # 냉방 사다리 진입: 실내 > 목표 + 0.5
       cooling_off_band_c: 1.0              # 해제: 실내 < 목표 − 1.0
       ceiling_fan_high_above_setpoint_c: 2.0   # 목표 + 2 °C 초과면 실링팬 강 (소음 등급 허용 시)
+      ceiling_fan_speed_band_c: 0.5        # 강 → 약 복귀는 목표 + 2 − 0.5 °C 아래 (I5 로 에어컨이 목표 + 1 근처에 머물 때 강/약 채터링 방지)
       shade_requires_lux: 250.0            # 실내 조도가 이 이상(낮 · 일사)일 때만 냉방 차광
       dehumidify_off_band_pct: 5.0         # 제습: 상한 초과 진입 → 상한 − 5 %p 아래에서 해제
       humidify_restart_band_pct: 3.0       # 가습: 하한 미만 진입 → 유효 상한 도달 정지 · 상한 − 3 %p 아래로 내려오면 재개 허용
       cap_extension_by_ceiling_fan: true   # I4 — 결로 상한이 모드 상한보다 낮으면 실링팬 역회전으로 상한 확장 (C10)
       escalate_to_ac_after_s: 900.0        # draft — 무료 냉방(창문 · 배기)만으로 이 시간 안에 못 내리면 에어컨으로 승격 (C5 '필요 시')
       escalate_above_setpoint_c: 1.0       # draft — 승격 판단: 실내 > 목표 + 1.0 °C (C5 예산 ≤ 28 °C = 수면 목표 27 + 1)
+      escalate_release_band_c: 0.5         # 승격 유지 — 실내 ≤ 목표 + 1.0 − 0.5 °C (= 냉방 진입 기준) 가 되거나 냉방이 끝나야 무료 냉방으로 돌아간다 (I2 창문 ↔ 에어컨 채터링 방지)
       ac_dry_within_setpoint_c: 0.5        # draft — 냉방 + 제습이 함께 필요할 때, 실내 ≤ 냉방 설정 + 0.5 면 제습 모드 (C1)
       ac_cool_resume_above_c: 1.5          # draft — 제습 모드 중 실내 > 냉방 설정 + 1.5 면 다시 냉방
 

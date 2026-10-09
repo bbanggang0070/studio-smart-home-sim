@@ -502,3 +502,165 @@ scenarios:
       - "ac_power == 0 for all t"                            # 제습기 외 가전 가동 0
       - "humidifier == 0 for all t"
     metrics: [energy_wh, rule_violation_count]
+
+  # ---- C6 · 고습 + 저온 — 결로 대처 (docs/03 §3) --------------------------------------
+  - id: C6
+    tier: 2
+    name: "고습 + 저온 — 결로 대처"
+    duration_s: 3600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261106
+    run_mode: fast
+    appliance_profile: full
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    baseline_a: { auto_appliances: [dehumidifier] }   # 제습기 자체 설정 50 %만 (docs/03 C6)
+    initial:
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 85.0
+      co2_ppm: 600.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 200.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "22:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 90.0         # 블라인드 닫힘 → 결로 중
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 5.0
+      outdoor_rh_pct: 80.0
+      heating_setpoint_c: 21.0
+    pass_criteria:
+      - "dew_margin >= 0.5 within 1800 after 0"              # 30분 내 Δ ≥ 0.5 °C
+      - "temperature >= 19.0 for all t"                      # 실내 온도 하락 ≤ 2 °C
+      - "humidifier == 0 for all t"
+    metrics: [condensation_exposure_s, energy_wh, rule_violation_count]
+
+  # ---- C8 · 고온 + 외기 미세먼지 — 등급형 제약 (docs/03 §3) ---------------------------------
+  - id: C8
+    tier: 2
+    name: "고온 + 외기 미세먼지 (등급형)"
+    duration_s: 3600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261108
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    baseline_a: { auto_appliances: [purifier] }   # 청정기 자체 자동 (docs/03 C8)
+    initial:
+      user_mode: NORMAL
+      temperature_c: 30.0
+      humidity_pct: 55.0
+      co2_ppm: 950.0
+      pm25_ugm3: 12.0
+      illuminance_lux: 400.0
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "15:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: false }, purifier_level: 1 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 25.0       # 보통
+      outdoor_temp_c: 27.0
+      outdoor_rh_pct: 55.0
+      outdoor_illuminance_lux: 20000.0
+    events:                         # 보통(25) → 나쁨(52) → 매우나쁨(90)
+      - { at_s: 1200, set: { outdoor_pm25_ugm3: 52.0 } }
+      - { at_s: 2400, set: { outdoor_pm25_ugm3: 90.0 } }
+    pass_criteria:
+      - "window_open_ratio <= 0.4 for all t"                          # 보통 — 창문 40 % 상한
+      - "window_open_ratio <= 0.01 when outdoor_pm25 > 35 and t >= 1215"   # 나쁨 이상 — 폐쇄 (1차 지연 15 s 허용)
+      - "q_net >= 0 when outdoor_pm25 > 35 and t >= 1215"             # 나쁨 이상 양압 상시 (I7)
+      - "pm25 <= 35 for all t"
+      - "co2 <= 1000 for all t"
+      - "purifier_level >= 2 when outdoor_pm25 > 75 and t >= 2405"    # 매우나쁨 — 청정기 2단 (반응 5 s 허용)
+    metrics: [pm25_peak, co2_compliance, energy_wh, rule_violation_count]
+
+  # ---- C11 · 냉방 중 + 기본 환기 (docs/03 §3) ------------------------------------------
+  - id: C11
+    tier: 2
+    name: "냉방 중 + 기본 환기"
+    duration_s: 7200
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261111
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: STUDY
+      temperature_c: 29.0
+      humidity_pct: 55.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 500.0
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "14:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: true, mode: cool, setpoint: 25.0 }, purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 33.0
+      outdoor_rh_pct: 55.0
+      outdoor_illuminance_lux: 50000.0
+    pass_criteria:
+      - "window_open_ratio <= 0.1 for all t"                 # I2
+      - "base_vent_compliance >= 0.95"                       # 기본 환기 40 m³/h 충족 ≥ 95 %
+      - "co2_compliance >= 0.95"                             # (검증) 참값 CO2 ≤ 800 ppm 체류율
+      - "energy_wh <= baseline_B.energy_wh"                  # 히스테리시스 없는 협조 대비 감소
+    metrics: [base_vent_compliance, co2_compliance, energy_wh, rule_violation_count]
+
+  # ---- C12 · 수면 중 + 기본 환기 (docs/03 §3) ------------------------------------------
+  - id: C12
+    tier: 2
+    name: "수면 중 + 기본 환기"
+    duration_s: 21600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261112
+    run_mode: fast
+    appliance_profile: full
+    season: mid
+    persona: commuter
+    power_limit_w: 3000
+    baseline_a: { auto_appliances: [] }
+    initial:
+      user_mode: SLEEP
+      temperature_c: 25.0
+      humidity_pct: 50.0
+      co2_ppm: 600.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 0.0
+      occupancy: true
+      occupant_zone: bed
+      time_of_day: "23:30"
+      window_open_ratio: 0.0
+      blind_angle_deg: 90.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 8.0        # 좋음
+      outdoor_temp_c: 18.0
+      outdoor_rh_pct: 60.0
+    pass_criteria:
+      - "base_vent_compliance >= 0.95"                       # 기본 환기 16 m³/h 충족 ≥ 95 %
+      - "exhaust_fan_rpm <= 600 for all t"                   # N0
+      - "intake_fan_rpm <= 700 for all t"                    # N0
+      - "co2_compliance >= 0.95"                             # (검증) 참값 CO2 ≤ 1,000 ppm
+    metrics: [base_vent_compliance, co2_compliance, energy_wh, rule_violation_count]

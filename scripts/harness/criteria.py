@@ -61,6 +61,8 @@ ALIASES = {
     "ac_setpoint": "act.ac_setpoint",
     "blind_angle_deg": "act.blind_angle_deg",
     "condensate": "truth.condensate_g",
+    "outdoor_pm25": "ext.outdoor_pm25_ugm3",
+    "outdoor_temp": "ext.outdoor_temp_c",
 }
 
 PASS, FAIL, PENDING, ERROR, NA = "PASS", "FAIL", "PENDING", "ERROR", "N/A"
@@ -86,7 +88,7 @@ def _first_time(t: np.ndarray, mask: np.ndarray) -> float:
 
 
 def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[str, str],
-                    cfg_metrics: dict[str, Any], dt_s: float) -> dict[str, float]:
+                    cfg_metrics: dict[str, Any], dt_s: float, ctx: dict[str, Any] | None = None) -> dict[str, float]:
     """docs/03 §7 지표 중 참값 로그로 계산할 수 있는 것. 계산할 수 없으면 NaN (사유는 metric_notes)."""
     t = df["time_s"].to_numpy()
     out: dict[str, float] = {}
@@ -120,6 +122,37 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
     out["condensation_exposure_s"] = float((df["truth.dew_margin_c"] < 0).sum() * dt_s)
     out["rule_violation_count"] = (float(df["ctrl.rule_violations"].iloc[-1])
                                    if "ctrl.rule_violations" in df.columns else math.nan)
+
+    # 지표 #8 — 장치 전환(구동) 횟수 (불필요 구동 · 채터링은 Baseline B 대비로 본다)
+    n = 0
+    for col in cfg_metrics.get("actuation_columns", []):
+        if col in df.columns:
+            n += int((df[col].astype(float).diff().abs() > 1e-6).sum())
+    for col, step in (cfg_metrics.get("actuation_continuous") or {}).items():
+        if col in df.columns:
+            v = df[col].astype(float).to_numpy()
+            ref, cnt = v[0], 0
+            for x in v[1:]:                          # 직전 '구동 시점' 값 대비 step 이상 바뀌면 1회
+                if abs(x - ref) >= step:
+                    cnt, ref = cnt + 1, x
+            n += cnt
+    out["actuation_count"] = float(n)
+
+    # 지표 #9 — 재실 중 기본 환기 충족률 · 참값 CO2 기준 이하 비율 (제어에 쓰지 않는 검증값)
+    ctx = ctx or {}
+    occ_col = T.S_OCCUPANCY
+    occ = df[occ_col].astype(bool).to_numpy() if occ_col in df.columns else np.ones(len(df), dtype=bool)
+    target = float(ctx.get("base_vent_m3h") or 0.0)
+    if occ.any() and target > 0:
+        supplied = (df["truth.q_intake_m3h"] + df["truth.q_window_m3h"] + df["truth.q_inf_m3h"]
+                    - float(ctx.get("q_inf0_m3h", 0.0))).to_numpy()      # 기저 침기를 뺀 '공급한' 외기
+        ok = supplied >= target - cfg_metrics["base_vent_tolerance_m3h"]
+        out["base_vent_compliance"] = float(ok[occ].mean())
+    else:
+        out["base_vent_compliance"] = math.nan
+    ref = cfg_metrics["co2_reference_ppm"]["study" if ctx.get("user_mode") == "STUDY" else "other"]
+    co2 = df["truth.co2_ppm"].to_numpy()
+    out["co2_compliance"] = float((co2[occ] <= ref).mean()) if occ.any() else math.nan
     return out
 
 

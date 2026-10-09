@@ -99,6 +99,8 @@ class RuleEngine:
         add("exhaust", "cap", pol["fan_max_rpm"], L1, f"외기 {o.outdoor_pm_grade} 배기 상한")
         if o.ac_cooling:
             add("window", "cap", g("interaction_rules.I2_ac_cooling_window_max_pct") / 100.0, L1, "I2 냉방 중 창문")
+        if pol.get("purifier_min_level", 0) > 0 and mode != "AWAY":
+            add("purifier", "need", pol["purifier_min_level"], L5, f"외기 {o.outdoor_pm_grade} 청정기 예방 가동")
 
         # -- L2 건강 · 재산 --
         self._cooking(o, ev, blocked, noise, add)
@@ -109,6 +111,7 @@ class RuleEngine:
             add("humidifier", "force", 0, L2, "E2 결로 위험 가습 금지")
             add("ceiling_fan", "need", -1, L2, "E2 결로 위험 실링팬 역회전")
             add("dehumidifier", "need", 1, L2, "E2 결로 위험 제습")
+            self._pulse_vent(o, cond, blocked, add)
 
         # -- L3 절전 · 외출 --
         if mode == "AWAY":
@@ -146,6 +149,18 @@ class RuleEngine:
             add("ceiling_fan", "need", -1, L5, "E2 결로 경고 실링팬 역회전")
             add("humidifier", "cap", 0, L5, "E2 결로 경고 가습 중단")
         return out
+
+    def _pulse_vent(self, o: Observation, cond: ActiveEvent, blocked: list[str], add) -> None:
+        """E2 위험 — 외기 절대습도가 낮으면 간헐 환기 (창문 20 % × 60 s / 300 s + 배기 저속). 난방 손실을 줄이려 짧게."""
+        g = self.p.get
+        if blocked or math.isnan(o.outdoor_temp_c):
+            return
+        if self.psy.dew_point(o.outdoor_temp_c, o.outdoor_rh_pct) >= self.psy.dew_point(o.temp_c, o.rh_pct):
+            return                                         # 바깥 공기가 더 습하면 환기는 제습이 아니다
+        phase = (o.now_s - cond.since_s) % g("setpoints.window_pulse_interval_s")
+        if phase < g("setpoints.window_pulse_duration_s"):
+            add("window", "need", g("setpoints.window_pulse_ratio_pct") / 100.0, L2, "E2 결로 위험 간헐 환기")
+            add("exhaust", "need", g("setpoints.fan_low_rpm"), L2, "E2 결로 위험 간헐 환기 (배기 저속)")
 
     def _supply_for(self, exhaust_m3h: float, o: Observation, blocked: list[str], window_ratio: float,
                     add, why: str) -> None:

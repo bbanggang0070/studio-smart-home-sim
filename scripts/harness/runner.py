@@ -125,6 +125,9 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
                 row[tp] = v if not isinstance(v, (dict, list)) else json.dumps(v)
             for tp, v in ctrl_state.items():
                 row.setdefault(tp, v)
+            row["ext.outdoor_pm25_ugm3"] = world.ext.outdoor_pm25_ugm3
+            row["ext.outdoor_temp_c"] = world.ext.outdoor_temp_c
+            row["ext.raining"] = world.raining
             row["injections"] = ",".join(tl.active_labels(now))
             if callable(reasons_fn):
                 row["ctrl.reasons"] = json.dumps(reasons_fn(), ensure_ascii=False)
@@ -141,7 +144,13 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
     if acts.rejected:
         notes.append(f"프로파일에 없는 장치 명령 무시: {acts.rejected}")
     sources = {iv.label: iv.kind for iv in tl.intervals}
-    metrics = C.compute_metrics(df, tl.anchors(), sources, hcfg["metrics"], log_every)
+    with open(REPO / hcfg["metrics"]["user_modes"], encoding="utf-8") as f:
+        um = yaml.safe_load(f)
+    mode0 = sc["initial"].get("user_mode", "NORMAL")
+    ctx = {"user_mode": mode0,
+           "base_vent_m3h": (um["modes"].get(mode0) or {}).get("base_vent_m3h") or 0.0,
+           "q_inf0_m3h": env_cfg.get("air_balance.base_infiltration_ach") * env_cfg.get("room.volume_m3")}
+    metrics = C.compute_metrics(df, tl.anchors(), sources, hcfg["metrics"], log_every, ctx)
     res = RunResult(run=run, status="", controller=controller_name, df=df, metrics=metrics, notes=notes)
     res.intervals = {iv.label: (iv.start_s, iv.end_s) for iv in tl.intervals}   # type: ignore[attr-defined]
     res.anchors = tl.anchors()                                                  # type: ignore[attr-defined]

@@ -28,6 +28,12 @@ metrics:
   rh_recovery_delta_pct: 5.0      # 지표 #14 — 이벤트 전 + 5 %p
   rh_recovery_abs_pct: 60.0       # 지표 #14 — 또는 60 %
   co2_reference_ppm: { study: 800.0, other: 1000.0 }   # 지표 #9 (참값 검증)
+  base_vent_tolerance_m3h: 0.5    # 지표 #9 — 기본 환기 충족 판정 허용 오차 (rpm 반올림)
+  # 지표 #8 — 장치 전환(구동) 횟수: 이산 장치는 값이 바뀔 때마다, 연속 장치는 아래 폭 이상 바뀔 때 1회
+  actuation_columns: [act.ac_cool, act.ac_dry, act.ceiling_fan, act.purifier_level, act.range_hood_level,
+                      act.dehumidifier, act.humidifier]
+  actuation_continuous: { act.window_open_ratio: 0.05, act.exhaust_fan_rpm: 100.0, act.intake_fan_rpm: 100.0 }
+  user_modes: config/user_modes.yaml   # 지표 #9 — 모드별 기본 환기 목표 (시나리오 initial.user_mode 기준)
 
 # ---- 외기 PM 등급 (에어코리아 API 대체) — 환경부 PM2.5 예보 등급 -----------------
 outdoor_api:

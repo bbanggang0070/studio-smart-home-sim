@@ -27,6 +27,8 @@ class ComfortLadders:
         self._i10_open = False
         self._free_cool_since: float | None = None
         self._ac_dry = False
+        self._fan_high = False
+        self._escalated = False
 
     def _band(self, key: str) -> float:
         return self.p.get(f"comfort_ladders.{key}") if self.hyst else 0.0
@@ -80,28 +82,40 @@ class ComfortLadders:
         # 제습이 필요한데 바깥이 더 습하면(I10 불만족) 환기로 냉방하지 않는다 — 습기를 들인다 (C1)
         if self.dehumidifying and not i10:
             free_cool = False
+        # 에어컨 승격 (히스테리시스) — 무료 냉방을 escalate_to_ac_after_s 써도 목표 + margin 을 넘으면 승격하고,
+        # 목표 + margin − release_band 아래로 내려오거나 냉방이 끝날 때까지 유지한다. 승격 중엔 무료 냉방을 요청하지 않는다
+        # (I2 로 창문이 닫히면 승격 조건이 풀려 다시 창문을 여는 채터링 방지 — C5)
+        cl = "comfort_ladders."
+        if not self.cooling or not free_cool:
+            self._escalated, self._free_cool_since = False, None
+        else:
+            if self._free_cool_since is None:
+                self._free_cool_since = o.now_s
+            over_at = sp + g(cl + "escalate_above_setpoint_c")
+            if (not self._escalated and o.temp_c > over_at
+                    and o.now_s - self._free_cool_since >= g(cl + "escalate_to_ac_after_s")):
+                self._escalated = True
+            elif self._escalated and o.temp_c <= over_at - self._band("escalate_release_band_c"):
+                self._escalated = False
         if self.cooling:
             if o.illuminance_lux >= g("comfort_ladders.shade_requires_lux"):
                 add("blind", "need", g("setpoints.blind_shade_angle_deg"), L5, "냉방 ① 블라인드 차광")
-            if free_cool and not blocked:
+            if free_cool and not blocked and not self._escalated:
                 add("window", "need", g("setpoints.window_vent_ratio_pct") / 100.0, L5, "냉방 ② 창문 (외기가 더 시원)")
                 add("exhaust", "need", g("setpoints.fan_low_rpm"), L5, "냉방 ② 배기 저속 (창문 병행)")
-            speed = 2 if o.temp_c > sp + g("comfort_ladders.ceiling_fan_high_above_setpoint_c") else 1
-            fan = min(speed, fan_max)
+            hi_at = sp + g("comfort_ladders.ceiling_fan_high_above_setpoint_c")
+            if o.temp_c > hi_at:
+                self._fan_high = True
+            elif o.temp_c < hi_at - self._band("ceiling_fan_speed_band_c"):
+                self._fan_high = False
+            fan = min(2 if self._fan_high else 1, fan_max)
             if "ceiling_fan" in self.rules.devices:
                 add("ceiling_fan", "need", fan, L5, "냉방 ③ 실링팬 정회전")
-            if free_cool and blocked:
+            if free_cool and blocked and not self._escalated:
                 rpm = g("setpoints.fan_high_rpm")
                 add("exhaust", "need", rpm, L5, f"냉방 ④ 배기 + 흡기 (창문 불가 {','.join(blocked)})")
                 add("intake", "need", self.rules.intake_rpm_for(self.rules.exhaust_m3h(rpm)), L5, "냉방 ④ 균형 급기")
-            # 무료 냉방을 쓰는 중이어도 escalate_to_ac_after_s 동안 목표 + margin 아래로 못 내리면 에어컨으로 승격
-            cl = "comfort_ladders."
-            if free_cool:
-                self._free_cool_since = self._free_cool_since if self._free_cool_since is not None else o.now_s
-            else:
-                self._free_cool_since = None
-            escalate = (free_cool and o.now_s - self._free_cool_since >= g(cl + "escalate_to_ac_after_s")
-                        and o.temp_c > sp + g(cl + "escalate_above_setpoint_c"))
+            escalate = self._escalated
             if (not free_cool or escalate) and ac_allowed:
                 relax = g("interaction_rules.I5_ceiling_fan_setpoint_relax_c") if "ceiling_fan" in self.rules.devices else 0.0
                 sp_ac = sp + relax
@@ -115,8 +129,6 @@ class ComfortLadders:
                     self._ac_dry = False
                 why = "냉방 ⑤ 에어컨" + (" (승격 — 무료 냉방 부족)" if escalate else "") + (f" (I5 +{relax:g} °C)" if relax else "")
                 ac_cmd = ("dry", sp_ac, why + " → 제습 모드 (냉방 + 제습)") if self._ac_dry else ("cool", sp_ac, why)
-        else:
-            self._free_cool_since = None
         info["cooling"] = self.cooling
 
         # ---- 제습 수단 ----

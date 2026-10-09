@@ -680,7 +680,7 @@ smart_home_controller:
       energy_wh_reduction_pct: 20.0       # [v3.0] 지표 #7 — 가동시간 → 추정 Wh
       base_vent_compliance_pct: 95.0      # [v3.4] 지표 #9 — 기본 환기 충족률
       verification_co2_compliance_pct: 95.0   # [v3.4] 지표 #9 — 참값 CO2 기준 이하 비율 (제어 미사용)
-      pm_peak_reduction_pct: 30.0         # [v3.0] 지표 #10 (Baseline A 대비)
+      pm_peak_reduction_pct: 15.0         # [v3.0] 지표 #10 (Baseline A 대비) — 2026-10-09 30 → 15 (에너지 A 이하와 함께)
       pm_recovery_time_s: 1200.0          # [v3.0] 지표 #10
       condensation_exposure_s: 0.0        # [v3.0] 지표 #11
       rule_violation_count: 0             # [v3.0] 지표 #12

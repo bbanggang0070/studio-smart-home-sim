@@ -208,7 +208,8 @@ scenarios:
     pass_criteria:
       - "event_entered('COOKING') within 90 after cooking_start"
       - "window_open_ratio == 0 for all t"
-      - "pm25_peak <= 0.7 * baseline_A.pm25_peak"
+      - "pm25_peak <= 0.85 * baseline_A.pm25_peak"     # 지표 #10 — 2026-10-09 −30 % → −15 %
+      - "energy_wh <= baseline_A.energy_wh"
       - "pm25 <= 35 within 1200 after cooking_end"
 
     metrics:

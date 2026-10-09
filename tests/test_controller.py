@@ -183,6 +183,7 @@ def test_c9_proposed_behaviour(tmp_path):
     assert st["range_hood_level == 1 during cooking settle 90"] == C.PASS
     assert st["intake_fan_rpm >= 1800.0 during cooking settle 90"] == C.PASS
     assert st["pm25 <= 35 within 1200 after cooking_end"] == C.PASS     # 외기 오염 중 열 꺼진 뒤 후드 재예측
+    assert p.status == C.PASS, [(c.status, c.text, c.detail) for c in p.criteria]
     a = next(r for r in res if r.run.baseline == "A")
     assert p.metrics["pm25_peak"] < a.metrics["pm25_peak"]
 

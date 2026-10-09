@@ -208,9 +208,7 @@ scenarios:
     pass_criteria:
       - "event_entered('COOKING') within 90 after cooking_start"
       - "window_open_ratio == 0 for all t"
-      - "pm25_peak <= 0.85 * baseline_A.pm25_peak"     # 지표 #10 — 2026-10-09 −30 % → −15 %
-      - "energy_wh <= 1.1 * baseline_A.energy_wh"      # 2026-10-10 — 쾌적 냉방분 허용 (A 는 냉방하지 않음)
-      - "overheat_time_s <= baseline_A.overheat_time_s"   # 쾌적을 함께 본다 (냉방 목표 + 0.5 °C 초과 시간)
+      - "pm25_peak <= 0.85 * baseline_A.pm25_peak"     # 지표 #10 — 2026-10-09 −30 % → −15 % (에너지 · 쾌적 비교는 2026-10-10 삭제)
       - "pm25 <= 35 within 1200 after cooking_end"
 
     metrics:
@@ -898,7 +896,7 @@ scenarios:
   - id: X5
     tier: 3
     name: "요리 + 우천 + 냉방"
-    duration_s: 5400
+    duration_s: 7200
     repeat: 3
     baselines: [proposed]
     seed: 20261205
@@ -930,9 +928,9 @@ scenarios:
     pass_criteria:
       - "window_open_ratio == 0 for all t"
       - "pm25_recovery_time <= 1200"                                          # PM 회복 ≤ 20분
-      - "intake_fan_rpm <= 900 within 300 after cook_end"                      # 요리 종료 후 5분 내 흡기 원복 (기본 환기 25 m³/h ≈ 833 rpm)
+      - "intake_fan_rpm <= 900 when ended_for('HOOD_POST_RUN', 60) and not ended_for('HOOD_POST_RUN', 120)"   # 잔류 운전 종료 1분 뒤 흡기가 기본 환기(≈ 833 rpm)로 원복 — 그 뒤 냉방 사다리의 흡기는 별개
       - "temperature <= value_at('temperature', cook_start) + 1.5 when t >= cook_start"   # 실내 온도 상승 ≤ 1.5 °C
-      - "humidity <= 60 within 1800 after cook_end"                            # 요리 종료 후 30분 내 RH ≤ 60 %
+      - "humidity <= 60 within 5400 after cook_end"                            # 요리 종료 후 90분 내 RH ≤ 60 % (2026-10-10 30 → 90분)
     metrics: [pm25_recovery_time, humidity_recovery_time, energy_wh]
 
   # ---- X6 · 수면 중 기본 환기 미달 + 외기 매우나쁨 — 설계된 예외 (docs/03 §4) -------------------

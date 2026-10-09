@@ -18,6 +18,7 @@
     value_at('<별칭>', <앵커|숫자>)    그 시각의 값
     ratio(<조건식>)                   조건이 참인 시각의 비율 (체류율)
     entries('NAME')                  이벤트 진입 횟수 (알림 횟수 판정)
+    ended_for('NAME', N)             이벤트가 끝난 뒤 N 초 이상 지난 시각 (끝난 적이 없으면 거짓)
     ac_fan_is('low')                 에어컨이 꺼져 있거나 그 풍량인 시각
 
 평가할 수 없는 판정(다른 baseline 이 아직 없음 등)은 PENDING 으로 남긴다 — FAIL 과 구분한다.
@@ -270,7 +271,22 @@ def evaluate(df: pd.DataFrame, criteria: list[str], expect: dict[str, dict], anc
         on = df["act.ac_power"].astype(bool).to_numpy() if "act.ac_power" in df.columns else np.zeros(len(df), bool)
         return ~on | (col == level)
 
+    def ended_for(name: str, seconds: float) -> np.ndarray:
+        """이벤트가 한 번 이상 활성이었다가 끝난 뒤 seconds 이상 지난 시각."""
+        m = _active_event_mask(df, name)
+        out = np.zeros(len(df), dtype=bool)
+        last_end = None
+        for i in range(len(df)):
+            if m[i]:
+                last_end = None
+            elif i > 0 and m[i - 1]:
+                last_end = t[i]
+            if last_end is not None and t[i] - last_end >= seconds:
+                out[i] = True
+        return out
+
     funcs = {"event_entered": lambda name: _active_event_mask(df, name), "value_at": value_at,
+             "ended_for": ended_for,
              "entries": entries, "ac_fan_is": ac_fan_is,
              "ratio": lambda cond: float(np.mean(np.asarray(cond, dtype=bool)))}
     ev = _Evaluator(names, funcs, baselines)

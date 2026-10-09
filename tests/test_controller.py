@@ -183,9 +183,7 @@ def test_c9_proposed_behaviour(tmp_path):
     assert st["range_hood_level == 1 during cooking settle 90"] == C.PASS
     assert st["intake_fan_rpm >= 1800.0 during cooking settle 90"] == C.PASS
     assert st["pm25 <= 35 within 1200 after cooking_end"] == C.PASS     # 외기 오염 중 열 꺼진 뒤 후드 재예측
-    # 에너지 · 체감 과열 비교(A 는 실링팬 상시 약)는 결정 대기 — 그 밖의 판정은 모두 PASS
-    others = [c for c in p.criteria if "energy_wh" not in c.text and "overheat_time_s" not in c.text]
-    assert all(c.status == C.PASS for c in others), [(c.status, c.text, c.detail) for c in others]
+    assert p.status == C.PASS, [(c.status, c.text, c.detail) for c in p.criteria]
     a = next(r for r in res if r.run.baseline == "A")
     assert p.metrics["pm25_peak"] < a.metrics["pm25_peak"]
 
@@ -275,7 +273,7 @@ def test_baseline_b_has_no_hysteresis(params):
 
 
 @pytest.mark.parametrize("sid", ["B8", "B9", "C1", "C5", "C6", "C8", "C10", "C11", "C12", "C13", "C14", "C17", "C18", "C19",
-                                 "X1", "X6", "X8"])
+                                 "X1", "X5", "X6", "X8"])
 def test_comfort_scenarios_pass(sid, tmp_path):
     # baseline_A.* 비교 판정이 있는 시나리오는 A 도 함께 돌린다 (없으면 PENDING)
     res = run_batch([sid], baselines=["A", "B", "proposed"], reps=1, out_dir=tmp_path, progress=lambda *_: None)

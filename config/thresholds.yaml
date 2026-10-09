@@ -520,6 +520,22 @@ smart_home_controller:
       appliance_no_response: { max_resend: 2, layer: 1, power_confirm_s: 10.0 }  # E9 — v3.1 전력 1차 확인
       laundry_drying:                  # E10 [v3.1]
         trigger: ['washer_spin_end', 'user_declare']
+        #  [v3.4.3] 두 번째 신호 확장 — 'RH 상승'은 이미 제습 중이면 나타나지 않으므로(C15: 75 %RH 에서 제습 중),
+        #  같은 의도(실내 습기 발생원)를 습기 수지 잔차로도 본다: 발생원 ≈ V·dw/dt − 환기 유입 + 제습 제거 − 재실자
+        moisture_residual_enter_g_per_h: 100.0   # draft — 탈수 종료 후 60분 안에 잔차가 이 이상(10분 평균)이면 진입
+        moisture_residual_release_g_per_h: 30.0  # draft — 잔차가 이 아래로 30분 지속 → 건조 끝 (RH 상승률 ≈ 0 대체)
+        release_hold_min: 30.0
+        spin_end_window_min: 60.0
+        residual_window_s: 600.0
+        occupant_moisture_g_per_h: 50.0          # 재실자 1인 수분 발생 (docs/06 §5.4)
+        ac_cool_latent_g_per_h_est: 300.0        # draft — 냉방 운전 중 잔차 계산에 쓰는 에어컨 제습량 추정
+        ceiling_fan_level: 2                     # 실링팬 정 강 (빨래에 기류)
+        #  에어컨은 '제습 모드'(제거 500 g/h · 현열 ≈ 제습기 발열)를 기본으로 쓰고, 온도가 예산에 가까워지면 냉방으로 바꾼다
+        #  (C15 비교: 냉방만 → 6 h 안에 못 마름 · 제습 모드만 → 5.3 h 지만 예산 +1.1 °C 초과)
+        ac_mode: 'dry'
+        ac_setpoint_above_entry_c: 0.0           # 냉방 전환 시 설정 = 진입 시 온도 + 이 값 · 단 쾌적 냉방 설정을 넘지 않는다
+        cool_switch_above_entry_c: 0.7           # draft — 진입 + 0.7 °C 이상이면 냉방 (예산 1.0 안에서 여유)
+        dry_resume_below_entry_c: 0.2            # draft — 진입 + 0.2 °C 이하로 내려오면 다시 제습 모드
         rh_rise_pct_per_h: 3.0
         rh_rise_hold_min: 60.0
         done_remaining_moisture: 0.05
@@ -528,7 +544,7 @@ smart_home_controller:
         primary_goal: 'drying_time'
         budget: { indoor_temp_rise_c: 1.0, indoor_temp_rise_away_c: 3.0, noise_grade: 'N2', extra_energy_wh: -1.0 }   # -1 = 상한 없음
         overrides: ['I6']
-      power_limit: { enter_ratio: 0.90, release_ratio: 0.75, release_hold_s: 300.0, layer: 1 }   # E11
+      power_limit: { enter_ratio: 0.90, release_ratio: 0.75, release_hold_s: 300.0, layer: 1, shed_step_s: 10.0 }   # E11 · [v3.4.3] shed_step_s — 한도 90 % 이상이 이어지면 I8 순서로 이 간격마다 한 단계씩 더 끈다
       manual_override: { hold_min: 30.0, layer: 4 }                                              # E12
       precool: { quantile: 0.2, margin_min: 5.0, timeout_after_pred_min: 60.0, layer: 3 }       # E13
       unattended_cooking: { layer: 1, plug_cooktop_cutoff: true, gas_alert_only: true }          # E15 [v3.3]

@@ -25,8 +25,9 @@ L0, L1, L2, L3, L4, L5, L6 = 0, 1, 2, 3, 4, 5, 6
 
 
 class RuleEngine:
-    def __init__(self, p: ControllerParams, psy: Psychro, hysteresis: bool = True):
+    def __init__(self, p: ControllerParams, psy: Psychro, hysteresis: bool = True, primary_goals: bool = True):
         self.p, self.psy = p, psy
+        self.primary_goals = primary_goals          # False = Proposed−P (우선 목표 비활성, C15 대조군)
         self.pred = HoodPredictor(p)
         g = p.get
         self.intake_max_m3h = g("appliances.intake_fan.max_m3h")
@@ -37,6 +38,7 @@ class RuleEngine:
         self.pm_hist: deque[tuple[float, float]] = deque(maxlen=240)
         self._i10_open = False
         self._hood_next_eval = -math.inf
+        self._laundry_cooling = False
         self.info: dict = {}
         self.ladders = ComfortLadders(p, psy, self, hysteresis)
 
@@ -104,7 +106,7 @@ class RuleEngine:
 
         # -- L2 건강 · 재산 --
         self._cooking(o, ev, blocked, noise, add)
-        self._shower(o, ev, blocked, noise, add)
+        self._shower(o, ev, blocked, noise, add, mode)
         cond = ev.get("CONDENSATION")
         if cond and cond.info.get("level") == "critical":
             add("blind", "force", g("condensation.blind_slat_on_critical_deg"), L2, "E2 결로 위험 블라인드 개방")
@@ -112,6 +114,10 @@ class RuleEngine:
             add("ceiling_fan", "need", -1, L2, "E2 결로 위험 실링팬 역회전")
             add("dehumidifier", "need", 1, L2, "E2 결로 위험 제습")
             self._pulse_vent(o, cond, blocked, add)
+
+        # -- L4.5 우선 목표 (E10 빨래 건조) · L1 전력 한도 (E11) --
+        self._laundry(o, ev, mode, noise, add)
+        self._power_limit(o, ev, add)
 
         # -- L3 절전 · 외출 --
         if mode == "AWAY":
@@ -248,11 +254,18 @@ class RuleEngine:
         self._hood_next_eval = o.now_s + g(hp + "reevaluate_s")
         return plan.hood_level
 
-    def _shower(self, o, ev, blocked, noise, add) -> None:
+    def _shower(self, o, ev, blocked, noise, add, mode: str) -> None:
         g = self.p.get
         if "SHOWER" not in ev:
             self._i10_open = False
             return
+        # R4 — 안에서 처리하는 수단을 앞당겨 쓴다: 제습기 허용(E3 가 I6 해제) · 여름엔 에어컨 제습 강화
+        add("dehumidifier", "need", 1, L2, "E3 샤워 제습기 (I6 해제 · R4)")
+        sp = self.p.mode(mode).get("cooling_setpoint_c")
+        if (self.ladders.season(o) == "summer" and "ac" in self.devices and sp is not None):
+            add("ac", "need", 1, L2, "E3 샤워 에어컨 제습 강화 (R4)")
+            self.info["ac_override"] = {"mode": "dry", "setpoint": sp + g("recovery.ac_dry_boost_setpoint_c"),
+                                        "fan": noise["ac_fan_max"]}
         i10 = "interaction_rules.I10_vent_dehumidify_requires_drier_outside."
         diff = self.psy.dew_point(o.temp_c, o.rh_pct) - self.psy.dew_point(o.outdoor_temp_c, o.outdoor_rh_pct) \
             if not math.isnan(o.outdoor_temp_c) else -math.inf
@@ -268,6 +281,55 @@ class RuleEngine:
                              add, "E3")
         else:
             add("dehumidifier", "need", 1, L2, "E3 샤워 실내 제습 (I10 바깥이 더 습함 · I6 해제)")
+
+    def _laundry(self, o: Observation, ev, mode: str, noise: dict, add) -> None:
+        """E10 — 우선 목표 = 건조 시간 (L4.5). I6 해제: 제습기 + (여름 · 간절기) 에어컨 냉방으로 열 상쇄 · 실링팬 강.
+        온도 예산(+1.0 °C)을 지키려 에어컨 설정 = 진입 시 실내 온도. 외출이면 예산 +3.0 °C 로 에어컨을 생략할 수 있다."""
+        lev = ev.get("LAUNDRY_DRYING")
+        if lev is None or not self.primary_goals:
+            return
+        g = self.p.get
+        e = "events.laundry_drying."
+        L45 = g(e + "layer")
+        add("dehumidifier", "need", 1, L45, "E10 빨래 건조 제습기 (I6 해제)")
+        fan_max = {"low": 1, "mid": 1, "high": 2}[noise["ceiling_fan_max_speed"]]
+        if "ceiling_fan" in self.devices:
+            add("ceiling_fan", "need", min(g(e + "ceiling_fan_level"), fan_max), L45, "E10 빨래에 기류 (실링팬 정)")
+        sp = self.p.mode(mode).get("cooling_setpoint_c")
+        season = self.ladders.season(o)
+        if season != "winter" and "ac" in self.devices and sp is not None:
+            # 온도 예산은 상한이지 목표가 아니다 — 쾌적 냉방 설정(I5 포함)보다 높게 잡지 않는다 (C17: 진입 30 °C)
+            relax = g("interaction_rules.I5_ceiling_fan_setpoint_relax_c") if "ceiling_fan" in self.devices else 0.0
+            entry = lev.info["entry_temp_c"]
+            target = min(entry + g(e + "ac_setpoint_above_entry_c"), sp + relax)
+            # 기본은 제습 모드 — 온도가 예산에 가까워지면 냉방, 충분히 내려오면 다시 제습 (예산 히스테리시스)
+            if o.temp_c >= entry + g(e + "cool_switch_above_entry_c") or o.temp_c > sp + relax:
+                self._laundry_cooling = True
+            elif o.temp_c <= entry + g(e + "dry_resume_below_entry_c"):
+                self._laundry_cooling = False
+            mode_ac = "cool" if self._laundry_cooling else g(e + "ac_mode")
+            add("ac", "need", 1, L45, f"E10 제습기 열 상쇄 — 에어컨 {mode_ac} (예산 +{g(e + 'budget.indoor_temp_rise_c'):g} °C)")
+            self.info["ac_override"] = {"mode": mode_ac, "setpoint": round(target * 2) / 2, "fan": noise["ac_fan_max"]}
+        self.info["primary_goal"] = "drying_time"
+
+    def _power_limit(self, o: Observation, ev, add) -> None:
+        """E11 — I8 차단 순서대로 단계마다 하나씩 더 끈다 (L1). 요리 중 후드는 끄지 않는다(I8_never_shed)."""
+        pev = ev.get("POWER_LIMIT")
+        if pev is None:
+            return
+        order = self.p.get("interaction_rules.I8_power_shed_order")
+        shed = pev.info["shed"]
+        for item in order[: int(pev.info["stage"])]:
+            if item == "purifier_step_down":
+                shed.setdefault("purifier", max(0, o.purifier_level - 1))
+                add("purifier", "cap", shed["purifier"], L1, "E11 전력 한도 — 청정기 한 단 하향 (I8)")
+            elif item == "ac_setpoint_plus_1":
+                self.info["ac_setpoint_offset"] = 1.0
+            elif item == "ac_fan_low":
+                self.info["ac_fan_force"] = "low"
+            elif item in ("humidifier", "dehumidifier"):
+                add(item, "cap", 0, L1, f"E11 전력 한도 — {item} 차단 (I8)")
+        self.info["power_shed_stage"] = int(pev.info["stage"])
 
     def _base_ventilation(self, o: Observation, mode: str, blocked: list[str], add) -> None:
         g = self.p.get

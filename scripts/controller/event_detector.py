@@ -1,7 +1,8 @@
 """이벤트 감지기 (docs/07 §3) — 진입 · 해제(히스테리시스) · 상태.
 
-v1 구현: E1 요리(후드 아래 온도 · 쿡탑 전력, 열 + 연기 / 열만 구분) · E2 결로 · E3 샤워 · E5 강우 · E6 외기 오염.
-나머지(E4 · E7–E15)는 W09–W10 에 같은 틀로 더한다.
+v1 구현: E1 요리(후드 아래 온도 · 쿡탑 전력, 열 + 연기 / 열만 구분) · E2 결로 · E3 샤워 · E5 강우 · E6 외기 오염 ·
+        E10 빨래 건조(사용자 선언 ∨ 탈수 종료 + 습기 수지 잔차) · E11 전력 한도.
+나머지(E4 · E7–E9 · E12–E15)는 W09–W10 에 같은 틀로 더한다.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from controller.params import ControllerParams
+from controller.moisture import MoistureResidual
 from controller.signals import Observation, Psychro
 
 GRADE_ORDER = ["good", "moderate", "bad", "very_bad"]
@@ -58,6 +60,12 @@ class EventDetector:
         self._pm_clear_since: float | None = None
         self._cook_release_since: float | None = None
         self._cond_release_since: float | None = None
+        self.moisture = MoistureResidual(p, psy)
+        self.residual: float | None = None
+        self._washer_spinning = False
+        self._spin_end_at: float | None = None
+        self._laundry_quiet_since: float | None = None
+        self._power_ok_since: float | None = None
 
     # -- 공통 --
 
@@ -78,6 +86,9 @@ class EventDetector:
         self._cooking(o)
         self._shower(o)
         self._condensation(o)
+        self.residual = self.moisture.update(o)
+        self._laundry(o)
+        self._power_limit(o)
         return self.active
 
     # -- E5 강우 (L1) --
@@ -168,6 +179,58 @@ class EventDetector:
         timeout = o.now_s - ev.since_s >= g(s + "max_duration_min") * 60.0
         if (recovered and o.now_s - ev.since_s >= g(s + "min_hold_s")) or timeout:
             self._exit("SHOWER")
+
+    # -- E10 빨래 건조 (L4.5) --
+
+    def _laundry(self, o: Observation) -> None:
+        g = self.p.get
+        e = "events.laundry_drying."
+        pw = o.power_w.get("washer", 0.0)
+        st = self.p.get("power_monitor.states_w.washer")
+        if pw >= st["spin_gt"]:
+            self._washer_spinning = True
+        elif self._washer_spinning and pw < st["off_lt"]:
+            self._washer_spinning, self._spin_end_at = False, o.now_s     # 탈수 종료 엣지
+        ev = self.active.get("LAUNDRY_DRYING")
+        if ev is None:
+            declared = o.activity == "LAUNDRY"
+            recent_spin = (self._spin_end_at is not None
+                           and o.now_s - self._spin_end_at <= g(e + "spin_end_window_min") * 60.0)
+            residual_ok = self.residual is not None and self.residual >= g(e + "moisture_residual_enter_g_per_h")
+            if declared or (recent_spin and residual_ok):
+                self._enter("LAUNDRY_DRYING", o.now_s, entry_temp_c=o.temp_c,
+                            source="user_declare" if declared else "washer_spin_end+moisture_residual")
+                self._laundry_quiet_since, self._spin_end_at = None, None
+            return
+        quiet = self.residual is not None and self.residual < g(e + "moisture_residual_release_g_per_h")
+        self._laundry_quiet_since = (self._laundry_quiet_since or o.now_s) if quiet else None
+        done = self._laundry_quiet_since is not None and o.now_s - self._laundry_quiet_since >= g(e + "release_hold_min") * 60.0
+        if done or o.now_s - ev.since_s >= g(e + "max_duration_h") * 3600.0:
+            self._exit("LAUNDRY_DRYING")
+
+    # -- E11 전력 한도 (L1) --
+
+    def _power_limit(self, o: Observation) -> None:
+        pl = "events.power_limit."
+        g = self.p.get
+        limit = float(self.p.modes["energy"]["power_limit_w"])
+        total = sum(float(v) for v in o.power_w.values())
+        ev = self.active.get("POWER_LIMIT")
+        if ev is None:
+            if total >= g(pl + "enter_ratio") * limit:
+                self._enter("POWER_LIMIT", o.now_s, stage=1, last_step=o.now_s, shed={})
+                self._power_ok_since = None
+            return
+        ev.info["total_w"] = total
+        if total >= g(pl + "enter_ratio") * limit and o.now_s - ev.info["last_step"] >= g(pl + "shed_step_s"):
+            ev.info["stage"] += 1
+            ev.info["last_step"] = o.now_s
+        if total < g(pl + "release_ratio") * limit:
+            self._power_ok_since = self._power_ok_since or o.now_s
+            if o.now_s - self._power_ok_since >= g(pl + "release_hold_s"):
+                self._exit("POWER_LIMIT")
+        else:
+            self._power_ok_since = None
 
     # -- E2 결로 (경고 L5 / 위험 L2) --
 

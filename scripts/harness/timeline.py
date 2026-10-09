@@ -16,9 +16,9 @@ UNSUPPORTED_KINDS = {
     "wifi": "W07 휴대폰 Wi-Fi 모델",
     "neighbor": "W07 벽 너머 신호 주입",
     "fault": "W10 고장 주입 (ir_miss · door_sensor_stuck 등)",
-    "appliance": "W08 T8.w1 기기 전력 프로파일 (세탁기 등)",
 }
-SUPPORTED_SOURCES = ("cooking", "shower", "pm_no_heat")
+SUPPORTED_SOURCES = ("cooking", "shower", "pm_no_heat", "laundry")
+# 기기 전력 프로파일 주입 — washer: 탈수 구간 전력 → 종료 시 젖은 빨래를 넌다 (laundry_moisture_g)
 EXTERNAL_KEYS = ("outdoor_temp_c", "outdoor_rh_pct", "outdoor_pm25_ugm3", "outdoor_illuminance_lux",
                  "wind_speed_ms", "heating_setpoint_c", "weather")
 WORLD_KEYS = ("occupancy", "occupant_zone", "user_mode", "illuminance_lux", "activity", "occupants")
@@ -74,7 +74,20 @@ class Timeline:
                 src.moisture_g_per_h += float(s["moisture_g"]) / float(s["duration_s"]) * 3600.0
             elif iv.kind == "pm_no_heat":
                 src.other_pm_mg_per_min += float(s.get("pm_mg_per_min", 0.0))
+        for iv in self.intervals:
+            if iv.kind == "washer" and iv.active(t):
+                power["washer"] = power.get("washer", 0.0) + float(iv.spec.get("power_w", 450.0))
         return src, power
+
+    def laundry_hung_between(self, t0: float, t1: float) -> float:
+        """(t0, t1] 에 널린 빨래 수분 [g] — 세탁기 탈수 종료 시각 · 'source: laundry' 시작 시각."""
+        g = 0.0
+        for iv in self.intervals:
+            if iv.kind == "washer" and t0 < iv.end_s <= t1:
+                g += float(iv.spec.get("laundry_moisture_g", 0.0))
+            elif iv.kind == "laundry" and t0 < iv.start_s <= t1:
+                g += float(iv.spec.get("moisture_g", 0.0))
+        return g
 
     def door_open_at(self, t: float) -> bool:
         return any(iv.kind == "door" and iv.active(t) for iv in self.intervals)
@@ -96,6 +109,9 @@ def build_timeline(scenario: dict[str, Any]) -> Timeline:
                 continue
             dur = float(inj.get("duration_s", duration - at))
             tl.intervals.append(Interval(inj.get("label", kind), kind, at, at + dur, inj))
+        elif inj.get("appliance") == "washer":
+            dur = float(inj.get("duration_s", 600.0))
+            tl.intervals.append(Interval(inj.get("label", "washer"), "washer", at, at + dur, inj))
         elif inj.get("door") == "open_close":
             open_s = float(inj.get("open_s", 5.0))
             tl.intervals.append(Interval(inj.get("label", "door"), "door", at, at + open_s, inj))

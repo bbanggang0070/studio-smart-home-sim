@@ -48,6 +48,9 @@ class Observation:
     ceiling_fan: int
     humidifier_on: bool
     ac_cooling: bool
+    ac_power: bool
+    ac_mode: str
+    dehumidifier_on: bool
 
     @property
     def tod_s(self) -> float:
@@ -83,6 +86,9 @@ def parse_inbox(now_s: float, inbox: dict[str, Any]) -> Observation:
         ceiling_fan=int(round(float(inbox.get(T.T_CEILING_FAN, 0)))),
         humidifier_on=bool(inbox.get(T.T_HUMIDIFIER, False)),
         ac_cooling=bool(ac.get("power")) and ac.get("mode") == "cool",
+        ac_power=bool(ac.get("power")),
+        ac_mode=str(ac.get("mode", "cool")),
+        dehumidifier_on=bool(inbox.get(T.T_DEHUMIDIFIER, False)),
     )
 
 
@@ -99,6 +105,11 @@ class Psychro:
 
     def dew_point(self, temp_c: float, rh_pct: float) -> float:
         return dew_point_c(temp_c, rh_pct, self.b, self.c)
+
+    def abs_humidity(self, temp_c: float, rh_pct: float) -> float:
+        """절대습도 [g/m³] — Magnus 포화수증기압 · 이상기체."""
+        e_s = 611.2 * math.exp(self.b * temp_c / (self.c + temp_c))       # Pa (Magnus 계수 6.112 hPa — 물리 상수)
+        return rh_pct / 100.0 * e_s / (461.5 * (temp_c + 273.15)) * 1000.0
 
     def surface_resistance(self, blind_deg: float, ceiling_fan: int) -> float:
         if blind_deg >= self.closed_min:

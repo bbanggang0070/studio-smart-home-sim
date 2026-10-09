@@ -666,3 +666,188 @@ scenarios:
       - "intake_fan_rpm <= 700 for all t"                    # N0
       - "co2_compliance >= 0.95"                             # (검증) 참값 CO2 ≤ 1,000 ppm
     metrics: [base_vent_compliance, co2_compliance, energy_wh, rule_violation_count]
+
+  # ---- C15 · 장마철 실내 빨래 건조 — 우선 목표 (docs/03 §3) --------------------------------
+  - id: C15
+    tier: 2
+    name: "장마철 빨래 건조"
+    duration_s: 28800              # E10 최대 8시간까지 — 건조 시간을 끝까지 잰다
+    repeat: 3
+    baselines: [A, B, proposed, proposed_np]   # + Proposed−P (우선 목표 비활성)
+    seed: 20261115
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    baseline_a: { auto_appliances: [dehumidifier] }   # A: 제습기만 (자체 설정)
+    initial:
+      user_mode: NORMAL
+      temperature_c: 26.0
+      humidity_pct: 75.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "10:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: rain
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 24.0
+      outdoor_rh_pct: 95.0
+      outdoor_illuminance_lux: 5000.0
+    injections:
+      - at_s: 0                     # 세탁기 탈수 10분 → 종료 시 빨래 2.0 kg 를 넌다
+        appliance: washer
+        label: washer
+        power_w: 450
+        duration_s: 600
+        laundry_moisture_g: 2000
+    pass_criteria:
+      - "event_entered('LAUNDRY_DRYING') within 3600 after washer_end"          # 탈수 종료 + 습기 수지 잔차
+      - "laundry_dry_time_s <= 14400"                                           # 잔여 수분 ≤ 5 % 도달 ≤ 4시간 (널린 시각부터)
+      - "temperature <= value_at('temperature', washer_end) + 1.0 when t >= washer_end"   # 온도 예산 +1.0 °C
+      - "humidity <= 70 when t >= 1800"                                         # RH 정점 ≤ 70 % (초기 75 % 에서 내려온 뒤)
+      - "laundry_dry_time_s < baseline_proposed_np.laundry_dry_time_s"          # 우선 목표의 효과 (Proposed−P 대비)
+    metrics: [laundry_dry_time_s, energy_wh, rule_violation_count]
+
+  # ---- C17 · 전력 한도 — 요리 + 냉방 + 제습 (docs/03 §3) -----------------------------------
+  - id: C17
+    tier: 2
+    name: "전력 한도"
+    duration_s: 3600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261117
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    baseline_a: { auto_appliances: [ac, dehumidifier] }
+    initial:
+      user_mode: NORMAL
+      temperature_c: 30.0
+      humidity_pct: 65.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: kitchen
+      time_of_day: "18:00"
+      activity: LAUNDRY            # 빨래 건조 선언 → 제습기 + 에어컨 (I6 해제)
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: rain
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 30.0
+      outdoor_rh_pct: 85.0
+    injections:
+      - { at_s: 0, source: laundry, label: laundry, moisture_g: 2000 }
+      - at_s: 300                  # 인덕션 2.0 kW 가열 (플러그형 — 쿡탑 전력 신호)
+        source: cooking
+        label: cook
+        stove: induction_plug
+        pm_mg_per_min: 1.0
+        moisture_g_per_h: 300
+        heat_w: 2000
+        duration_s: 900
+    pass_criteria:
+      - "event_entered('POWER_LIMIT') within 30 after cook_start"              # E11
+      - "total_power <= 3000 when t >= 360"                                   # 차단기 트립 0 (차단 단계 60 s 허용)
+      - "range_hood_level >= 1 during cook settle 30"                         # 후드 차단 0 (I8_never_shed)
+      - "dehumidifier within 330 after cook_end"                              # 요리 종료 후 5분 내 복원
+    metrics: [energy_wh, rule_violation_count]
+
+  # ---- C18 · 장마철 샤워 — 비가 와도 배기할 때와 멈출 때 (docs/03 §3) ------------------------
+  - id: C18
+    tier: 2
+    name: "장마철 샤워"
+    duration_s: 3600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261118
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    baseline_a: { auto_appliances: [ac] }
+    initial:
+      user_mode: NORMAL
+      temperature_c: 26.0
+      humidity_pct: 60.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: none
+      time_of_day: "21:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: true, mode: cool, setpoint: 26.0 }, purifier_level: 0 }
+    external:
+      weather: rain
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 24.0
+      outdoor_rh_pct: 95.0
+    injections:
+      - { at_s: 600, source: shower, label: shower, moisture_g: 250, duration_s: 600 }
+    pass_criteria:
+      - "window_open_ratio == 0 for all t"
+      - "humidity <= 60 within 1800 after shower_end"                         # 30분 내 RH ≤ 60 % (습기 유입이 끝난 뒤부터)
+      - "exhaust_fan_rpm < 1 when outdoor_dew > dew_point"                    # I10 — 바깥이 더 습한데 배기 0 s
+      - "temperature <= value_at('temperature', shower_start) + 1.0 when t >= shower_start"
+      - "temperature >= value_at('temperature', shower_start) - 1.0 when t >= shower_start"
+    metrics: [humidity_recovery_time, energy_wh, rule_violation_count]
+
+  # ---- C19 · 겨울 샤워 → 빨래 건조 + 외기 미세먼지 나쁨 (docs/03 §3) ------------------------
+  - id: C19
+    tier: 2
+    name: "겨울 샤워 · 빨래 + 외기 나쁨"
+    duration_s: 14400
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261119
+    run_mode: fast
+    appliance_profile: full
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    baseline_a: { auto_appliances: [dehumidifier] }
+    initial:
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 45.0
+      co2_ppm: 600.0
+      pm25_ugm3: 15.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "20:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 60.0        # 나쁨
+      outdoor_temp_c: 2.0
+      outdoor_rh_pct: 70.0
+      heating_setpoint_c: 21.0
+    injections:
+      - { at_s: 300, source: shower, label: shower, moisture_g: 200, duration_s: 600 }
+      - { at_s: 2100, appliance: washer, label: washer, power_w: 450, duration_s: 300, laundry_moisture_g: 1500 }
+    pass_criteria:
+      - "window_open_ratio == 0 for all t"
+      - "q_net >= -1 for all t"                                               # 배기 단독 0 s · 양압 (I7)
+      - "pm25 <= 35 for all t"
+      - "humidity <= value_at('humidity', shower_start) + 5 by 1800 after shower_start"
+      - "dew_margin >= 0 for all t"                                           # 결로 노출 0
+      - "temperature >= 19.5 for all t"                                       # 실내 온도 하락 ≤ 1.5 °C
+    metrics: [humidity_recovery_time, laundry_dry_time_s, condensation_exposure_s, energy_wh]

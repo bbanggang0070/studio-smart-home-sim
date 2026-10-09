@@ -63,6 +63,10 @@ ALIASES = {
     "condensate": "truth.condensate_g",
     "outdoor_pm25": "ext.outdoor_pm25_ugm3",
     "outdoor_temp": "ext.outdoor_temp_c",
+    "outdoor_dew": "ext.outdoor_dew_c",
+    "dew_point": "truth.dew_point_c",
+    "total_power": "power.total_w",
+    "laundry_moisture": "truth.laundry_moisture_g",
 }
 
 PASS, FAIL, PENDING, ERROR, NA = "PASS", "FAIL", "PENDING", "ERROR", "N/A"
@@ -137,6 +141,15 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
                     cnt, ref = cnt + 1, x
             n += cnt
     out["actuation_count"] = float(n)
+
+    # 빨래 건조 시간 — 처음 널린 시각부터 잔여 수분 ≤ 5 % 까지 (C15 · C19)
+    lm = df["truth.laundry_moisture_g"].to_numpy()
+    if lm.max() > 0:
+        t_hang = float(t[np.flatnonzero(lm > 0)[0]])
+        dry = _first_time(t, (t > t_hang) & (lm <= 0.05 * lm.max()))
+        out["laundry_dry_time_s"] = dry - t_hang if not math.isnan(dry) else math.inf   # 널었는데 끝까지 안 마름
+    else:
+        out["laundry_dry_time_s"] = math.nan
 
     # 쾌적 — 모드 냉방 목표 + margin 을 넘은 누적 시간 (냉방을 하지 않는 비교군과 에너지를 견줄 때 함께 본다)
     sp = (ctx or {}).get("cooling_setpoint_c")

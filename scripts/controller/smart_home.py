@@ -53,7 +53,9 @@ class SmartHomeController:
         if not self.hysteresis:
             self.modes.hysteresis_s = 0.0
         self.events = EventDetector(self.p, self.psy)
-        self.rules = RuleEngine(self.p, self.psy, hysteresis=self.hysteresis)
+        # Proposed−P = 우선 목표(L4.5) 비활성 대조군 (docs/03 C15)
+        self.rules = RuleEngine(self.p, self.psy, hysteresis=self.hysteresis,
+                                primary_goals=self.baseline not in ("P-", "proposed_np"))
         self.devices = self.rules.devices
         self._reasons: list[str] = []
 
@@ -76,7 +78,7 @@ class SmartHomeController:
             if profile_name not in self.devices:
                 continue
             if dev == "ac":
-                out[topic] = ac_json(self.rules.info, d.value > 0)
+                out[topic] = self._ac_command(d.value > 0)
             else:
                 out[topic] = cast(round(d.value) if cast is int else d.value)
             self._reasons.append(f"{dev}={out[topic]} ← {' / '.join(d.reasons)}")
@@ -90,6 +92,19 @@ class SmartHomeController:
                                            "i10_dew_diff_c": info.get("i10_dew_diff_c")})
         out[T.T_CONTROL_FEASIBILITY] = "FEASIBLE"     # 판정 로직은 W09 T9.7
         return out
+
+    def _ac_command(self, on: bool) -> str:
+        """에어컨 JSON — 이벤트 지정(ac_override) > 사다리(ac). E11 설정 +1 °C · 풍량 약을 마지막에 덧씌운다."""
+        info = dict(self.rules.info)
+        if "ac_override" in info:
+            info["ac"] = info["ac_override"]
+        if on and "ac" in info:
+            a = dict(info["ac"])
+            a["setpoint"] = a["setpoint"] + info.get("ac_setpoint_offset", 0.0)
+            if "ac_fan_force" in info:
+                a["fan"] = info["ac_fan_force"]
+            info["ac"] = a
+        return ac_json(info, on)
 
     def _i1_check(self, decided: dict[str, Decision]) -> None:
         """I1 — 제습기 ⟂ 가습기. 둘 다 켜지면 가습을 끈다 (결로 · 습기 쪽이 재산 보호에 가깝다)."""

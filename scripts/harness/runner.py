@@ -53,6 +53,11 @@ def _flatten(prefix: str, d: dict[str, Any], row: dict[str, Any]) -> None:
             row[f"{prefix}{k}"] = v
 
 
+def _dew(t: float, rh: float, env_cfg) -> float:
+    from env_model.psychro import dew_point_c
+    return dew_point_c(t, rh, env_cfg.get("condensation.magnus_b"), env_cfg.get("condensation.magnus_c"))
+
+
 def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_name: str) -> RunResult:
     """고속 모드 1회 실행. 제어기는 정책 주기(dt)마다 최신 토픽 값을 받는다."""
     sc = run.scenario
@@ -93,6 +98,9 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
             if "activity" in change:
                 user_cmds[T.C_ACTIVITY] = world.activity
         src, extra_power = tl.sources_at(now)
+        hung = tl.laundry_hung_between(now - dt if k else -1.0, now)
+        if hung > 0:
+            model.hang_laundry(model.state.laundry_moisture_g + hung)
 
         inbox = sensor_topics(obs, world, tl.door_open_at(now), extra_power,
                               grade["pm_grade_bounds_ugm3"], grade["pm_grade_names"])
@@ -125,7 +133,9 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
                 row[tp] = v if not isinstance(v, (dict, list)) else json.dumps(v)
             for tp, v in ctrl_state.items():
                 row.setdefault(tp, v)
+            row["power.total_w"] = sum(float(v) for v in json.loads(inbox[T.S_APPLIANCE_POWER]).values())
             row["ext.outdoor_pm25_ugm3"] = world.ext.outdoor_pm25_ugm3
+            row["ext.outdoor_dew_c"] = _dew(world.ext.outdoor_temp_c, world.ext.outdoor_rh_pct, env_cfg)
             row["ext.outdoor_temp_c"] = world.ext.outdoor_temp_c
             row["ext.raining"] = world.raining
             row["injections"] = ",".join(tl.active_labels(now))

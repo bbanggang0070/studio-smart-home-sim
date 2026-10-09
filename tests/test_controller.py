@@ -253,6 +253,17 @@ def test_hysteresis_cuts_actuations_vs_baseline_b(tmp_path):
     assert p <= 0.5 * b
 
 
+def test_c15_priority_goal_dries_faster_within_budget(tmp_path):
+    """C15 — 우선 목표(E10)가 Proposed−P 보다 빨리 말리고 온도 예산을 지킨다. (4시간 절대 목표는 결정 대기)"""
+    res = run_batch(["C15"], baselines=["proposed", "proposed_np"], reps=1, out_dir=tmp_path, progress=lambda *_: None)
+    p = next(r for r in res if r.run.baseline == "proposed")
+    st = {c.text: c.status for c in p.criteria}
+    assert st["event_entered('LAUNDRY_DRYING') within 3600 after washer_end"] == C.PASS
+    assert st["laundry_dry_time_s < baseline_proposed_np.laundry_dry_time_s"] == C.PASS
+    assert st["temperature <= value_at('temperature', washer_end) + 1.0 when t >= washer_end"] == C.PASS
+    assert st["humidity <= 70 when t >= 1800"] == C.PASS
+
+
 def test_baseline_b_has_no_hysteresis(params):
     b = SmartHomeController(params)
     b.reset({"baseline": "B"})
@@ -260,7 +271,7 @@ def test_baseline_b_has_no_hysteresis(params):
     assert b.rules.ladders._band("cooling_off_band_c") == 0.0
 
 
-@pytest.mark.parametrize("sid", ["B8", "B9", "C1", "C5", "C6", "C8", "C10", "C11", "C12", "C13", "C14"])
+@pytest.mark.parametrize("sid", ["B8", "B9", "C1", "C5", "C6", "C8", "C10", "C11", "C12", "C13", "C14", "C17", "C18", "C19"])
 def test_comfort_scenarios_pass(sid, tmp_path):
     # baseline_A.* 비교 판정이 있는 시나리오는 A 도 함께 돌린다 (없으면 PENDING)
     res = run_batch([sid], baselines=["A", "B", "proposed"], reps=1, out_dir=tmp_path, progress=lambda *_: None)

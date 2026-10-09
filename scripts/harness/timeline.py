@@ -56,14 +56,17 @@ class Timeline:
     def active_labels(self, t: float) -> list[str]:
         return [iv.label for iv in self.intervals if iv.active(t)]
 
-    def sources_at(self, t: float) -> tuple[SourceRates, dict[str, float]]:
-        """t 에서의 발생원 합계 + 전력 신호가 있는 발생원 (플러그형 인덕션 → 쿡탑 전력)."""
+    def sources_at(self, t: float, cooktop_relay: bool = True) -> tuple[SourceRates, dict[str, float]]:
+        """t 에서의 발생원 합계 + 전력 신호가 있는 발생원 (플러그형 인덕션 → 쿡탑 전력).
+        쿡탑 계량 플러그가 차단되면(cooktop_relay=False) 플러그형 인덕션 요리는 열 · 연기 · 수증기가 멈춘다."""
         src = SourceRates()
         power: dict[str, float] = {}
         for iv in self.intervals:
             if iv.kind not in SUPPORTED_SOURCES or not iv.active(t):
                 continue
             s = iv.spec
+            if iv.kind == "cooking" and s.get("stove") == "induction_plug" and not cooktop_relay:
+                continue
             if iv.kind == "cooking":
                 src.cooking_pm_mg_per_min += float(s.get("pm_mg_per_min", 0.0))
                 src.moisture_g_per_h += float(s.get("moisture_g_per_h", 0.0))

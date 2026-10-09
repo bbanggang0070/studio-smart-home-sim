@@ -20,6 +20,7 @@
     entries('NAME')                  이벤트 진입 횟수 (알림 횟수 판정)
     ended_for('NAME', N)             이벤트가 끝난 뒤 N 초 이상 지난 시각 (끝난 적이 없으면 거짓)
     basis_is('FALLBACK')             재실 판정 근거(occupancy_basis)가 그 값인 시각
+    alert_raised('E15')              /studio/state/alerts 에 그 코드의 알림이 나온 뒤의 시각
     ac_fan_is('low')                 에어컨이 꺼져 있거나 그 풍량인 시각
 
 평가할 수 없는 판정(다른 baseline 이 아직 없음 등)은 PENDING 으로 남긴다 — FAIL 과 구분한다.
@@ -74,6 +75,7 @@ ALIASES = {
     "occupied": "/studio/sensor/occupancy",             # 재실 판정 노드 출력
     "occupied_truth": "truth.occupied",
     "occupancy_alerts": "occ.alerts",
+    "cooktop_power": "act.cooktop_power",
 }
 
 PASS, FAIL, PENDING, ERROR, NA = "PASS", "FAIL", "PENDING", "ERROR", "N/A"
@@ -293,8 +295,15 @@ def evaluate(df: pd.DataFrame, criteria: list[str], expect: dict[str, dict], anc
         col = T.T_OCCUPANCY_BASIS
         return (df[col].astype(str) == name).to_numpy() if col in df.columns else np.zeros(len(df), dtype=bool)
 
+    def alert_raised(code: str) -> np.ndarray:
+        """/studio/state/alerts 에 그 코드의 알림이 이미 나온 시각."""
+        col = T.T_ALERTS
+        if col not in df.columns:
+            return np.zeros(len(df), dtype=bool)
+        return df[col].fillna("[]").map(lambda s: any(a.get("code") == code for a in json.loads(s))).to_numpy(bool)
+
     funcs = {"event_entered": lambda name: _active_event_mask(df, name), "value_at": value_at,
-             "basis_is": basis_is,
+             "basis_is": basis_is, "alert_raised": alert_raised,
              "ended_for": ended_for,
              "entries": entries, "ac_fan_is": ac_fan_is,
              "ratio": lambda cond: float(np.mean(np.asarray(cond, dtype=bool)))}

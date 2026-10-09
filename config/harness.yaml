@@ -54,9 +54,9 @@ controllers:
 #  프로파일에 없는 장치로 가는 명령은 무시되고 결과 notes 에 기록된다 (X8 · X2 의 전제).
 appliance_profiles:
   core: [ceiling_light, desk_lamp, exhaust_fan, blind, window]
-  std:  [ceiling_light, desk_lamp, exhaust_fan, blind, window, ac, range_hood]
+  std:  [ceiling_light, desk_lamp, exhaust_fan, blind, window, ac, range_hood, cooktop_plug]
   full: [ceiling_light, desk_lamp, exhaust_fan, blind, window,
-         ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood]
+         ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood, cooktop_plug]
 
 # ---- mmWave(LD2410) 시뮬레이션 — 참값 → 구간 0–8 의 움직임 · 정지 에너지 (고속 모드 재실 노드 입력) ----
 #  구간 = 0.75 m. 사람 위치(zone) → 구간은 thresholds occupancy.zone_gates 와 같은 배치를 쓴다 (센서 배치는 W03 Scene 에서 확정).

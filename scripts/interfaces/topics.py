@@ -1,4 +1,4 @@
-"""ROS 2 토픽 계약 — docs/02 §6 (53개: 센서 13 · 명령 15 · 상태 25).
+"""ROS 2 토픽 계약 — docs/02 §6 (55개: 센서 13 · 명령 16 · 상태 26).
 
 제어기 · 하네스(고속 모드) · ROS 노드(물리 모드)가 같은 이름을 쓴다.
 고속 모드에서는 메시지 대신 파이썬 값으로 주고받는다 — String(JSON) 토픽은 JSON 문자열 그대로.
@@ -28,7 +28,7 @@ SENSOR_TOPICS = (
     S_OUTDOOR_PM_GRADE, S_PM25, S_WIFI_PRESENCE, S_DOOR_CONTACT, S_HOOD_TEMPERATURE, S_APPLIANCE_POWER, S_WEATHER,
 )
 
-# ---- 명령 (15) -----------------------------------------------------------------
+# ---- 명령 (16) -----------------------------------------------------------------
 C_CEILING_LIGHT = f"{P}/cmd/ceiling_light_intensity"     # Float32 (0–100 %)
 C_DESK_LIGHT = f"{P}/cmd/desk_light_intensity"           # Float32 (0–100 %)
 C_DESK_LIGHT_CCT = f"{P}/cmd/desk_light_cct"             # Float32 (K)
@@ -44,15 +44,16 @@ C_INTAKE_FAN_RPM = f"{P}/cmd/intake_fan_rpm"             # Float32
 C_PURIFIER_LEVEL = f"{P}/cmd/purifier_level"             # Int8 (0–3)
 C_RANGE_HOOD_LEVEL = f"{P}/cmd/range_hood_level"         # Int8 (0–2)
 C_ACTIVITY = f"{P}/cmd/activity"                         # String — 사용자 행동 선언
+C_COOKTOP_POWER = f"{P}/cmd/cooktop_power"               # Bool — 플러그형 인덕션 릴레이 (false = 차단, v3.4.5)
 
 COMMAND_TOPICS = (
     C_CEILING_LIGHT, C_DESK_LIGHT, C_DESK_LIGHT_CCT, C_FAN_RPM, C_BLIND_ANGLE, C_WINDOW_OPEN_RATIO, C_MODE,
     C_AC, C_DEHUMIDIFIER, C_HUMIDIFIER, C_CEILING_FAN, C_INTAKE_FAN_RPM, C_PURIFIER_LEVEL, C_RANGE_HOOD_LEVEL,
-    C_ACTIVITY,
+    C_ACTIVITY, C_COOKTOP_POWER,
 )
 USER_COMMAND_TOPICS = (C_MODE, C_ACTIVITY)   # 사용자(시나리오)가 내는 명령 — 제어기 입력
 
-# ---- 상태 (25) -----------------------------------------------------------------
+# ---- 상태 (26) -----------------------------------------------------------------
 T_CEILING_LIGHT = f"{P}/state/ceiling_light_intensity"
 T_DESK_LIGHT = f"{P}/state/desk_light_intensity"
 T_FAN_RPM = f"{P}/state/fan_rpm"
@@ -78,13 +79,14 @@ T_APPLIANCE_STATES = f"{P}/state/appliance_states"
 T_VENTILATION = f"{P}/state/ventilation"
 T_OCCUPANCY_BASIS = f"{P}/state/occupancy_basis"
 T_ENERGY_FORECAST = f"{P}/state/energy_forecast"
+T_ALERTS = f"{P}/state/alerts"                           # String(JSON 배열 [{"code","level","msg","t"}]) — 사용자 알림 (v3.4.5)
 
 STATE_TOPICS = (
     T_CEILING_LIGHT, T_DESK_LIGHT, T_FAN_RPM, T_BLIND_ANGLE, T_WINDOW_OPEN_RATIO, T_WINDOW_POSITION_EST,
     T_WINDOW_ZONE, T_PINCH_DETECTED, T_LIVING_MODE, T_SAFETY_STATE, T_CONTROL_FEASIBILITY, T_AC,
     T_DEHUMIDIFIER, T_HUMIDIFIER, T_CEILING_FAN, T_INTAKE_FAN_RPM, T_PURIFIER_LEVEL, T_RANGE_HOOD_LEVEL,
     T_ACTIVE_EVENTS, T_AIR_BALANCE, T_DEW_MARGIN, T_APPLIANCE_STATES, T_VENTILATION, T_OCCUPANCY_BASIS,
-    T_ENERGY_FORECAST,
+    T_ENERGY_FORECAST, T_ALERTS,
 )
 
 ALL_TOPICS = SENSOR_TOPICS + COMMAND_TOPICS + STATE_TOPICS

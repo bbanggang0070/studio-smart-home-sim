@@ -32,6 +32,7 @@ DEVICE_TOPIC = {
     "humidifier": (T.C_HUMIDIFIER, bool, "humidifier"),
     "ceiling_fan": (T.C_CEILING_FAN, int, "ceiling_fan"),
     "ac": (T.C_AC, None, "ac"),                         # JSON — 사다리가 정한 모드 · 설정온도로 만든다
+    "cooktop": (T.C_COOKTOP_POWER, bool, "cooktop_plug"),  # 요구가 있을 때만 (E15 차단 · 귀가 복구)
 }
 # 아무 요구가 없을 때의 값 — 요구가 사라지면 끈다 (블라인드 · 실링팬은 요구가 있을 때만 움직인다)
 DEFAULTS = {"window": 0.0, "exhaust": 0.0, "intake": 0.0, "hood": 0.0, "purifier": 0.0,
@@ -105,9 +106,9 @@ class SmartHomeController:
                                            "window_blocked": info["window_blocked"],
                                            "i10_dew_diff_c": info.get("i10_dew_diff_c")})
         out[T.T_CONTROL_FEASIBILITY] = "FEASIBLE"     # 판정 로직은 W09 T9.7
-        alerts = self.rules.alerts + self.events.alerts
-        if alerts:                                     # 사용자 알림 (전용 토픽이 없어 safety_state 에 싣는다)
-            out[T.T_SAFETY_STATE] = json.dumps({"alerts": list(alerts)}, ensure_ascii=False)
+        alerts = sorted(self.rules.alerts + self.events.alerts, key=lambda a: a["t"])
+        if alerts:                                     # 사용자 알림 (v3.4.5 전용 토픽)
+            out[T.T_ALERTS] = json.dumps(alerts, ensure_ascii=False)
         return out
 
     def _ac_command(self, on: bool) -> str:

@@ -145,11 +145,19 @@ class FastActuators:
         self.target = replace(initial, ac=replace(initial.ac))
         self.tau = time_constants
         self.allowed = {f for d in devices for f in DEVICE_FIELDS.get(d, ())}
+        self.allowed_devices = set(devices)
         self.rejected: dict[str, int] = {}
         self.ac_fan = "auto"                          # 참값 모델은 풍량을 쓰지 않지만 소음 제약 판정용으로 기록한다
+        self.cooktop_relay = True                     # 플러그형 인덕션 계량 플러그 (false = 차단)
 
     def command(self, cmds: dict[str, Any]) -> None:
         for topic, value in cmds.items():
+            if topic == T.C_COOKTOP_POWER:
+                if "cooktop_plug" in self.allowed_devices:
+                    self.cooktop_relay = bool(value)
+                else:
+                    self.rejected[topic] = self.rejected.get(topic, 0) + 1
+                continue
             if topic == T.C_AC:
                 field_name = "ac"
             elif topic in CMD_TO_FIELD:

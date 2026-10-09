@@ -423,7 +423,7 @@ v2.0까지는 제어기 노드가 모든 판단을 했다. 그 구조에서는 *
 
 ---
 
-## 6. 인터페이스 경계 — ROS 2 토픽 53개 (v3.4.2)
+## 6. 인터페이스 경계 — ROS 2 토픽 55개 (v3.4.5)
 
 ### 센서 (13)
 
@@ -443,7 +443,7 @@ v2.0까지는 제어기 노드가 모든 판단을 했다. 그 구조에서는 *
 | `/studio/sensor/appliance_power` | `std_msgs/String` | 1 Hz | **v3.1** — JSON `{device: W}` |
 | `/studio/sensor/weather` | `std_msgs/String` | 변경 시 | **v3.4.2** — 기상청 API · JSON `{"raining", "outdoor_temp_c", "outdoor_rh_pct"}` — E5 강우 · I10 외기 이슬점 · 결로 여유(외기온) 입력 |
 
-### 명령 (15)
+### 명령 (16)
 
 | 토픽 | 타입 | 비고 |
 |---|---|---|
@@ -462,8 +462,9 @@ v2.0까지는 제어기 노드가 모든 판단을 했다. 그 구조에서는 *
 | `/studio/cmd/purifier_level` | `std_msgs/Int8` | **v3.0** — 0–3 |
 | `/studio/cmd/range_hood_level` | `std_msgs/Int8` | **v3.0** — 0–2 |
 | `/studio/cmd/activity` | `std_msgs/String` | **v3.1** — 사용자 행동 선언 (`LAUNDRY` 등) |
+| `/studio/cmd/cooktop_power` | `std_msgs/Bool` | **v3.4.5** — 플러그형 인덕션 계량 플러그 릴레이 (`false` = 전원 차단). E15 불 켜고 외출 시 차단 · 귀가 시 복구. 가스 · 빌트인은 대상 아님 |
 
-### 상태 (25)
+### 상태 (26)
 
 | 토픽 | 타입 | 비고 |
 |---|---|---|
@@ -476,7 +477,7 @@ v2.0까지는 제어기 노드가 모든 판단을 했다. 그 구조에서는 *
 | `/studio/state/window_zone` | `std_msgs/String` | `A_START`/`B_RUN`/`C_ENDZONE`/`D_SEAL` |
 | `/studio/state/pinch_detected` | `std_msgs/Bool` | |
 | `/studio/state/living_mode` | `std_msgs/String` | **v3.0 개명** (구 `lighting_mode`) — 현재 모드 + 결정 경로(`manual`/`schedule`/`auto`) |
-| `/studio/state/safety_state` | `std_msgs/String` | |
+| `/studio/state/safety_state` | `std_msgs/String` | 창문 안전 계층 상태 (끼임 · `SAFETY_HOLD` 등) — 사용자 알림은 `alerts` 로 분리 |
 | `/studio/state/control_feasibility` | `std_msgs/String` | `FEASIBLE`/`DEGRADED`/`INFEASIBLE` |
 | `/studio/state/ac` | `std_msgs/String` | **v3.0** — **추정 상태 + 신뢰도** (`CONFIRMED`/`UNKNOWN`/`UNVERIFIABLE`) |
 | `/studio/state/dehumidifier` | `std_msgs/Bool` | **v3.0** |
@@ -492,6 +493,7 @@ v2.0까지는 제어기 노드가 모든 판단을 했다. 그 구조에서는 *
 | `/studio/state/ventilation` | `std_msgs/String` | **v3.4** — 기본 환기 목표 · 공급 추정 · 회복 모드 · I10 (가상 CO₂ 대체) |
 | `/studio/state/occupancy_basis` | `std_msgs/String` | **v3.2** — 재실 판정 근거 (`LATCHED_OCCUPIED` / `LATCHED_VACANT` / `JUDGING` / `DOOR_OPEN` / `FALLBACK`) |
 | `/studio/state/energy_forecast` | `std_msgs/String` | **v3.1** — 귀가 분포 · 프리쿨링 시각 · 이달 kWh |
+| `/studio/state/alerts` | `std_msgs/String` | **v3.4.5** — 사용자 알림 · 변경 시 · JSON 배열 `[{"code": "E15", "level": "critical", "msg": "…", "t": 초}]` (필터 교체 E4 · 문 센서 점검 E14 · 불 켜고 외출 E15 등). 앱 · 스피커 연동은 범위 밖 |
 
 > 예약(집계 제외): `/studio/sensor/activity_audio` — 소리 기반 행동 라벨, 기본 비활성 ([`08` §1.4](08_multisignal_energy.md))
 
@@ -680,3 +682,4 @@ v2.0까지는 제어기 노드가 모든 판단을 했다. 그 구조에서는 *
 | 2026-10-09 | v3.4.2 | **토픽 52 → 53개** — 기상청 입력 `/studio/sensor/weather` 추가 (강우 · 외기 온습도). 제어기가 E5 · I10 · 결로 여유에 쓰는데 계약에 없던 것을 보완 |
 | 2026-10-09 | v3.4.3 | 지표 #10 목표 개정 — PM 피크 Baseline A 대비 **−30 % → −15 % 이상 + 에너지 A 이하** (참값 모델에서 A의 후드 강 + 창문이 예상보다 효과적이어서 −30 % 는 도달 불가 · 제안 제어기는 C9 에서 피크 −20 % · 에너지 −46 %) |
 | 2026-10-10 | v3.4.4 | 지표 #10 에서 '에너지 A 이하' 조건 삭제 — 에너지 · 쾌적 비교는 냉방 시나리오에서 따로 본다 (C9 판정은 PM 피크 −15 % · PM 회복) |
+| 2026-10-10 | v3.4.5 | **토픽 53 → 55개** — 명령 `/studio/cmd/cooktop_power`(E15 플러그형 인덕션 차단) · 상태 `/studio/state/alerts`(사용자 알림 전용 — `safety_state` 는 창문 안전 상태로 한정) |

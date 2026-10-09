@@ -42,6 +42,7 @@ class RuleEngine:
         self.filter_hours = 0.0                     # 흡기 필터 누적 가동 시간 (제어기가 스스로 기록 · 교체 시 0)
         self._e4_short_since: float | None = None
         self._e4_ok_since: float | None = None
+        self._cooktop_cut = False
         self.alerts: list[str] = []
         self.info: dict = {}
         self.ladders = ComfortLadders(p, psy, self, hysteresis)
@@ -120,6 +121,17 @@ class RuleEngine:
             add("window", "cap", g("interaction_rules.I2_ac_cooling_window_max_pct") / 100.0, L1, "I2 냉방 중 창문")
         if pol.get("purifier_min_level", 0) > 0 and mode != "AWAY":
             add("purifier", "need", pol["purifier_min_level"], L5, f"외기 {o.outdoor_pm_grade} 청정기 예방 가동")
+
+        # E15 — 플러그형 인덕션이면 전원 차단, 사람이 돌아오면 복구 (가스 · 빌트인은 경고만)
+        un = ev.get("UNATTENDED_COOKING")
+        if un and un.info.get("plug") and g("events.unattended_cooking.plug_cooktop_cutoff") and "cooktop_plug" in self.devices:
+            add("cooktop", "force", 0, L1, "E15 불 켜고 외출 — 플러그형 인덕션 전원 차단")
+            self._cooktop_cut = True
+        elif self._cooktop_cut and o.occupied:
+            add("cooktop", "force", 1, L1, "귀가 — 쿡탑 계량 플러그 전원 복구")
+            self._cooktop_cut = False
+        elif self._cooktop_cut:
+            add("cooktop", "force", 0, L1, "E15 차단 유지 (귀가 전)")
 
         # -- L2 건강 · 재산 --
         self._cooking(o, ev, blocked, noise, add)
@@ -332,7 +344,8 @@ class RuleEngine:
             self._e4_short_since = (self._e4_short_since or o.now_s) if short else None
             if short and o.now_s - self._e4_short_since >= g(sf + "hold_s"):
                 ev["VENT_SHORTFALL"] = ActiveEvent("VENT_SHORTFALL", o.now_s, {"capacity_m3h": cap_m3h})
-                self.alerts.append(f"필터 교체 · 흡기팬 점검 — 기본 환기 {target:g} m³/h 미달 (가능 {cap_m3h:.0f})")
+                self.alerts.append({"code": "E4", "level": "warning", "t": o.now_s,
+                                    "msg": f"필터 교체 · 흡기팬 점검 — 기본 환기 {target:g} m³/h 미달 (가능 {cap_m3h:.0f})"})
                 self._e4_ok_since = None
         else:
             self._e4_ok_since = (self._e4_ok_since or o.now_s) if not short else None

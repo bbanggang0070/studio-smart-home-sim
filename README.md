@@ -153,7 +153,7 @@ v3.0은 이를 **수단 사다리**로 일반화했다 — 목표마다 수단�
 | | └ **Prismatic / Revolute Joint** | 창문 · 블라인드 · 배기/흡기팬 · **실링팬(정/역)** |
 | | └ emissive 머티리얼 | 가전 ON/단 상태 표시 |
 | **환경 모델** | 집중 정수 모델 (Python) | 온도 · **절대습도 · CO₂ · PM2.5 · 이슬점 · 창 표면온도 · 공기 수지** |
-| **미들웨어** | ROS 2 (토픽 53개) · Isaac Sim ROS 2 Bridge | 센서 · 제어기 · 액추에이터 · 가전 통신 |
+| **미들웨어** | ROS 2 (토픽 55개) · Isaac Sim ROS 2 Bridge | 센서 · 제어기 · 액추에이터 · 가전 통신 |
 | **제어** | Python · **규칙 엔진 + 모드 관리자 + 이벤트 감지기 + 6계층 중재기** | 협조 제어 |
 | | └ 수단 사다리 · 히스테리시스 · 적응형 임계값 | 역할 재분배 · 채터링 · 드리프트 |
 | | └ 리플 카운팅 · Zone 기반 토크 프로파일 | 센서리스 anti-pinch |
@@ -339,7 +339,7 @@ L0 로컬 하드 보호  >  L1 안전 인터록  >  L2 건강·재산 이벤트 
 │  Isaac Sim      │ ─────────► │ smart_home_controller            │
 │  (USD World)    │            │  ├ mode_manager   ├ rule_engine   │
 │                 │ ◄───────── │  ├ event_detector ├ means_ladder  │
-└────────┬────────┘  명령 15   │  └ arbiter (6계층) · anti-pinch   │
+└────────┬────────┘  명령 16   │  └ arbiter (6계층) · anti-pinch   │
          │                     └───────────────┬──────────────────┘
          │                                     │ 상태 24
   ┌──────┴──────────────────────┐      ┌───────▼──────────┐
@@ -354,10 +354,10 @@ L0 로컬 하드 보호  >  L1 안전 인터록  >  L2 건강·재산 이벤트 
   └─────────────────────────────┘
 ```
 
-### 6.3 토픽 인터페이스 (53개)
+### 6.3 토픽 인터페이스 (55개)
 
 <details>
-<summary><b>센서 13 · 명령 15 · 상태 25 — 펼쳐보기</b></summary>
+<summary><b>센서 13 · 명령 16 · 상태 26 — 펼쳐보기</b></summary>
 
 **센서**
 ```text
@@ -386,6 +386,7 @@ L0 로컬 하드 보호  >  L1 안전 인터록  >  L2 건강·재산 이벤트 
 /studio/cmd/purifier_level             Int8     ← [v3.0] 0–3
 /studio/cmd/range_hood_level           Int8     ← [v3.0] 0–2
 /studio/cmd/activity                   String   ← [v3.1] 사용자 행동 선언 (LAUNDRY)
+/studio/cmd/cooktop_power              Bool     ← [v3.4.5] 플러그형 인덕션 릴레이 (E15 차단 · 귀가 시 복구)
 ```
 
 **상태**
@@ -402,6 +403,7 @@ L0 로컬 하드 보호  >  L1 안전 인터록  >  L2 건강·재산 이벤트 
 /studio/state/ventilation           String   ← [v3.4] 기본 환기 · 회복 모드 · I10
 /studio/state/occupancy_basis       String   ← [v3.2] 판정 근거 (재실 고정 · 빈방 고정 · 판정 중 · 문 열림 · 폴백)
 /studio/state/energy_forecast       String   ← [v3.1] 귀가 분포 · 프리쿨링 · 이달 kWh
+/studio/state/alerts                String   ← [v3.4.5] 사용자 알림 JSON 배열 (E4 필터 · E14 문 센서 · E15 불 켜고 외출 …)
 ```
 </details>
 
@@ -721,7 +723,7 @@ actuator_workspace/
 │   ├── smart_home_controller_node.py
 │   ├── controller/                    # 순수 Python 제어기 — smart_home · mode_manager · event_detector · rule_engine · predictor · arbiter · baseline_a
 │   ├── env_model/                     # 고속 모드 환경 참값 모델 (순수 Python · ROS 비의존)
-│   ├── interfaces/topics.py           # 토픽 계약 53개 상수 (docs/02 §6)
+│   ├── interfaces/topics.py           # 토픽 계약 55개 상수 (docs/02 §6)
 │   ├── sensors/occupancy.py           # 재실 판정 노드 코어 — 문 이벤트 + 판정 창 · 폴백 융합 (순수 Python)
 │   ├── harness/                       # 하네스 — 시나리오 전개 · 주입 · 고속 세계 · 판정 · 집계
 │   ├── scenario_runner.py             # ⭐ 하네스 CLI (물리 / 고속)

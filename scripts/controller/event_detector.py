@@ -100,7 +100,8 @@ class EventDetector:
         if o.occupancy_basis == "FALLBACK":
             if "DOOR_SENSOR_FAULT" not in self.active:
                 self._enter("DOOR_SENSOR_FAULT", o.now_s)
-                self.alerts.append("재실 판정이 24시간 융합으로 전환됨 — 문 센서 점검 (E14)")
+                self.alerts.append({"code": "E14", "level": "warning", "t": o.now_s,
+                                    "msg": "재실 판정이 24시간 융합으로 전환됨 — 문 센서 점검"})
         else:
             self._exit("DOOR_SENSOR_FAULT")
 
@@ -115,9 +116,10 @@ class EventDetector:
             if "UNATTENDED_COOKING" not in self.active:
                 self._enter("UNATTENDED_COOKING", o.now_s)
                 plug = o.power_w.get("cooktop", 0.0) >= g(c + "cooktop_power_trigger_w")
-                self.alerts.append("불을 켠 채 외출 — 즉시 확인 (E15)"
-                                   + (" · 플러그형 인덕션 전원 차단 요청 (차단 명령 토픽 미정)" if plug and
-                                      g("events.unattended_cooking.plug_cooktop_cutoff") else " · 가스레인지 — 경고만"))
+                self.active["UNATTENDED_COOKING"].info["plug"] = plug
+                self.alerts.append({"code": "E15", "level": "critical", "t": o.now_s,
+                                    "msg": "불을 켠 채 외출 — 즉시 확인" + (" · 플러그형 인덕션 전원 차단" if plug and
+                                           g("events.unattended_cooking.plug_cooktop_cutoff") else " · 가스레인지 — 경고만")})
         elif not heat:
             self._exit("UNATTENDED_COOKING")
 

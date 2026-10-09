@@ -553,7 +553,7 @@ smart_home_controller:
       power_limit: { enter_ratio: 0.90, release_ratio: 0.75, release_hold_s: 300.0, layer: 1, shed_step_s: 10.0 }   # E11 · [v3.4.3] shed_step_s — 한도 90 % 이상이 이어지면 I8 순서로 이 간격마다 한 단계씩 더 끈다
       manual_override: { hold_min: 30.0, layer: 4 }                                              # E12
       precool: { quantile: 0.2, margin_min: 5.0, timeout_after_pred_min: 60.0, layer: 3 }       # E13
-      unattended_cooking: { layer: 1, plug_cooktop_cutoff: true, gas_alert_only: true }          # E15 [v3.3] — ⚠️ 쿡탑 차단 명령 토픽은 계약에 없음 (2026-10-10 보고)
+      unattended_cooking: { layer: 1, plug_cooktop_cutoff: true, gas_alert_only: true }          # E15 [v3.3] — 차단 명령 /studio/cmd/cooktop_power (v3.4.5)
       saving_state: { mold_guard_rh_pct: 70.0 }   # [v3.4.3] 빈방 절전(AUTO_SAVING) 중에도 남기는 곰팡이 방지 제습 상한 (외출 모드와 같은 값)
 
     # ---- 가전 (Appliances) — [신설 v3.0] · docs/06 §3 ---------------------------
@@ -562,11 +562,12 @@ smart_home_controller:
       profile: 'full'                  # core | std | full
       #  ceiling_light = 천장 조명 채널. full 에서는 조명 일체형 실링팬의 조명부, core 에서는 일반 천장등
       #  dehumidifier / humidifier 는 별개 액추에이터 (I1 상호배제로 연결)
+      #  cooktop_plug [v3.4.5] — 플러그형 인덕션의 계량 플러그 릴레이 (가정 A16 · E15 차단)
       profiles:
         core: [ceiling_light, desk_lamp, exhaust_fan, blind, window]
-        std:  [ceiling_light, desk_lamp, exhaust_fan, blind, window, ac, range_hood]
+        std:  [ceiling_light, desk_lamp, exhaust_fan, blind, window, ac, range_hood, cooktop_plug]
         full: [ceiling_light, desk_lamp, exhaust_fan, blind, window,
-               ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood]
+               ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood, cooktop_plug]
       ac:
         interface: 'ir'
         setpoint_range_c: [18.0, 30.0]

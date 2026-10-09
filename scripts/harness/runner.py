@@ -111,7 +111,7 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
                 user_cmds[T.C_MODE] = world.user_mode
             if "activity" in change:
                 user_cmds[T.C_ACTIVITY] = world.activity
-        src, extra_power = tl.sources_at(now)
+        src, extra_power = tl.sources_at(now, acts.cooktop_relay)
         hung = tl.laundry_hung_between(now - dt if k else -1.0, now)
         if hung > 0:
             model.hang_laundry(model.state.laundry_moisture_g + hung)
@@ -160,6 +160,7 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
             row["act.ac_dry"] = ac.power and ac.mode == "dry"
             row["act.ac_setpoint"] = ac.setpoint_c
             row["act.ac_fan"] = acts.ac_fan
+            row["act.cooktop_power"] = acts.cooktop_relay
             for tp in (T.S_TEMPERATURE, T.S_HUMIDITY, T.S_PM25, T.S_HOOD_TEMPERATURE, T.S_OCCUPANCY,
                        T.S_DOOR_CONTACT, T.S_OUTDOOR_PM_GRADE):
                 row[tp] = inbox[tp]

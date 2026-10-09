@@ -972,7 +972,8 @@ scenarios:
       - "window_open_ratio == 0 for all t"                   # 창문 끝까지 폐쇄
       - "q_net >= -1 for all t"                              # 배기 단독 0 s
       - "event_entered('VENT_SHORTFALL') within 660 after 0" # E4 진입 ≤ 11분
-      - "entries('VENT_SHORTFALL') == 1"                     # 알림 1회
+      - "entries('VENT_SHORTFALL') == 1"                     # E4 1회
+      - "alert_raised('E4') within 660 after 0"              # 필터 교체 알림 (/studio/state/alerts)
     metrics: [base_vent_compliance, co2_compliance, actuation_count]
 
   # ---- X8 · 가전 프로파일 축소 — 같은 제어기, 다른 답 (docs/03 §4) -----------------------------
@@ -1175,6 +1176,9 @@ scenarios:
       - "basis_is('LATCHED_OCCUPIED') within 240 after arrive3_end"         # ⑦ 문 닫히면 복귀
       - "occupied == 1 when t >= arrive3_start and t < leave3_start"
       - "event_entered('UNATTENDED_COOKING') within 190 after leave3_end"   # ⑩ 판정 창 종료 + 10 s
+      - "alert_raised('E15') within 190 after leave3_end"                   # ⑩ 사용자 알림 (/studio/state/alerts)
+      - "cooktop_power == 0 within 191 after leave3_end"                    # ⑩ 플러그형 인덕션 전원 차단
       - "basis_is('FALLBACK') within 60 after pc_start"                     # ⑥ 모순 → 폴백 ≤ 60 s
       - "event_entered('DOOR_SENSOR_FAULT') within 61 after pc_start"       # ⑥ E14
+      - "alert_raised('E14') within 61 after pc_start"                      # ⑥ 사용자 알림
     metrics: [energy_wh]

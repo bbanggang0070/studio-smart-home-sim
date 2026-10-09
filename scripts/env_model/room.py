@@ -367,6 +367,11 @@ class RoomModel:
         s.mass_temp_c += q_mass * dt / (g(th + "mass_capacity_wh_per_k") * WH_TO_J)
         s.envelope_temp_c += q_env * dt / (g(th + "envelope_capacity_wh_per_k") * WH_TO_J)
         s.abs_humidity_g_m3 = max(0.0, s.abs_humidity_g_m3 + dw * hrs)
+        # 공기 자체가 과포화되면 넘친 수분은 응결(안개 · 표면 이슬)로 빠진다 — RH > 100 % 방지
+        w_sat_air = psychro.saturation_density_g_m3(s.temp_c, b, c)
+        if s.abs_humidity_g_m3 > w_sat_air:
+            s.condensate_g += (s.abs_humidity_g_m3 - w_sat_air) * v
+            s.abs_humidity_g_m3 = w_sat_air
         s.pm25_ugm3 = max(0.0, s.pm25_ugm3 + dp * hrs)
         s.co2_ppm = s.co2_ppm + dco2 * hrs
         s.laundry_moisture_g = max(0.0, s.laundry_moisture_g - laundry_g_h * hrs)

@@ -317,3 +317,12 @@ def test_open_window_supplies_hood_makeup_air(cfg):
     assert closed["q_net_m3h"] == pytest.approx(-300.0)
     assert opened["q_net_m3h"] >= -50.0
     assert opened["q_inf_m3h"] < closed["q_inf_m3h"] / 5
+
+
+def test_air_never_supersaturates(cfg):
+    """습한 외기를 많이 들이면 RH 는 100 % 에서 멈추고 넘친 수분은 응결로 빠진다."""
+    ext = ExternalConditions(outdoor_temp_c=29.0, outdoor_rh_pct=100.0)
+    model = RoomModel.from_conditions(cfg, 26.0, 95.0, 12.0, 600.0)
+    obs = run(model, 1800, ActuatorCommands(window_open_ratio=1.0, ac=AcCommand(power=True, setpoint_c=20.0)),
+              ext, SourceRates(moisture_g_per_h=2000.0), dt=5.0)
+    assert obs["humidity_pct"] <= 100.0 + 1e-9

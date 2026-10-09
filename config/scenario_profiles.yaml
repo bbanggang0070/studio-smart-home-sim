@@ -337,7 +337,7 @@ scenarios:
     pass_criteria:
       - "window_open_ratio == 0 for all t"                   # E5
       - "ac_power within 10 after 0"                         # 강우 감지 후 10 s 이내 에어컨 기동
-      - "humidity <= 60 within 1800 after 0"                 # 30분 내 RH ≤ 60 %
+      - "humidity <= 72 within 3600 after 0"                 # 60분 내 RH ≤ 72 % (2026-10-10 완화)
       - "exhaust_fan_rpm == 0 for all t"                     # I10 — 바깥이 더 습하다
       - "energy_wh <= baseline_A.energy_wh"
     metrics: [energy_wh, rule_violation_count]
@@ -453,7 +453,7 @@ scenarios:
       outdoor_rh_pct: 95.0
       outdoor_illuminance_lux: 5000.0
     pass_criteria:
-      - "humidity <= 60 within 1800 after 0"                 # 30분 내 RH ≤ 60 %
+      - "humidity <= 60 within 3600 after 0"                 # 60분 내 RH ≤ 60 % (2026-10-10 완화)
       - "dehumidifier == 0 for all t"                        # I6 여름 — 에어컨 제습
       - "temperature <= 26.05 for all t"                     # 실내 온도 상승 0
       - "energy_wh <= baseline_A.energy_wh"

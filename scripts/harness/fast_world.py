@@ -1,0 +1,222 @@
+"""고속 모드의 '세계' — 환경 참값 모델을 토픽 계약(docs/02 §6)으로 감싼다.
+
+물리 모드에서 Isaac Sim + ROS 노드가 하는 일을 대신한다:
+  센서 노드  : 참값 → /studio/sensor/* (v0.1 은 노이즈 없음 — 센서 모델은 W07)
+  브릿지     : /studio/cmd/* → 액추에이터 목표 (가전 보호 L0 · IR 역확인은 W06 · W10 에서 이 자리에 들어온다)
+  액추에이터 : 창문 · 블라인드 · 팬은 1차 지연, 가전은 즉시 (docs/03 §5.3)
+  상태 발행  : 실제 동작값 → /studio/state/*
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from dataclasses import dataclass, replace
+from typing import Any
+
+from env_model import AcCommand, ActuatorCommands, ExternalConditions, Occupancy, RoomModel
+from interfaces import topics as T
+
+# 명령 토픽 → ActuatorCommands 필드 (스칼라만; AC 는 JSON 으로 따로 처리)
+CMD_TO_FIELD = {
+    T.C_WINDOW_OPEN_RATIO: ("window_open_ratio", float),
+    T.C_BLIND_ANGLE: ("blind_angle_deg", float),
+    T.C_FAN_RPM: ("exhaust_fan_rpm", float),
+    T.C_INTAKE_FAN_RPM: ("intake_fan_rpm", float),
+    T.C_RANGE_HOOD_LEVEL: ("range_hood_level", int),
+    T.C_PURIFIER_LEVEL: ("purifier_level", int),
+    T.C_DEHUMIDIFIER: ("dehumidifier", bool),
+    T.C_HUMIDIFIER: ("humidifier", bool),
+    T.C_CEILING_FAN: ("ceiling_fan", int),
+    T.C_CEILING_LIGHT: ("ceiling_light_pct", float),
+    T.C_DESK_LIGHT: ("desk_light_pct", float),
+}
+FIELD_TO_STATE = {
+    "window_open_ratio": T.T_WINDOW_OPEN_RATIO,
+    "blind_angle_deg": T.T_BLIND_ANGLE,
+    "exhaust_fan_rpm": T.T_FAN_RPM,
+    "intake_fan_rpm": T.T_INTAKE_FAN_RPM,
+    "range_hood_level": T.T_RANGE_HOOD_LEVEL,
+    "purifier_level": T.T_PURIFIER_LEVEL,
+    "dehumidifier": T.T_DEHUMIDIFIER,
+    "humidifier": T.T_HUMIDIFIER,
+    "ceiling_fan": T.T_CEILING_FAN,
+    "ceiling_light_pct": T.T_CEILING_LIGHT,
+    "desk_light_pct": T.T_DESK_LIGHT,
+}
+# 장치 이름(가전 프로파일) → 그 장치를 움직이는 필드
+DEVICE_FIELDS = {
+    "window": ("window_open_ratio",),
+    "blind": ("blind_angle_deg",),
+    "exhaust_fan": ("exhaust_fan_rpm",),
+    "intake_fan": ("intake_fan_rpm",),
+    "range_hood": ("range_hood_level",),
+    "purifier": ("purifier_level",),
+    "dehumidifier": ("dehumidifier",),
+    "humidifier": ("humidifier",),
+    "ceiling_fan": ("ceiling_fan",),
+    "ceiling_light": ("ceiling_light_pct",),
+    "desk_lamp": ("desk_light_pct",),
+    "ac": ("ac",),
+}
+
+
+@dataclass
+class WorldInputs:
+    """시나리오가 주는 세계 상태 (센서가 아니라 참값 · 외부 입력)."""
+
+    ext: ExternalConditions
+    raining: bool
+    occupancy: bool
+    occupants: int
+    occupant_zone: str
+    user_mode: str
+    activity: str
+    illuminance_lux: float
+
+    @classmethod
+    def from_scenario(cls, sc: dict[str, Any]) -> "WorldInputs":
+        ini, ext = sc["initial"], sc["external"]
+        return cls(
+            ext=ExternalConditions(
+                outdoor_temp_c=float(ext["outdoor_temp_c"]),
+                outdoor_rh_pct=float(ext["outdoor_rh_pct"]),
+                outdoor_pm25_ugm3=float(ext.get("outdoor_pm25_ugm3", 12.0)),
+                outdoor_illuminance_lux=float(ext.get("outdoor_illuminance_lux", 0.0)),
+                wind_speed_ms=float(ext.get("wind_speed_ms", -1.0)),
+                heating_setpoint_c=float(ext.get("heating_setpoint_c", -1.0)),
+            ),
+            raining=ext.get("weather") == "rain",
+            occupancy=bool(ini.get("occupancy", True)),
+            occupants=int(ini.get("occupants", 1)),
+            occupant_zone=str(ini.get("occupant_zone", "room")),
+            user_mode=str(ini.get("user_mode", "NORMAL")),
+            activity=str(ini.get("activity", "")),
+            illuminance_lux=float(ini.get("illuminance_lux", 0.0)),
+        )
+
+    def apply(self, changes: dict[str, Any]) -> None:
+        for key, val in changes.items():
+            if key == "weather":
+                self.raining = val == "rain"
+            elif hasattr(self.ext, key):
+                setattr(self.ext, key, float(val))
+            elif key == "illuminance_lux":
+                self.illuminance_lux = float(val)
+            elif hasattr(self, key):
+                setattr(self, key, type(getattr(self, key))(val))
+
+    def occupancy_model(self) -> Occupancy:
+        if not self.occupancy:
+            return Occupancy(count=0)
+        return Occupancy(count=self.occupants, activity="sleeping" if self.user_mode == "SLEEP" else "seated")
+
+
+def initial_actuators(sc: dict[str, Any]) -> ActuatorCommands:
+    ini = sc["initial"]
+    app = ini.get("appliances") or {}
+    ac = app.get("ac") or {}
+    return ActuatorCommands(
+        window_open_ratio=float(ini.get("window_open_ratio", 0.0)),
+        blind_angle_deg=float(ini.get("blind_angle_deg", 0.0)),
+        exhaust_fan_rpm=float(app.get("exhaust_fan_rpm", 0.0)),
+        intake_fan_rpm=float(app.get("intake_fan_rpm", 0.0)),
+        range_hood_level=int(app.get("range_hood_level", 0)),
+        purifier_level=int(app.get("purifier_level", 0)),
+        ac=AcCommand(power=bool(ac.get("power", False)), mode=str(ac.get("mode", "cool")),
+                     setpoint_c=float(ac.get("setpoint", 26.0))),
+        dehumidifier=bool(app.get("dehumidifier", False)),
+        humidifier=bool(app.get("humidifier", False)),
+        ceiling_fan=int(app.get("ceiling_fan", 0)),
+        ceiling_light_pct=float(app.get("ceiling_light_pct", 0.0)),
+        desk_light_pct=float(app.get("desk_light_pct", 0.0)),
+    )
+
+
+class FastActuators:
+    """명령 → 목표 → 실제 동작값. 프로파일에 없는 장치 명령은 무시하고 기록한다."""
+
+    def __init__(self, initial: ActuatorCommands, time_constants: dict[str, float], devices: list[str]):
+        self.actual = replace(initial, ac=replace(initial.ac))
+        self.target = replace(initial, ac=replace(initial.ac))
+        self.tau = time_constants
+        self.allowed = {f for d in devices for f in DEVICE_FIELDS.get(d, ())}
+        self.rejected: dict[str, int] = {}
+
+    def command(self, cmds: dict[str, Any]) -> None:
+        for topic, value in cmds.items():
+            if topic == T.C_AC:
+                field_name = "ac"
+            elif topic in CMD_TO_FIELD:
+                field_name = CMD_TO_FIELD[topic][0]
+            else:
+                continue   # 상태 · 사용자 토픽 등 — 액추에이터가 아님
+            if field_name not in self.allowed:
+                self.rejected[topic] = self.rejected.get(topic, 0) + 1
+                continue
+            if field_name == "ac":
+                d = json.loads(value) if isinstance(value, str) else dict(value)
+                self.target.ac = AcCommand(power=bool(d.get("power", False)), mode=str(d.get("mode", "cool")),
+                                           setpoint_c=float(d.get("setpoint", self.target.ac.setpoint_c)))
+            else:
+                setattr(self.target, field_name, CMD_TO_FIELD[topic][1](value))
+
+    def update(self, dt: float) -> None:
+        for name in FIELD_TO_STATE:
+            tgt = getattr(self.target, name)
+            tau = self.tau.get(name)
+            if tau and tau > 0:
+                cur = getattr(self.actual, name)
+                setattr(self.actual, name, tgt + (cur - tgt) * math.exp(-dt / tau))
+            else:
+                setattr(self.actual, name, tgt)
+        self.actual.ac = replace(self.target.ac)
+
+    def state_topics(self) -> dict[str, Any]:
+        out: dict[str, Any] = {topic: getattr(self.actual, name) for name, topic in FIELD_TO_STATE.items()}
+        ac = self.actual.ac
+        out[T.T_AC] = json.dumps({"power": ac.power, "mode": ac.mode, "setpoint": ac.setpoint_c,
+                                  "confidence": "CONFIRMED"})   # 고속 모드 v0.1: IR 역확인 없음
+        return out
+
+
+def pm_grade(pm: float, bounds: list[float], names: list[str]) -> str:
+    for bound, name in zip(bounds, names):
+        if pm <= bound:
+            return name
+    return names[-1]
+
+
+def sensor_topics(obs: dict[str, Any], world: WorldInputs, door_open: bool, extra_power: dict[str, float],
+                  grade_bounds: list[float], grade_names: list[str]) -> dict[str, Any]:
+    """참값 → 센서 토픽. v0.1: 노이즈 · 지연 없음 (W07 센서 노드에서 추가)."""
+    power = {k: round(v, 1) for k, v in obs["appliance_power_w"].items()}
+    power.update(extra_power)
+    return {
+        T.S_TEMPERATURE: obs["temperature_c"],
+        T.S_HUMIDITY: obs["humidity_pct"],
+        T.S_PM25: obs["pm25_ugm3"],
+        T.S_HOOD_TEMPERATURE: obs["hood_temperature_c"],
+        T.S_ILLUMINANCE: world.illuminance_lux,          # 조도 모델은 W08 T8.3 — 지금은 시나리오 값
+        T.S_OCCUPANCY: world.occupancy,                  # 재실 판정 노드는 W07 — 지금은 참값
+        T.S_OCCUPANT_ZONE: world.occupant_zone if world.occupancy else "none",
+        T.S_DOOR_CONTACT: door_open,
+        T.S_WIFI_PRESENCE: world.occupancy,              # Wi-Fi 모델은 W07
+        T.S_OUTDOOR_PM_GRADE: pm_grade(world.ext.outdoor_pm25_ugm3, grade_bounds, grade_names),
+        T.S_APPLIANCE_POWER: json.dumps(power, sort_keys=True),
+        T.PROVISIONAL_WEATHER: json.dumps({"raining": world.raining,
+                                           "outdoor_temp_c": world.ext.outdoor_temp_c,
+                                           "outdoor_rh_pct": world.ext.outdoor_rh_pct}),
+    }
+
+
+def make_model(env_cfg, sc: dict[str, Any]) -> RoomModel:
+    ini = sc["initial"]
+    return RoomModel.from_conditions(
+        env_cfg,
+        temp_c=float(ini["temperature_c"]),
+        rh_pct=float(ini["humidity_pct"]),
+        pm25_ugm3=float(ini.get("pm25_ugm3", 12.0)),
+        co2_ppm=float(ini.get("co2_ppm", 600.0)),
+        filter_hours=float(ini.get("filter_hours", 0.0)),
+    )

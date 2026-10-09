@@ -1,0 +1,51 @@
+# ============================================================================
+#  실험 하네스 설정 (scenario_runner)  --  v0.1 (2026-10-09) · 기획 v3.4
+# ----------------------------------------------------------------------------
+#  근거: docs/03 §5.3 (물리 / 고속 모드) · §7 (평가 지표) · §8 (자동화 스키마 · 하네스 동작 규약)
+#  ROS 2 파라미터 파일이 아니다 — scenario_runner 가 일반 YAML 로 읽는다.
+# ============================================================================
+
+version: 1
+
+paths:
+  scenarios: config/scenario_profiles.yaml
+  environment_model: config/environment_model.yaml
+  results_dir: results            # 커밋하지 않는다 (.gitignore)
+
+fast_mode:
+  dt_s: 1.0                       # 환경 모델 적분 · 정책 주기 (thresholds policy_rate_hz 1 Hz 와 같게)
+  log_interval_s: 1.0             # CSV 기록 간격
+  # 고속 모드에서 창문 · 블라인드는 1차 지연 위치 모델로 대체한다 (docs/03 §5.3)
+  actuator_time_constant_s:
+    window_open_ratio: 3.0        # draft — 지표 #2 '창문 응답 ≤ 5 s' 를 만족하는 크기
+    blind_angle_deg: 0.5          # draft — SG90 서보
+    exhaust_fan_rpm: 2.0          # draft
+    intake_fan_rpm: 2.0           # draft
+
+# ---- 지표 정의 상수 (docs/03 §7) ---------------------------------------------
+metrics:
+  pm25_recovery_ugm3: 35.0        # 지표 #10 — 요리 종료 후 35 µg/m³ 복귀
+  rh_recovery_delta_pct: 5.0      # 지표 #14 — 이벤트 전 + 5 %p
+  rh_recovery_abs_pct: 60.0       # 지표 #14 — 또는 60 %
+  co2_reference_ppm: { study: 800.0, other: 1000.0 }   # 지표 #9 (참값 검증)
+
+# ---- 외기 PM 등급 (에어코리아 API 대체) — 환경부 PM2.5 예보 등급 -----------------
+outdoor_api:
+  pm_grade_bounds_ugm3: [15.0, 35.0, 75.0]
+  pm_grade_names: [good, moderate, bad, very_bad]
+
+# ---- Baseline → 제어기 구현 매핑 (docs/03 §6) ---------------------------------
+#  아직 구현되지 않은 것은 'unimplemented' — 실행하면 명확한 오류로 멈춘다.
+#  --controller hold 로 덮어쓰면 하네스 자체만 검증할 수 있다 (판정은 대부분 FAIL 이 정상).
+controllers:
+  A: unimplemented                # W10 T10.v4 — 장치 · 가전 독립 제어 (가전 내장 자동)
+  B: unimplemented                # W09–W10 — 협조, 히스테리시스 없음
+  proposed: unimplemented         # W09 — smart_home_controller (규칙 + 모드 + 이벤트 · 6계층 중재)
+
+# ---- 가전 프로파일 — 세계(참값)에 존재하는 장치 (docs/06 §7 · thresholds appliances.profiles 와 같은 구성) ----
+#  프로파일에 없는 장치로 가는 명령은 무시되고 결과 notes 에 기록된다 (X8 · X2 의 전제).
+appliance_profiles:
+  core: [ceiling_light, desk_lamp, exhaust_fan, blind, window]
+  std:  [ceiling_light, desk_lamp, exhaust_fan, blind, window, ac, range_hood]
+  full: [ceiling_light, desk_lamp, exhaust_fan, blind, window,
+         ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood]

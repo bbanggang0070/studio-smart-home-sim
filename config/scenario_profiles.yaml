@@ -1,0 +1,219 @@
+# ============================================================================
+#  시나리오 정의 (Scenario Profiles)  --  스키마 v2.0 (docs/03 §8) · 2026-10-09 초안
+# ----------------------------------------------------------------------------
+#  시나리오 추가는 코드 수정 없이 이 파일에만 항목을 더한다.
+#  현재 수록: B6 · B7 · C9 (고속 모드 하네스 골격 검증용) — 40개 전량은 W09–W10 에 채운다.
+#
+#  [스키마 보충 — 하네스 v0.1]
+#    injections[].label  : 발생원 이름. pass_criteria 에서 <label>_start · <label>_end · during: <label> 로 쓴다
+#                          (생략 시 source 이름)
+#    external.heating_setpoint_c : 겨울 난방 경계 조건 (가정 A13) — 없으면 난방 없음
+#    external.wind_speed_ms      : 없으면 environment_model.yaml 기본 풍속
+#    pass_criteria 문법 : scripts/harness/criteria.py 머리말 참조
+# ============================================================================
+
+scenarios:
+
+  # ---- B6 · 샤워 감지 기본 (docs/03 §2) -------------------------------------------
+  - id: B6
+    tier: 1
+    name: "샤워 감지 기본"
+    duration_s: 3600
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261006
+    run_mode: fast
+    appliance_profile: full
+    season: mid
+    persona: commuter
+    power_limit_w: 3000
+
+    initial:
+      user_mode: NORMAL
+      temperature_c: 23.0
+      humidity_pct: 50.0
+      co2_ppm: 600.0
+      pm25_ugm3: 12.0
+      illuminance_lux: 350.0
+      occupancy: true
+      occupant_zone: none          # 욕실 (레이더 시야 밖)
+      time_of_day: "21:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances:
+        ac: { power: false }
+        purifier_level: 0
+        range_hood_level: 0
+
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: 18.0
+      outdoor_rh_pct: 50.0         # 바깥이 건조 — I10 상 배기가 이득
+      outdoor_illuminance_lux: 0.0
+
+    injections:
+      - at_s: 0
+        radar: silent              # 욕실 사용 — 레이더 무신호 (재실 센서 노드 W07 이후 지원)
+        duration_s: 900
+      - at_s: 900
+        source: shower
+        label: shower
+        moisture_g: 200
+        duration_s: 600
+
+    pass_criteria:
+      - "event_entered('SHOWER') within 120 after shower_start"
+      - "not event_entered('COOKING')"
+      - "humidity <= value_at('humidity', shower_start) + 5 by 1200 after shower_start"
+      - "range_hood_level == 0 for all t"
+
+    metrics:
+      - humidity_recovery_time
+      - energy_wh
+      - rule_violation_count
+
+  # ---- B7 · 요리 감지 기본 (docs/03 §2) -------------------------------------------
+  - id: B7
+    tier: 1
+    name: "요리 감지 기본"
+    duration_s: 4800
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261007
+    run_mode: fast
+    appliance_profile: full
+    season: mid
+    persona: commuter
+    power_limit_w: 3000
+
+    initial:
+      user_mode: NORMAL
+      temperature_c: 24.0
+      humidity_pct: 50.0
+      co2_ppm: 600.0
+      pm25_ugm3: 12.0
+      illuminance_lux: 350.0
+      occupancy: true
+      occupant_zone: kitchen
+      time_of_day: "18:30"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances:
+        ac: { power: false }
+        purifier_level: 1
+        range_hood_level: 0
+
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0      # 좋음
+      outdoor_temp_c: 20.0
+      outdoor_rh_pct: 55.0
+      outdoor_illuminance_lux: 0.0
+
+    injections:
+      - at_s: 60                   # ① 가스레인지 요리 — 전력 신호 없음
+        source: cooking
+        label: cook
+        stove: gas
+        pm_mg_per_min: 1.5
+        moisture_g_per_h: 400
+        heat_w: 2000
+        duration_s: 900
+      - at_s: 1800                 # ② 열 없는 미세먼지 (원인 미상)
+        source: pm_no_heat
+        label: candle
+        pm_mg_per_min: 0.3
+        duration_s: 1200
+      - at_s: 3600                 # ③ 주전자 물 끓이기 — 열 · 수증기만
+        source: cooking
+        label: kettle
+        stove: gas
+        pm_mg_per_min: 0.0
+        moisture_g_per_h: 600
+        heat_w: 1500
+        duration_s: 600
+
+    expect:
+      range_hood_level: { eq: 0, during: candle }
+
+    pass_criteria:
+      - "event_entered('COOKING') within 60 after cook_start"
+      - "q_net >= -50 when range_hood_level > 0"
+      - "range_hood_level == 0 during candle"
+
+    metrics:
+      - pm25_peak
+      - pm25_recovery_time
+      - energy_wh
+      - rule_violation_count
+
+  # ---- C9 · 요리 + 외기 미세먼지 나쁨 (docs/03 §3 · 스키마 예시 §8) ---------------------
+  - id: C9
+    tier: 2
+    name: "요리 + 외기 미세먼지 나쁨"
+    duration_s: 3600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261209
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+
+    initial:
+      user_mode: NORMAL
+      temperature_c: 26.0
+      humidity_pct: 55.0
+      co2_ppm: 750.0
+      pm25_ugm3: 18.0
+      illuminance_lux: 350.0
+      occupancy: true
+      occupant_zone: kitchen
+      time_of_day: "19:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances:
+        ac: { power: false }
+        purifier_level: 1
+        range_hood_level: 0
+
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 52.0
+      outdoor_temp_c: 24.0
+      outdoor_rh_pct: 60.0
+      outdoor_illuminance_lux: 500.0
+
+    injections:
+      - at_s: 60
+        source: cooking
+        label: cooking
+        stove: gas
+        pm_mg_per_min: 1.5
+        moisture_g_per_h: 400
+        heat_w: 800
+        duration_s: 900
+
+    events:
+      - at_s: 1800
+        set: { outdoor_pm25_ugm3: 40.0 }
+
+    expect:
+      window_open_ratio: { max: 0.0 }
+      intake_fan_rpm:    { min: 1800.0, during: cooking }
+      range_hood_level:  { eq: 1, during: cooking }
+
+    pass_criteria:
+      - "event_entered('COOKING') within 90 after cooking_start"
+      - "window_open_ratio == 0 for all t"
+      - "pm25_peak <= 0.7 * baseline_A.pm25_peak"
+      - "pm25 <= 35 within 1200 after cooking_end"
+
+    metrics:
+      - pm25_peak
+      - pm25_recovery_time
+      - infiltration_volume
+      - energy_wh
+      - rule_violation_count

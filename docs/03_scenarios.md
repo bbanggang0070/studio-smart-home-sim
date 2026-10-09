@@ -845,6 +845,19 @@ scenarios:
       - rule_violation_count
 ```
 
+### 스키마 보충 — 하네스 v0.1 구현 (2026-10-09)
+
+| 항목 | 내용 |
+|---|---|
+| `injections[].label` | 발생원 이름. 판정에서 `<label>_start` · `<label>_end` 앵커와 `during <label>` 구간으로 쓴다 (생략 시 `source` 이름) |
+| `external.heating_setpoint_c` | 겨울 난방 경계 조건 (가정 A13) — 없으면 난방 없음 |
+| `external.wind_speed_ms` | 창문 풍압 환기용 — 없으면 `environment_model.yaml` 기본값 |
+| `pass_criteria` 문법 | `<식>` · `for all t` · `during <label>` · `when <조건>` · `within N after <앵커>`(구간 안에 한 번이라도) · **`by N after <앵커>`(그 시각에 참 — 회복 판정용)** · `event_entered('E')` · `value_at('<별칭>', 앵커)` · `baseline_X.<지표>` — 상세: `scripts/harness/criteria.py` |
+| 판정 상태 | PASS · FAIL · **PENDING**(비교할 baseline 결과 없음) · **ERROR**(문법 · 열 없음) · **N/A**(baseline X 자신의 실행에서 `baseline_X.*` 비교) |
+| 미지원 주입 | 하네스가 아직 처리하지 못하는 주입(레이더 · Wi-Fi · 고장 등)은 무시하지 않고 `summary.csv` 의 `notes` 에 남긴다 |
+
+> **B6 판정 문구:** "20분 내 RH ≤ 샤워 전 + 5 %p" 는 `by 1200 after shower_start` 로 쓴다. `within` 으로 쓰면 샤워 시작 직후(아직 습도가 오르기 전)에 이미 참이 되어 거짓 PASS 가 난다.
+
 ### 하네스 동작 규약
 
 | 단계 | 동작 |
@@ -892,3 +905,4 @@ scenarios:
 | 2026-10-06 | **v2.5** | **CO₂ 폐지 · 재실 기본 환기 · 샤워 · 환경 회복** — B6 샤워 감지 기본(CO₂ 수요 환기 대체) · C11/C12 기본 환기로 개정 · X5 습도 회복 추가 · X6 기본 환기 미달(E4)로 개정 · **C18 장마철 샤워 · C19 겨울 샤워 · 빨래 + 외기 나쁨 신설** · C1 배기 정지 근거를 I10(이슬점)으로 · B7 ② 향초 → 원인 미상 · 지표 #9 기본 환기 충족 · 참값 CO₂ / #14 습도 회복 시간 · EXP-3 기본 환기량 민감도 → **40개 / 234회** |
 | 2026-10-07 | v2.6 | **EXP-5 추가 (논문용)** — 에너지 제어 방식 비교(질문별 모델 vs LSTM vs 심층 RL) · 시나리오 수 · 실행 횟수 변동 없음 · 계획 [`10`](10_energy_control_comparison_study.md) |
 | 2026-10-09 | v2.7 | 최신 계획 정합 — B4 입력 · 판정을 PIR 클리어 60 s에서 **문 닫힘 + 판정 창 3분(180 ± 2 s)** 으로 정정 |
+| 2026-10-09 | v2.8 | §8 스키마 보충 — 하네스 v0.1 구현 (`label` · `heating_setpoint_c` · `wind_speed_ms` · 판정 문법 `by` · `when` · `during` · PENDING/ERROR/N/A · 미지원 주입 기록) |

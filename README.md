@@ -703,7 +703,8 @@ actuator_workspace/
 │   ├── user_modes.yaml                # [v3.0] 사용자 모드 · 소음 등급 · 스케줄
 │   ├── environment_model.yaml         # 환경 · 가전 효과 계수 (W08)
 │   ├── actuator_limits.yaml · lighting_calibration.yaml
-│   └── scenario_profiles.yaml         # 시나리오 40개
+│   ├── harness.yaml                   # 하네스 설정 (적분 · 로그 · 지표 상수 · baseline → 제어기)
+│   └── scenario_profiles.yaml         # 시나리오 40개 (현재 B6 · B7 · C9)
 ├── worlds/lowcost_studio_room.usd
 ├── assets/ furniture/ · actuator_models/ · appliance_models/ · obstacles/
 ├── scripts/
@@ -718,10 +719,13 @@ actuator_workspace/
 │   ├── smart_home_controller_node.py
 │   ├── controller/                    # [v3.0] mode_manager · event_detector · rule_engine · means_ladder · arbiter
 │   ├── env_model/                     # 고속 모드 환경 참값 모델 (순수 Python · ROS 비의존)
-│   ├── scenario_runner.py             # ⭐ 하네스 (물리 / 고속)
+│   ├── interfaces/topics.py           # 토픽 계약 52개 상수 (docs/02 §6)
+│   ├── harness/                       # 하네스 — 시나리오 전개 · 주입 · 고속 세계 · 판정 · 집계
+│   ├── scenario_runner.py             # ⭐ 하네스 CLI (물리 / 고속)
 │   ├── experiment_logger_node.py
 │   └── analyze_results.py
 ├── launch/studio_smart_home.launch.py
+├── tools/isaac/                       # Isaac Sim 5.1 전용 컨테이너 실행 · 검증 스크립트 (SETUP §4-A)
 ├── tests/                             # pytest (uv run pytest)
 ├── pyproject.toml · uv.lock           # uv 환경 (Python 3.12)
 └── results/ raw/ · sweep/ · validation/ · figures/ · summary.csv

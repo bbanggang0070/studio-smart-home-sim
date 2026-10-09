@@ -52,9 +52,13 @@ class ComfortLadders:
             self._i10_open = False
         return self._i10_open
 
-    def apply(self, o: Observation, mode: str, blocked: list[str], noise: dict, add) -> dict:
+    def apply(self, o: Observation, mode: str, blocked: list[str], noise: dict, add, saving: bool = False) -> dict:
+        """saving = 빈방 절전(AUTO_SAVING) — 냉방 · 가습은 멈추고 곰팡이 방지 제습만 남긴다."""
         g = self.p.get
-        m = self.p.mode(mode)
+        m = dict(self.p.mode(mode))
+        if saving:
+            m["cooling_setpoint_c"] = None
+            m["humidity_range_pct"] = [None, g("events.saving_state.mold_guard_rh_pct")]
         season = self.season(o)
         info: dict = {"season": season}
         outdoor_cooler = (not math.isnan(o.outdoor_temp_c)

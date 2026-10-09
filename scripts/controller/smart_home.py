@@ -61,6 +61,10 @@ class SmartHomeController:
         if sc.get("appliance_profile"):
             self.rules.devices = set(self.p.get("appliances.profiles")[sc["appliance_profile"]])
         self.rules.filter_hours = float((sc.get("initial") or {}).get("filter_hours", 0.0))
+        # 사용자 설정 (user_modes.yaml 의 switching 값을 시나리오가 바꿀 수 있다 — 예: B4 외출 자동 전환 끔)
+        us = sc.get("user_settings") or {}
+        if "away_auto_enabled" in us:
+            self.modes.away_auto = bool(us["away_auto_enabled"])
         self.devices = self.rules.devices
         self._last_t: float | None = None
         self._reasons: list[str] = []
@@ -94,14 +98,16 @@ class SmartHomeController:
 
         info = self.rules.info
         out[T.T_ACTIVE_EVENTS] = json.dumps(sorted(ev))
-        out[T.T_LIVING_MODE] = json.dumps({"mode": mode, "path": path, "noise_grade": info["noise_grade"]})
+        out[T.T_LIVING_MODE] = json.dumps({"mode": mode, "path": path, "noise_grade": info["noise_grade"],
+                                           "state": "AUTO_SAVING" if info.get("saving") else "AUTO_COMFORT"})
         out[T.T_DEW_MARGIN] = self.psy.dew_margin(o)
         out[T.T_VENTILATION] = json.dumps({"base_vent_m3h": info.get("base_vent_m3h", 0.0),
                                            "window_blocked": info["window_blocked"],
                                            "i10_dew_diff_c": info.get("i10_dew_diff_c")})
         out[T.T_CONTROL_FEASIBILITY] = "FEASIBLE"     # 판정 로직은 W09 T9.7
-        if self.rules.alerts:                          # 사용자 알림 (전용 토픽이 없어 safety_state 에 싣는다)
-            out[T.T_SAFETY_STATE] = json.dumps({"alerts": list(self.rules.alerts)}, ensure_ascii=False)
+        alerts = self.rules.alerts + self.events.alerts
+        if alerts:                                     # 사용자 알림 (전용 토픽이 없어 safety_state 에 싣는다)
+            out[T.T_SAFETY_STATE] = json.dumps({"alerts": list(alerts)}, ensure_ascii=False)
         return out
 
     def _ac_command(self, on: bool) -> str:

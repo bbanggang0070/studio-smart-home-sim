@@ -160,7 +160,9 @@ class RuleEngine:
 
         # -- L5 쾌적 --
         self._base_ventilation(o, mode, blocked, add)
-        self.info.update(self.ladders.apply(o, mode, blocked, noise, add))
+        saving = not o.occupied and mode != "AWAY"
+        self.info["saving"] = saving
+        self.info.update(self.ladders.apply(o, mode, blocked, noise, add, saving=saving))
         if mode in ("AWAY",) and "ac" in self.devices:
             add("ac", "cap", 0, L3, "외출 — 냉방 정지")
         pm = "indoor_pm."

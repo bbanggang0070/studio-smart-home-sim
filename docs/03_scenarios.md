@@ -877,6 +877,10 @@ scenarios:
 | `environment_overrides` | 시나리오별 참값 계수 덮어쓰기 (예: X6 `air_balance.base_infiltration_ach: 0.1`) |
 | `initial.filter_hours` | 흡기 필터 누적 가동 시간 — 참값 유량과 제어기의 저장 상태에 함께 쓴다 (X6) |
 | `entries('E')` · `ac_fan_is('low')` | 판정 함수 — 이벤트 진입 횟수(알림 횟수) · 에어컨 풍량 |
+| 재실 감지 주입 | `door: open_close`(`open_s`) · `wifi: doze`(절전 끊김) · `neighbor: {gate, static_energy}` · `curtain: {gate, moving_energy}` · `fault: door_sensor_stuck` · `appliance: pc` · `radar: silent`(레이더 시야 밖) |
+| `events.set` 사람 상태 | `occupancy` · `occupant_zone` · `motion`(still/moving/sleeping) · `phone`(person/home — 두고 외출) |
+| `user_settings` | 사용자 설정 덮어쓰기 (예: B4 `away_auto_enabled: false`) |
+| `basis_is('X')` · 별칭 `occupied` | 판정 함수 — 재실 판정 근거 · 재실 노드 출력 (참값은 `occupied_truth`) |
 | 지표 `actuation_count` (#8) · `base_vent_compliance` · `co2_compliance` (#9) | 하네스가 계산 — 장치 전환 횟수 · 재실 중 기본 환기 충족률 · 참값 CO₂ 기준 이하 비율 |
 | `expect.<별칭>.settle_s` | 구간 시작 N 초 뒤부터 판정 — 감지 지연 허용 (C9: E1 진입 허용 90 s 와 맞춤) |
 | 판정 상태 | PASS · FAIL · **PENDING**(비교할 baseline 결과 없음) · **ERROR**(문법 · 열 없음) · **N/A**(baseline X 자신의 실행에서 `baseline_X.*` 비교) |
@@ -943,3 +947,4 @@ scenarios:
 | 2026-10-10 | v2.17 | **C15 판정 개정** — 건조 ≤ 4시간 → **≤ 6시간 + Proposed−P 대비 단축** (실측 5.9 h · Proposed−P · A 는 8시간 안에 못 마름) |
 | 2026-10-10 | v2.18 | X1 · X5 · X6 · X8 를 scenario_profiles 에 수록 · `environment_overrides` · `filter_hours` · `entries()` · `ac_fan_is()` · X8 '팬 최대'를 N2 허용 최대로 해석 · `overheat_time_s` 는 체감온도 기준 |
 | 2026-10-10 | v2.19 | **C9** 에너지 · 체감 과열 비교 판정 삭제 (지표 #10 = PM 피크 −15 %) · **X5** 흡기 원복 기준을 후드 잔류 운전 종료 + 1분으로, RH 회복 30 → 90분 |
+| 2026-10-10 | v2.20 | B4 · B12 · X9(⑨ 제외)를 scenario_profiles 에 수록 — 재실 판정 노드(문 이벤트 + 판정 창)를 하네스에 연결 · 재실 감지 주입 · `user_settings` · `basis_is()` |

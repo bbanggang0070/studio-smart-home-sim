@@ -1011,3 +1011,170 @@ scenarios:
       - "window_open_ratio == 0 for all t"
       - "exhaust_fan_rpm >= 1330 within 10 after 0"          # 10 s 이내 팬 최대 — 배기팬이 역할 인수 (현행 소음 N2 허용 최대 1,400 rpm 의 95 %)
     metrics: [energy_wh]
+
+  # ---- B4 · 무재실 절전 전환 (docs/03 §2 · 문 이벤트 + 판정 창) ------------------------------
+  - id: B4
+    tier: 1
+    name: "무재실 절전 전환"
+    duration_s: 1800
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261004
+    run_mode: fast
+    appliance_profile: full
+    season: mid
+    persona: commuter
+    power_limit_w: 3000
+    user_settings: { away_auto_enabled: false }      # 외출 자동 전환 옵션 OFF → AUTO_SAVING
+    initial:
+      user_mode: NORMAL
+      temperature_c: 24.0
+      humidity_pct: 50.0
+      co2_ppm: 700.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "10:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 30.0           # 창문 기본 환기 범위 밖 → 재실 중엔 흡기팬
+      outdoor_rh_pct: 50.0
+    injections:
+      - { at_s: 600, door: open_close, label: leave, open_s: 8 }
+    events:
+      - { at_s: 604, set: { occupancy: false } }      # 문으로 나간다 (휴대폰 들고)
+    pass_criteria:
+      - "occupied == 1 when t < leave_end + 178"                 # 판정 창 3분 동안은 재실
+      - "occupied == 0 within 182 after leave_end"               # 문 닫힘 후 180 ± 2 s 에 빈방
+      - "intake_fan_rpm < 1 when t >= leave_end + 200"           # 절전 — 팬 정지 (기본 환기 중단)
+      - "ac_power == 0 when t >= leave_end + 200"
+    metrics: [energy_wh]
+
+  # ---- B12 · 문 이벤트 기반 재실 판정 (호텔 로직) (docs/03 §2) ------------------------------
+  - id: B12
+    tier: 1
+    name: "문 이벤트 기반 재실 판정"
+    duration_s: 9000
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261012
+    run_mode: fast
+    appliance_profile: full
+    season: mid
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 24.0
+      humidity_pct: 50.0
+      co2_ppm: 450.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: false               # 외출 상태
+      occupant_zone: none
+      time_of_day: "17:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 20.0
+      outdoor_rh_pct: 55.0
+    injections:
+      - { at_s: 600, door: open_close, label: arrive, open_s: 8 }
+      - { at_s: 1800, source: cooking, label: cook, stove: induction_plug, pm_mg_per_min: 0.8, moisture_g_per_h: 300, heat_w: 1500, duration_s: 900 }
+      - { at_s: 3000, wifi: doze, label: doze, duration_s: 1200 }       # 휴대폰 절전 끊김
+      - { at_s: 7800, door: open_close, label: leave, open_s: 8 }
+    events:
+      - { at_s: 600, set: { occupancy: true, occupant_zone: kitchen } }
+      - { at_s: 900, set: { occupant_zone: desk } }
+      - { at_s: 1790, set: { occupant_zone: kitchen } }
+      - { at_s: 2700, set: { occupant_zone: desk } }
+      - { at_s: 5400, set: { occupant_zone: bed, motion: sleeping } }   # 30분 수면
+      - { at_s: 7200, set: { occupant_zone: desk, motion: still } }
+      - { at_s: 7804, set: { occupancy: false, phone: home } }           # 휴대폰은 집에 두고 외출
+    pass_criteria:
+      - "occupied == 1 within 2 after arrive_start"                       # 귀가 처리 ≤ 2 s
+      - "occupied == 1 when t >= arrive_start and t < leave_end"          # 재실 고정 중 오판 0 (수면 · Wi-Fi 끊김)
+      - "occupied == 0 within 190 after leave_end"                        # 외출 확정 = 문 닫힘 + 3분 ± 10 s
+      - "occupied == 1 when t >= leave_end and t < leave_end + 170"
+    metrics: [energy_wh]
+
+  # ---- X9 · 재실 신호 오판 — 한 신호가 틀려도 다른 신호가 받친다 (docs/03 §4) -------------------
+  #  ① ③ ⑤ ② ④ ⑧ ⑦ ⑩ ⑥ 순서로 한 타임라인에 배치. ⑨(빈방 보정 6회 학습)는 mmWave 자동 보정 구현 후 추가.
+  - id: X9
+    tier: 3
+    name: "재실 신호 오판"
+    duration_s: 16000
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261209
+    run_mode: fast
+    appliance_profile: full
+    season: mid
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 23.0
+      humidity_pct: 50.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "09:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 20.0
+      outdoor_rh_pct: 55.0
+    injections:
+      - { at_s: 600,  wifi: doze, label: doze1, duration_s: 1200 }                 # ① 공부 중 Wi-Fi 절전 끊김 20분
+      - { at_s: 2400, door: open_close, label: parcel, open_s: 8 }                 # ⑤ 택배 — 문만 열고 닫음
+      - { at_s: 3000, wifi: doze, label: doze_sleep, duration_s: 1800 }            # ③ 수면 중 Wi-Fi 끊김
+      - { at_s: 5400, door: open_close, label: leave1, open_s: 8 }                 # ② 휴대폰 두고 외출
+      - { at_s: 6000, curtain: { gate: 4, moving_energy: 35.0 }, label: curtain, duration_s: 600 }   # ④ 빈집 커튼
+      - { at_s: 7200, door: open_close, label: arrive2, open_s: 8 }
+      - { at_s: 7800, door: open_close, label: leave2, open_s: 8 }                 # ⑧ 외출 직후 옆집 벽 너머
+      - { at_s: 7810, neighbor: { gate: 6, static_energy: 45.0 }, label: neighbor, duration_s: 1800 }
+      - { at_s: 10200, door: open_close, label: arrive3, open_s: 1200 }            # ⑦ 문 20분 열어 둠
+      - { at_s: 12000, source: cooking, label: cook2, stove: induction_plug, pm_mg_per_min: 0.5, moisture_g_per_h: 200, heat_w: 1500, duration_s: 1800 }
+      - { at_s: 12600, door: open_close, label: leave3, open_s: 8 }                # ⑩ 쿡탑 켠 채 외출
+      - { at_s: 14400, fault: door_sensor_stuck, label: stuck }                    # ⑥ 문 센서 고장 (닫힘 고정)
+      - { at_s: 14500, door: open_close, label: sneak, open_s: 8 }                 # 실제로는 문이 열림 — 센서는 모름
+      - { at_s: 14560, appliance: pc, label: pc, power_w: 120, duration_s: 1200 }  # 기기 조작
+    events:
+      - { at_s: 2380, set: { occupant_zone: kitchen, motion: moving } }
+      - { at_s: 2500, set: { occupant_zone: desk, motion: still } }
+      - { at_s: 3000, set: { occupant_zone: bed, motion: sleeping } }
+      - { at_s: 4800, set: { occupant_zone: desk, motion: still } }
+      - { at_s: 5404, set: { occupancy: false, phone: home } }
+      - { at_s: 7200, set: { occupancy: true, occupant_zone: desk, phone: person } }
+      - { at_s: 7804, set: { occupancy: false } }
+      - { at_s: 10200, set: { occupancy: true, occupant_zone: desk } }
+      - { at_s: 11950, set: { occupant_zone: kitchen } }
+      - { at_s: 12604, set: { occupancy: false } }
+      - { at_s: 14504, set: { occupancy: true, occupant_zone: room, motion: moving } }
+    pass_criteria:
+      - "occupied == 1 when t < leave1_start"                               # ① ③ ⑤ — 재실 유지
+      - "occupied == 0 within 190 after leave1_end"                         # ② 외출 확정 ≤ 3분 10초
+      - "occupied == 0 when t >= leave1_end + 190 and t < arrive2_start"    # ④ 커튼 무시
+      - "occupied == 0 within 600 after leave2_end"                         # ⑧ 약한 증거만 → 연장 → 빈방 ≤ 10분
+      - "occupied == 0 when t >= leave2_end + 600 and t < arrive3_start"
+      - "basis_is('FALLBACK') within 610 after arrive3_start"               # ⑦ 10분 후 폴백
+      - "basis_is('LATCHED_OCCUPIED') within 240 after arrive3_end"         # ⑦ 문 닫히면 복귀
+      - "occupied == 1 when t >= arrive3_start and t < leave3_start"
+      - "event_entered('UNATTENDED_COOKING') within 190 after leave3_end"   # ⑩ 판정 창 종료 + 10 s
+      - "basis_is('FALLBACK') within 60 after pc_start"                     # ⑥ 모순 → 폴백 ≤ 60 s
+      - "event_entered('DOOR_SENSOR_FAULT') within 61 after pc_start"       # ⑥ E14
+    metrics: [energy_wh]

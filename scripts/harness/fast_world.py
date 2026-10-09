@@ -73,6 +73,8 @@ class WorldInputs:
     user_mode: str
     activity: str
     illuminance_lux: float
+    motion: str = "still"          # still | moving | sleeping — mmWave 신호 합성
+    phone: str = "person"          # person(들고 다님) | home(두고 나감)
 
     @classmethod
     def from_scenario(cls, sc: dict[str, Any]) -> "WorldInputs":
@@ -93,6 +95,8 @@ class WorldInputs:
             user_mode=str(ini.get("user_mode", "NORMAL")),
             activity=str(ini.get("activity", "")),
             illuminance_lux=float(ini.get("illuminance_lux", 0.0)),
+            motion=str(ini.get("motion", "sleeping" if ini.get("user_mode") == "SLEEP" else "still")),
+            phone=str(ini.get("phone", "person")),
         )
 
     def apply(self, changes: dict[str, Any]) -> None:
@@ -190,8 +194,9 @@ def pm_grade(pm: float, bounds: list[float], names: list[str]) -> str:
 
 
 def sensor_topics(obs: dict[str, Any], world: WorldInputs, door_open: bool, extra_power: dict[str, float],
-                  grade_bounds: list[float], grade_names: list[str]) -> dict[str, Any]:
-    """참값 → 센서 토픽. v0.1: 노이즈 · 지연 없음 (W07 센서 노드에서 추가)."""
+                  grade_bounds: list[float], grade_names: list[str], occ=None, wifi: bool | None = None) -> dict[str, Any]:
+    """참값 → 센서 토픽. 재실 · 위치 · Wi-Fi 는 재실 판정 노드(occ) 결과를 쓴다 (없으면 참값 — 단위 시험용).
+    온습도 · PM 등은 아직 노이즈 · 지연 없음 (W07 센서 노드에서 추가)."""
     power = {k: round(v, 1) for k, v in obs["appliance_power_w"].items()}
     power.update(extra_power)
     return {
@@ -200,10 +205,10 @@ def sensor_topics(obs: dict[str, Any], world: WorldInputs, door_open: bool, extr
         T.S_PM25: obs["pm25_ugm3"],
         T.S_HOOD_TEMPERATURE: obs["hood_temperature_c"],
         T.S_ILLUMINANCE: world.illuminance_lux,          # 조도 모델은 W08 T8.3 — 지금은 시나리오 값
-        T.S_OCCUPANCY: world.occupancy,                  # 재실 판정 노드는 W07 — 지금은 참값
-        T.S_OCCUPANT_ZONE: world.occupant_zone if world.occupancy else "none",
+        T.S_OCCUPANCY: occ.occupied if occ else world.occupancy,
+        T.S_OCCUPANT_ZONE: occ.zone if occ else (world.occupant_zone if world.occupancy else "none"),
         T.S_DOOR_CONTACT: door_open,
-        T.S_WIFI_PRESENCE: world.occupancy,              # Wi-Fi 모델은 W07
+        T.S_WIFI_PRESENCE: wifi if wifi is not None else world.occupancy,
         T.S_OUTDOOR_PM_GRADE: pm_grade(world.ext.outdoor_pm25_ugm3, grade_bounds, grade_names),
         T.S_APPLIANCE_POWER: json.dumps(power, sort_keys=True),
         T.S_WEATHER: json.dumps({"raining": world.raining,

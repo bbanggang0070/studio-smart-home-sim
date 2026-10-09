@@ -57,3 +57,19 @@ appliance_profiles:
   std:  [ceiling_light, desk_lamp, exhaust_fan, blind, window, ac, range_hood]
   full: [ceiling_light, desk_lamp, exhaust_fan, blind, window,
          ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood]
+
+# ---- mmWave(LD2410) 시뮬레이션 — 참값 → 구간 0–8 의 움직임 · 정지 에너지 (고속 모드 재실 노드 입력) ----
+#  구간 = 0.75 m. 사람 위치(zone) → 구간은 thresholds occupancy.zone_gates 와 같은 배치를 쓴다 (센서 배치는 W03 Scene 에서 확정).
+mmwave:
+  gates: 9
+  noise_max: 8.0                  # draft — 모든 구간에 0–8 균등 잡음
+  still_static: 55.0              # draft — 앉아 있음 (정지 · 호흡)
+  sleeping_static: 45.0           # draft — 수면
+  moving_moving: 65.0             # draft — 걸어 다님
+  arrival_walk_s: 60.0            # 귀가 직후 방 안을 걸어 다니는 시간 (판정 창 강한 증거)
+  zone_gate:                      # 사람이 있을 때 신호가 가장 센 구간
+    desk: 2
+    bed: 5
+    kitchen: 1
+    room: 4
+  wifi_arrival_delay_s: [-30.0, 60.0]   # docs/08 §1.5 — 귀가 시 접속 지연 (음수 = 복도에서 먼저)

@@ -12,16 +12,16 @@ from env_model import SourceRates
 
 # 주입 종류 → 지원 여부. 아직 처리하지 못하는 것은 해당 주차를 적어 둔다.
 UNSUPPORTED_KINDS = {
-    "radar": "W07 재실 센서 노드 (mmWave 구간 신호)",
-    "wifi": "W07 휴대폰 Wi-Fi 모델",
-    "neighbor": "W07 벽 너머 신호 주입",
-    "fault": "W10 고장 주입 (ir_miss · door_sensor_stuck 등)",
+    "fault": "W10 고장 주입 (ir_miss 등 — door_sensor_stuck 만 지원)",
 }
+# 재실 감지 주입 (sensing.py) — radar: silent(레이더 시야 밖) · wifi: doze(절전 끊김) · neighbor(벽 너머 정지 신호)
+#   · curtain(빈집 움직임 신호) · fault: door_sensor_stuck(문 센서 값 고정) · appliance: pc(사람이 켜는 기기 전력)
+SENSING_KINDS = ("radar", "wifi", "neighbor", "curtain")
 SUPPORTED_SOURCES = ("cooking", "shower", "pm_no_heat", "laundry")
 # 기기 전력 프로파일 주입 — washer: 탈수 구간 전력 → 종료 시 젖은 빨래를 넌다 (laundry_moisture_g)
 EXTERNAL_KEYS = ("outdoor_temp_c", "outdoor_rh_pct", "outdoor_pm25_ugm3", "outdoor_illuminance_lux",
                  "wind_speed_ms", "heating_setpoint_c", "weather")
-WORLD_KEYS = ("occupancy", "occupant_zone", "user_mode", "illuminance_lux", "activity", "occupants")
+WORLD_KEYS = ("occupancy", "occupant_zone", "user_mode", "illuminance_lux", "activity", "occupants", "motion", "phone")
 
 
 @dataclass
@@ -75,9 +75,16 @@ class Timeline:
             elif iv.kind == "pm_no_heat":
                 src.other_pm_mg_per_min += float(s.get("pm_mg_per_min", 0.0))
         for iv in self.intervals:
-            if iv.kind == "washer" and iv.active(t):
-                power["washer"] = power.get("washer", 0.0) + float(iv.spec.get("power_w", 450.0))
+            if iv.kind in ("washer", "pc") and iv.active(t):
+                power[iv.kind] = power.get(iv.kind, 0.0) + float(iv.spec.get("power_w", 450.0))
         return src, power
+
+    def active_kind(self, t: float, kind: str) -> list[Interval]:
+        return [iv for iv in self.intervals if iv.kind == kind and iv.active(t)]
+
+    def instants_between(self, t0: float, t1: float, kind: str) -> list[Interval]:
+        """(t0, t1] 에 시작하는 주입 — 순간 사건 (문 센서 고장 등)."""
+        return [iv for iv in self.intervals if iv.kind == kind and t0 < iv.start_s <= t1]
 
     def laundry_hung_between(self, t0: float, t1: float) -> float:
         """(t0, t1] 에 널린 빨래 수분 [g] — 세탁기 탈수 종료 시각 · 'source: laundry' 시작 시각."""
@@ -109,9 +116,16 @@ def build_timeline(scenario: dict[str, Any]) -> Timeline:
                 continue
             dur = float(inj.get("duration_s", duration - at))
             tl.intervals.append(Interval(inj.get("label", kind), kind, at, at + dur, inj))
-        elif inj.get("appliance") == "washer":
+        elif inj.get("appliance") in ("washer", "pc"):
+            kind = inj["appliance"]
             dur = float(inj.get("duration_s", 600.0))
-            tl.intervals.append(Interval(inj.get("label", "washer"), "washer", at, at + dur, inj))
+            tl.intervals.append(Interval(inj.get("label", kind), kind, at, at + dur, inj))
+        elif any(k in inj for k in SENSING_KINDS):
+            kind = next(k for k in SENSING_KINDS if k in inj)
+            dur = float(inj.get("duration_s", duration - at))
+            tl.intervals.append(Interval(inj.get("label", kind), kind, at, at + dur, inj))
+        elif inj.get("fault") == "door_sensor_stuck":
+            tl.intervals.append(Interval(inj.get("label", "door_stuck"), "door_sensor_stuck", at, at, inj))
         elif inj.get("door") == "open_close":
             open_s = float(inj.get("open_s", 5.0))
             tl.intervals.append(Interval(inj.get("label", "door"), "door", at, at + open_s, inj))

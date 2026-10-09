@@ -22,6 +22,9 @@ from harness import criteria as C
 from harness.controllers import ControllerNotImplemented, make_controller
 from harness.fast_world import (FastActuators, WorldInputs, initial_actuators, make_model, sensor_topics)
 from harness.scenario import Run, expand_runs, load_scenarios
+from harness.sensing import PersonTruth, SensingWorld
+from controller.params import load_params
+from sensors.occupancy import OccupancyJudge
 from harness.timeline import build_timeline
 from interfaces import topics as T
 
@@ -76,6 +79,15 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
     acts = FastActuators(initial_actuators(sc), fm["actuator_time_constant_s"], devices)
     grade = hcfg["outdoor_api"]
 
+    # 재실 판정 노드 (sensors/occupancy) — 설정은 시스템 상수 thresholds.yaml occupancy 블록
+    occ_params = load_params().th["occupancy"]
+    sensing = SensingWorld(cfg=hcfg["mmwave"], rng=np.random.default_rng(run.seed + 7919),
+                           judge=OccupancyJudge(occ_params, world.occupancy),
+                           person=PersonTruth(world.occupancy, world.occupant_zone, world.motion,
+                                              phone_with_person=world.phone == "person",
+                                              left_phone_home=world.phone == "home"))
+    was_present = world.occupancy
+
     controller.reset({"scenario": sc, "baseline": run.baseline, "seed": run.seed, "rng": rng})
     user_cmds: dict[str, Any] = {T.C_MODE: world.user_mode}
     if world.activity:
@@ -104,8 +116,27 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
         if hung > 0:
             model.hang_laundry(model.state.laundry_moisture_g + hung)
 
-        inbox = sensor_topics(obs, world, tl.door_open_at(now), extra_power,
-                              grade["pm_grade_bounds_ugm3"], grade["pm_grade_names"])
+        # 사람 참값 → 재실 판정 노드
+        p = sensing.person
+        if world.occupancy and not was_present:
+            p.arrived_at = now                                     # 귀가 — 잠시 방 안을 걷는다
+        was_present = world.occupancy
+        silent = bool(tl.active_kind(now, "radar"))                # 욕실 등 레이더 시야 밖
+        p.present, p.motion = world.occupancy, world.motion
+        p.zone = "none" if silent else world.occupant_zone
+        p.phone_with_person, p.left_phone_home = world.phone == "person", world.phone == "home"
+        for iv in tl.instants_between(now - dt if k else -1.0, now, "door_sensor_stuck"):
+            sensing.door_sensor_stuck_at = tl.door_open_at(now)    # 고장 — 접점 값이 그 자리에 멈춘다
+        extra_m = {int(iv.spec["curtain"].get("gate", 4)): float(iv.spec["curtain"].get("moving_energy", 35.0))
+                   for iv in tl.active_kind(now, "curtain")}
+        extra_s = {int(iv.spec["neighbor"].get("gate", 6)): float(iv.spec["neighbor"].get("static_energy", 45.0))
+                   for iv in tl.active_kind(now, "neighbor")}
+        occ, wifi, contact = sensing.step(now, tl.door_open_at(now), bool(tl.active_kind(now, "wifi")),
+                                          extra_power, extra_m, extra_s)
+
+        inbox = sensor_topics(obs, world, contact, extra_power,
+                              grade["pm_grade_bounds_ugm3"], grade["pm_grade_names"], occ=occ, wifi=wifi)
+        inbox[T.T_OCCUPANCY_BASIS] = occ.basis                    # 재실 노드가 내는 상태 토픽
         inbox.update(acts.state_topics())
         inbox.update(ctrl_state)
         inbox.update(user_cmds)
@@ -136,6 +167,11 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
                 row[tp] = v if not isinstance(v, (dict, list)) else json.dumps(v)
             for tp, v in ctrl_state.items():
                 row.setdefault(tp, v)
+            row["truth.occupied"] = world.occupancy
+            row["truth.door_open"] = tl.door_open_at(now)
+            row[T.T_OCCUPANCY_BASIS] = occ.basis
+            row["occ.alerts"] = len(sensing.alerts)
+            row[T.S_WIFI_PRESENCE] = wifi
             row["power.total_w"] = sum(float(v) for v in json.loads(inbox[T.S_APPLIANCE_POWER]).values())
             row["ext.outdoor_pm25_ugm3"] = world.ext.outdoor_pm25_ugm3
             row["ext.outdoor_dew_c"] = _dew(world.ext.outdoor_temp_c, world.ext.outdoor_rh_pct, env_cfg)

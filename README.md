@@ -722,6 +722,7 @@ actuator_workspace/
 │   ├── controller/                    # 순수 Python 제어기 — smart_home · mode_manager · event_detector · rule_engine · predictor · arbiter · baseline_a
 │   ├── env_model/                     # 고속 모드 환경 참값 모델 (순수 Python · ROS 비의존)
 │   ├── interfaces/topics.py           # 토픽 계약 53개 상수 (docs/02 §6)
+│   ├── sensors/occupancy.py           # 재실 판정 노드 코어 — 문 이벤트 + 판정 창 · 폴백 융합 (순수 Python)
 │   ├── harness/                       # 하네스 — 시나리오 전개 · 주입 · 고속 세계 · 판정 · 집계
 │   ├── scenario_runner.py             # ⭐ 하네스 CLI (물리 / 고속)
 │   ├── experiment_logger_node.py

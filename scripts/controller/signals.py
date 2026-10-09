@@ -51,6 +51,7 @@ class Observation:
     ac_power: bool
     ac_mode: str
     dehumidifier_on: bool
+    occupancy_basis: str
 
     @property
     def tod_s(self) -> float:
@@ -89,6 +90,7 @@ def parse_inbox(now_s: float, inbox: dict[str, Any]) -> Observation:
         ac_power=bool(ac.get("power")),
         ac_mode=str(ac.get("mode", "cool")),
         dehumidifier_on=bool(inbox.get(T.T_DEHUMIDIFIER, False)),
+        occupancy_basis=str(inbox.get(T.T_OCCUPANCY_BASIS, "")),
     )
 
 

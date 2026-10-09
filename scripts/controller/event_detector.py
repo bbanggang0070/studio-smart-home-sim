@@ -61,6 +61,7 @@ class EventDetector:
         self._cook_release_since: float | None = None
         self._cond_release_since: float | None = None
         self.moisture = MoistureResidual(p, psy)
+        self.alerts: list[str] = []
         self.residual: float | None = None
         self._washer_spinning = False
         self._spin_end_at: float | None = None
@@ -89,7 +90,36 @@ class EventDetector:
         self.residual = self.moisture.update(o)
         self._laundry(o)
         self._power_limit(o)
+        self._door_fault(o)
+        self._unattended_cooking(o)
         return self.active
+
+    # -- E14 문 센서 이상 (L1) — 재실 노드가 24시간 융합으로 폴백했다 --
+
+    def _door_fault(self, o: Observation) -> None:
+        if o.occupancy_basis == "FALLBACK":
+            if "DOOR_SENSOR_FAULT" not in self.active:
+                self._enter("DOOR_SENSOR_FAULT", o.now_s)
+                self.alerts.append("재실 판정이 24시간 융합으로 전환됨 — 문 센서 점검 (E14)")
+        else:
+            self._exit("DOOR_SENSOR_FAULT")
+
+    # -- E15 불 켜고 외출 (L1) --
+
+    def _unattended_cooking(self, o: Observation) -> None:
+        g = self.p.get
+        c = "events.cooking."
+        heat = (o.hood_temp_c - o.temp_c >= g(c + "hood_temp_delta_vs_room_c")
+                or o.power_w.get("cooktop", 0.0) >= g(c + "cooktop_power_trigger_w"))
+        if not o.occupied and heat:
+            if "UNATTENDED_COOKING" not in self.active:
+                self._enter("UNATTENDED_COOKING", o.now_s)
+                plug = o.power_w.get("cooktop", 0.0) >= g(c + "cooktop_power_trigger_w")
+                self.alerts.append("불을 켠 채 외출 — 즉시 확인 (E15)"
+                                   + (" · 플러그형 인덕션 전원 차단 요청 (차단 명령 토픽 미정)" if plug and
+                                      g("events.unattended_cooking.plug_cooktop_cutoff") else " · 가스레인지 — 경고만"))
+        elif not heat:
+            self._exit("UNATTENDED_COOKING")
 
     # -- E5 강우 (L1) --
 

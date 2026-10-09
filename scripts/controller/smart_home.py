@@ -56,7 +56,13 @@ class SmartHomeController:
         # Proposed−P = 우선 목표(L4.5) 비활성 대조군 (docs/03 C15)
         self.rules = RuleEngine(self.p, self.psy, hysteresis=self.hysteresis,
                                 primary_goals=self.baseline not in ("P-", "proposed_np"))
+        sc = params.get("scenario") or {}
+        # 가전 프로파일 · 필터 누적 시간은 설치 설정 · 저장 상태다 — 시나리오가 주면 그것을 쓴다 (X8 · X6)
+        if sc.get("appliance_profile"):
+            self.rules.devices = set(self.p.get("appliances.profiles")[sc["appliance_profile"]])
+        self.rules.filter_hours = float((sc.get("initial") or {}).get("filter_hours", 0.0))
         self.devices = self.rules.devices
+        self._last_t: float | None = None
         self._reasons: list[str] = []
 
     def reasons(self) -> list[str]:
@@ -64,6 +70,9 @@ class SmartHomeController:
 
     def step(self, now_s: float, inbox: dict[str, Any]) -> dict[str, Any]:
         o = parse_inbox(now_s, inbox)
+        if self._last_t is not None and o.intake_rpm > 0:
+            self.rules.filter_hours += (now_s - self._last_t) / 3600.0
+        self._last_t = now_s
         mode, path = self.modes.update(o)
         ev = self.events.update(o)
         cands = self.rules.candidates(o, mode, ev)
@@ -91,6 +100,8 @@ class SmartHomeController:
                                            "window_blocked": info["window_blocked"],
                                            "i10_dew_diff_c": info.get("i10_dew_diff_c")})
         out[T.T_CONTROL_FEASIBILITY] = "FEASIBLE"     # 판정 로직은 W09 T9.7
+        if self.rules.alerts:                          # 사용자 알림 (전용 토픽이 없어 safety_state 에 싣는다)
+            out[T.T_SAFETY_STATE] = json.dumps({"alerts": list(self.rules.alerts)}, ensure_ascii=False)
         return out
 
     def _ac_command(self, on: bool) -> str:

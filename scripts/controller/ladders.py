@@ -29,6 +29,7 @@ class ComfortLadders:
         self._ac_dry = False
         self._fan_high = False
         self._escalated = False
+        self._ac_on = False
 
     def _band(self, key: str) -> float:
         return self.p.get(f"comfort_ladders.{key}") if self.hyst else 0.0
@@ -56,8 +57,14 @@ class ComfortLadders:
         m = self.p.mode(mode)
         season = self.season(o)
         info: dict = {"season": season}
-        free_cool = (not math.isnan(o.outdoor_temp_c)
-                     and o.outdoor_temp_c <= o.temp_c - g("means_ladder.window_cooling_requires_outdoor_below_c"))
+        outdoor_cooler = (not math.isnan(o.outdoor_temp_c)
+                          and o.outdoor_temp_c <= o.temp_c - g("means_ladder.window_cooling_requires_outdoor_below_c"))
+        free_cool = outdoor_cooler                      # 환기로 하는 냉방 — 아래에서 I10 이 막을 수 있다
+        # 창문을 못 쓰면 배기 + 흡기만 남는다 — 소음 등급 · 외기 등급 상한 뒤 배기 여력이 작으면 무료 냉방이 없는 것과 같다
+        if free_cool and blocked:
+            ex_cap = min(noise["exhaust_fan_max_rpm"], g("air_quality.grade_policy")[o.outdoor_pm_grade]["fan_max_rpm"])
+            if ex_cap < g("comfort_ladders.min_free_cool_exhaust_rpm"):
+                free_cool = False
         ac_allowed = "ac" in self.rules.devices and m.get("cooling_setpoint_c") is not None
         ac_cmd = None                                   # (mode, setpoint) — 냉방 · 제습이 함께 정한다
         fan_max = SPEED[noise["ceiling_fan_max_speed"]]
@@ -80,7 +87,9 @@ class ComfortLadders:
         elif o.temp_c < sp - self._band("cooling_off_band_c"):
             self.cooling = False
         # 제습이 필요한데 바깥이 더 습하면(I10 불만족) 환기로 냉방하지 않는다 — 습기를 들인다 (C1)
-        if self.dehumidifying and not i10:
+        # 단 실내 제습 수단(에어컨 · 제습기)이 아예 없으면 습기는 어차피 못 뺀다 → 환기 냉방이 유일한 수단 (X8 P-core)
+        dehum_means = ac_allowed or "dehumidifier" in self.rules.devices
+        if self.dehumidifying and not i10 and dehum_means:
             free_cool = False
         # 에어컨 승격 (히스테리시스) — 무료 냉방을 escalate_to_ac_after_s 써도 목표 + margin 을 넘으면 승격하고,
         # 목표 + margin − release_band 아래로 내려오거나 냉방이 끝날 때까지 유지한다. 승격 중엔 무료 냉방을 요청하지 않는다
@@ -100,6 +109,8 @@ class ComfortLadders:
         if self.cooling:
             if o.illuminance_lux >= g("comfort_ladders.shade_requires_lux"):
                 add("blind", "need", g("setpoints.blind_shade_angle_deg"), L5, "냉방 ① 블라인드 차광")
+            elif m.get("blind_policy") == "night_cooling" and outdoor_cooler:   # 복사냉각은 공기를 들이지 않는다 — I10 무관
+                add("blind", "need", g("setpoints.blind_night_cooling_deg"), L5, "냉방 — 야간 복사냉각 블라인드 개방 (수면)")
             if free_cool and not blocked and not self._escalated:
                 add("window", "need", g("setpoints.window_vent_ratio_pct") / 100.0, L5, "냉방 ② 창문 (외기가 더 시원)")
                 add("exhaust", "need", g("setpoints.fan_low_rpm"), L5, "냉방 ② 배기 저속 (창문 병행)")
@@ -112,13 +123,20 @@ class ComfortLadders:
             if "ceiling_fan" in self.rules.devices:
                 add("ceiling_fan", "need", fan, L5, "냉방 ③ 실링팬 정회전")
             if free_cool and blocked and not self._escalated:
-                rpm = g("setpoints.fan_high_rpm")
+                # 비로 창문이 완전히 막히면 배기팬이 역할을 인수 — 최대 (setpoints.fan_max_rpm, v1.1 C1 · X8)
+                rpm = g("setpoints.fan_max_rpm") if "rain" in blocked else g("setpoints.fan_high_rpm")
                 add("exhaust", "need", rpm, L5, f"냉방 ④ 배기 + 흡기 (창문 불가 {','.join(blocked)})")
                 add("intake", "need", self.rules.intake_rpm_for(self.rules.exhaust_m3h(rpm)), L5, "냉방 ④ 균형 급기")
             escalate = self._escalated
-            if (not free_cool or escalate) and ac_allowed:
-                relax = g("interaction_rules.I5_ceiling_fan_setpoint_relax_c") if "ceiling_fan" in self.rules.devices else 0.0
-                sp_ac = sp + relax
+            relax = g("interaction_rules.I5_ceiling_fan_setpoint_relax_c") if "ceiling_fan" in self.rules.devices else 0.0
+            sp_ac = sp + relax
+            # 실링팬이 체감을 낮추는 동안(I5)은 에어컨 기동 기준도 같이 완화한다 — 설정만 완화하고 기동은 공기 온도
+            # 목표 + 0.5 에서 하면, 실링팬만으로 체감이 충분한데도 에어컨이 돈다 (C9: 실링팬 약만 쓰는 A 의 체감 과열 0 s)
+            if self._ac_on:
+                self._ac_on = o.temp_c >= sp_ac - self._band("cooling_off_band_c")
+            else:
+                self._ac_on = o.temp_c > sp_ac + g("comfort_ladders.cooling_on_above_setpoint_c")
+            if ((not free_cool and self._ac_on) or escalate) and ac_allowed:
                 # 냉방 + 제습이 함께 필요하면 설정 근처에서는 제습 모드 — 저부하 냉방은 습기를 거의 못 뺀다 (C1)
                 if self.dehumidifying and season == "summer":
                     if o.temp_c <= sp_ac + g(cl + "ac_dry_within_setpoint_c"):

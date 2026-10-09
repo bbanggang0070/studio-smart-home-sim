@@ -69,6 +69,8 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
 
     tl = build_timeline(sc)
     world = WorldInputs.from_scenario(sc)
+    if sc.get("environment_overrides"):             # 시나리오별 참값 계수 (예: X6 침기 0.1 ACH)
+        env_cfg = env_cfg.with_overrides(sc["environment_overrides"])
     model = make_model(env_cfg, sc)
     devices = hcfg["appliance_profiles"][sc.get("appliance_profile", "full")]
     acts = FastActuators(initial_actuators(sc), fm["actuator_time_constant_s"], devices)
@@ -126,6 +128,7 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
             row["act.ac_cool"] = ac.power and ac.mode == "cool"
             row["act.ac_dry"] = ac.power and ac.mode == "dry"
             row["act.ac_setpoint"] = ac.setpoint_c
+            row["act.ac_fan"] = acts.ac_fan
             for tp in (T.S_TEMPERATURE, T.S_HUMIDITY, T.S_PM25, T.S_HOOD_TEMPERATURE, T.S_OCCUPANCY,
                        T.S_DOOR_CONTACT, T.S_OUTDOOR_PM_GRADE):
                 row[tp] = inbox[tp]

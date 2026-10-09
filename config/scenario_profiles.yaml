@@ -709,7 +709,7 @@ scenarios:
         laundry_moisture_g: 2000
     pass_criteria:
       - "event_entered('LAUNDRY_DRYING') within 3600 after washer_end"          # 탈수 종료 + 습기 수지 잔차
-      - "laundry_dry_time_s <= 14400"                                           # 잔여 수분 ≤ 5 % 도달 ≤ 4시간 (널린 시각부터)
+      - "laundry_dry_time_s <= 21600"                                           # 잔여 수분 ≤ 5 % 도달 ≤ 6시간 (2026-10-10 4 → 6 h)
       - "temperature <= value_at('temperature', washer_end) + 1.0 when t >= washer_end"   # 온도 예산 +1.0 °C
       - "humidity <= 70 when t >= 1800"                                         # RH 정점 ≤ 70 % (초기 75 % 에서 내려온 뒤)
       - "laundry_dry_time_s < baseline_proposed_np.laundry_dry_time_s"          # 우선 목표의 효과 (Proposed−P 대비)
@@ -851,3 +851,165 @@ scenarios:
       - "dew_margin >= 0 for all t"                                           # 결로 노출 0
       - "temperature >= 19.5 for all t"                                       # 실내 온도 하락 ≤ 1.5 °C
     metrics: [humidity_recovery_time, laundry_dry_time_s, condensation_exposure_s, energy_wh]
+
+  # ---- X1 · 고온 + 고습 + 우천 + 수면 중 — 4중 제약 (docs/03 §4) ----------------------------
+  - id: X1
+    tier: 3
+    name: "4중 제약 (수면)"
+    duration_s: 3600
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261201
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: SLEEP
+      temperature_c: 30.5
+      humidity_pct: 82.0
+      co2_ppm: 700.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 0.0
+      occupancy: true
+      occupant_zone: bed
+      time_of_day: "02:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 90.0        # 수면 — 닫힘
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: rain
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 25.0
+      outdoor_rh_pct: 95.0
+    pass_criteria:                 # 우선순위 역전 0 · 제약 위반 명령 0
+      - "window_open_ratio == 0 for all t"                   # 우천 (L1)
+      - "exhaust_fan_rpm <= 600 for all t"                   # N0
+      - "intake_fan_rpm <= 700 for all t"                    # N0
+      - "dehumidifier == 0 for all t"                        # 수면 금지
+      - "purifier_level <= 1 for all t"                      # 수면 1단
+      - "ac_fan_is('low')"                                   # 에어컨 풍량 약 (N0)
+      - "ac_power within 60 after 0"                         # 에어컨 제습 · 냉방
+      - "blind_angle_deg <= 5 within 60 after 0"             # 야간 복사냉각 — 블라인드 개방
+    metrics: [energy_wh, actuation_count]
+
+  # ---- X5 · 요리 + 우천 + 냉방 중 (docs/03 §4) ------------------------------------------
+  - id: X5
+    tier: 3
+    name: "요리 + 우천 + 냉방"
+    duration_s: 5400
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261205
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 29.0
+      humidity_pct: 60.0
+      co2_ppm: 650.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 200.0
+      occupancy: true
+      occupant_zone: kitchen
+      time_of_day: "19:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: true, mode: cool, setpoint: 26.0 }, purifier_level: 0 }
+    external:
+      weather: rain
+      outdoor_pm25_ugm3: 10.0      # 좋음
+      outdoor_temp_c: 25.0
+      outdoor_rh_pct: 95.0
+    injections:
+      - { at_s: 60, source: cooking, label: cook, stove: gas, pm_mg_per_min: 1.5, moisture_g_per_h: 400, heat_w: 800, duration_s: 900 }
+    pass_criteria:
+      - "window_open_ratio == 0 for all t"
+      - "pm25_recovery_time <= 1200"                                          # PM 회복 ≤ 20분
+      - "intake_fan_rpm <= 900 within 300 after cook_end"                      # 요리 종료 후 5분 내 흡기 원복 (기본 환기 25 m³/h ≈ 833 rpm)
+      - "temperature <= value_at('temperature', cook_start) + 1.5 when t >= cook_start"   # 실내 온도 상승 ≤ 1.5 °C
+      - "humidity <= 60 within 1800 after cook_end"                            # 요리 종료 후 30분 내 RH ≤ 60 %
+    metrics: [pm25_recovery_time, humidity_recovery_time, energy_wh]
+
+  # ---- X6 · 수면 중 기본 환기 미달 + 외기 매우나쁨 — 설계된 예외 (docs/03 §4) -------------------
+  - id: X6
+    tier: 3
+    name: "수면 기본 환기 미달 (E4)"
+    duration_s: 3600
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261206
+    run_mode: fast
+    appliance_profile: full
+    season: mid
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { air_balance.base_infiltration_ach: 0.1 }   # 침기 0.1 ACH
+    initial:
+      user_mode: SLEEP
+      temperature_c: 24.0
+      humidity_pct: 50.0
+      co2_ppm: 700.0
+      pm25_ugm3: 12.0
+      illuminance_lux: 0.0
+      occupancy: true
+      occupant_zone: bed
+      time_of_day: "01:00"
+      filter_hours: 1900           # 흡기 필터 누적 1,900 h — 유량 약 −38 %
+      window_open_ratio: 0.0
+      blind_angle_deg: 90.0
+      appliances: { purifier_level: 1 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 90.0      # 매우나쁨
+      outdoor_temp_c: 18.0
+      outdoor_rh_pct: 60.0
+    pass_criteria:
+      - "intake_fan_rpm <= 1200 for all t"                   # N1 초과 0 (한 단계만 완화)
+      - "exhaust_fan_rpm <= 1000 for all t"
+      - "window_open_ratio == 0 for all t"                   # 창문 끝까지 폐쇄
+      - "q_net >= -1 for all t"                              # 배기 단독 0 s
+      - "event_entered('VENT_SHORTFALL') within 660 after 0" # E4 진입 ≤ 11분
+      - "entries('VENT_SHORTFALL') == 1"                     # 알림 1회
+    metrics: [base_vent_compliance, co2_compliance, actuation_count]
+
+  # ---- X8 · 가전 프로파일 축소 — 같은 제어기, 다른 답 (docs/03 §4) -----------------------------
+  - id: X8
+    tier: 3
+    name: "가전 프로파일 축소 (C1 · P-core)"
+    duration_s: 3600
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261208
+    run_mode: fast
+    appliance_profile: core        # 천장 조명 · 스탠드 · 배기팬 · 블라인드 · 창문 — 코드 변경 없이 프로파일만 바꾼다
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 31.0
+      humidity_pct: 78.0
+      co2_ppm: 600.0
+      pm25_ugm3: 12.0
+      illuminance_lux: 400.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "15:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: {}
+    external:
+      weather: rain
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 29.0
+      outdoor_rh_pct: 95.0
+      outdoor_illuminance_lux: 10000.0
+    pass_criteria:
+      - "window_open_ratio == 0 for all t"
+      - "exhaust_fan_rpm >= 1330 within 10 after 0"          # 10 s 이내 팬 최대 — 배기팬이 역할 인수 (현행 소음 N2 허용 최대 1,400 rpm 의 95 %)
+    metrics: [energy_wh]

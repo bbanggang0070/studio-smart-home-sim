@@ -674,6 +674,7 @@ smart_home_controller:
       dehumidify_off_band_pct: 5.0         # 제습: 상한 초과 진입 → 상한 − 5 %p 아래에서 해제
       humidify_restart_band_pct: 3.0       # 가습: 하한 미만 진입 → 유효 상한 도달 정지 · 상한 − 3 %p 아래로 내려오면 재개 허용
       cap_extension_by_ceiling_fan: true   # I4 — 결로 상한이 모드 상한보다 낮으면 실링팬 역회전으로 상한 확장 (C10)
+      min_free_cool_exhaust_rpm: 1000.0    # draft — 창문을 못 쓸 때, (소음 · 외기 등급) 상한 뒤 배기가 이 아래면 무료 냉방이 없는 것으로 본다 (X1 수면 N0 600 rpm)
       escalate_to_ac_after_s: 900.0        # draft — 무료 냉방(창문 · 배기)만으로 이 시간 안에 못 내리면 에어컨으로 승격 (C5 '필요 시')
       escalate_above_setpoint_c: 1.0       # draft — 승격 판단: 실내 > 목표 + 1.0 °C (C5 예산 ≤ 28 °C = 수면 목표 27 + 1)
       escalate_release_band_c: 0.5         # 승격 유지 — 실내 ≤ 목표 + 1.0 − 0.5 °C (= 냉방 진입 기준) 가 되거나 냉방이 끝나야 무료 냉방으로 돌아간다 (I2 창문 ↔ 에어컨 채터링 방지)
@@ -724,4 +725,4 @@ smart_home_controller:
       humidity_recovery_min: 30.0         # [v3.4] 지표 #14 — 샤워 · 요리 후 습도 회복 시간
       arrival_comfort_rate_pct: 90.0      # [v3.1] 지표 #15
       budget_violation_count: 0           # [v3.1] 지표 #16
-      laundry_drying_time_h: 4.0          # [v3.1] C15
+      laundry_drying_time_h: 6.0          # [v3.1] C15 — 2026-10-10 4 → 6 h (비 오는 날 기본 환기 습기 부하)

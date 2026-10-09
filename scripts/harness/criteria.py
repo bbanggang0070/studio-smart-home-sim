@@ -17,6 +17,8 @@
     event_entered('NAME')            제어기가 /studio/state/active_events 에 NAME 을 낸 시각들
     value_at('<별칭>', <앵커|숫자>)    그 시각의 값
     ratio(<조건식>)                   조건이 참인 시각의 비율 (체류율)
+    entries('NAME')                  이벤트 진입 횟수 (알림 횟수 판정)
+    ac_fan_is('low')                 에어컨이 꺼져 있거나 그 풍량인 시각
 
 평가할 수 없는 판정(다른 baseline 이 아직 없음 등)은 PENDING 으로 남긴다 — FAIL 과 구분한다.
 baseline_<X>.* 를 쓰는 판정은 baseline X 자신의 실행에서는 N/A (자기 자신과 비교하지 않는다).
@@ -151,9 +153,10 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
     else:
         out["laundry_dry_time_s"] = math.nan
 
-    # 쾌적 — 모드 냉방 목표 + margin 을 넘은 누적 시간 (냉방을 하지 않는 비교군과 에너지를 견줄 때 함께 본다)
+    # 쾌적 — 체감온도(실링팬 기류 보정)가 모드 냉방 목표 + margin 을 넘은 누적 시간
+    # (공기 온도로 세면 I5 로 설정을 완화하고 실링팬으로 체감을 낮춘 상태까지 '과열'로 센다)
     sp = (ctx or {}).get("cooling_setpoint_c")
-    out["overheat_time_s"] = (float((df["truth.temperature_c"] > sp + cfg_metrics["overheat_margin_c"]).sum() * dt_s)
+    out["overheat_time_s"] = (float((df["truth.operative_temp_c"] > sp + cfg_metrics["overheat_margin_c"]).sum() * dt_s)
                               if sp is not None else math.nan)
 
     # 지표 #9 — 재실 중 기본 환기 충족률 · 참값 CO2 기준 이하 비율 (제어에 쓰지 않는 검증값)
@@ -258,7 +261,17 @@ def evaluate(df: pd.DataFrame, criteria: list[str], expect: dict[str, dict], anc
     def value_at(alias: str, when: float) -> float:
         return float(np.interp(when, t, df[ALIASES[alias]].to_numpy(dtype=float)))
 
+    def entries(name: str) -> int:
+        m = _active_event_mask(df, name)
+        return int(np.sum(m[1:] & ~m[:-1]) + (1 if m.size and m[0] else 0))
+
+    def ac_fan_is(level: str) -> np.ndarray:
+        col = df["act.ac_fan"].astype(str).to_numpy() if "act.ac_fan" in df.columns else np.array([""] * len(df))
+        on = df["act.ac_power"].astype(bool).to_numpy() if "act.ac_power" in df.columns else np.zeros(len(df), bool)
+        return ~on | (col == level)
+
     funcs = {"event_entered": lambda name: _active_event_mask(df, name), "value_at": value_at,
+             "entries": entries, "ac_fan_is": ac_fan_is,
              "ratio": lambda cond: float(np.mean(np.asarray(cond, dtype=bool)))}
     ev = _Evaluator(names, funcs, baselines)
 

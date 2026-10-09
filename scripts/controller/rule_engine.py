@@ -39,13 +39,24 @@ class RuleEngine:
         self._i10_open = False
         self._hood_next_eval = -math.inf
         self._laundry_cooling = False
+        self.filter_hours = 0.0                     # 흡기 필터 누적 가동 시간 (제어기가 스스로 기록 · 교체 시 0)
+        self._e4_short_since: float | None = None
+        self._e4_ok_since: float | None = None
+        self.alerts: list[str] = []
         self.info: dict = {}
         self.ladders = ComfortLadders(p, psy, self, hysteresis)
 
     # ---- 도우미 ----
 
+    def filter_factor(self) -> float:
+        """필터 막힘에 따른 흡기 유량 비율 (누적 가동 시간 선형 — base_ventilation.shortfall)."""
+        g = self.p.get
+        clog = min(self.filter_hours / g("appliances.intake_fan.filter_replace_hours"), 1.0)
+        return 1.0 - g("base_ventilation.shortfall.filter_flow_loss_at_replace") * clog
+
     def intake_rpm_for(self, m3h: float) -> float:
-        return min(self.intake_max_rpm, m3h / self.intake_max_m3h * self.intake_max_rpm)
+        """원하는 유량을 내는 흡기팬 rpm — 필터 막힘을 보정한다."""
+        return min(self.intake_max_rpm, m3h / (self.intake_max_m3h * self.filter_factor()) * self.intake_max_rpm)
 
     def exhaust_m3h(self, rpm: float) -> float:
         return self.exhaust_max_m3h * min(rpm / self.exhaust_max_rpm, 1.0)
@@ -72,6 +83,10 @@ class RuleEngine:
             return self.p.get("events.cooking.noise_grade_override")
         if "SHOWER" in ev:
             return "N1" if mode == "SLEEP" else self.p.get("events.shower.noise_grade_override")
+        if "VENT_SHORTFALL" in ev:                   # E4 — 소음 상한을 한 단계만 완화 (N0 → N1)
+            order = ["N0", "N1", "N2", "N3"]
+            steps = int(self.p.get("base_ventilation.shortfall.noise_relax_steps"))
+            return order[min(order.index(grade) + steps, 2)]
         return grade
 
     def _pm_slope_per_h(self, now: float) -> float | None:
@@ -85,10 +100,12 @@ class RuleEngine:
 
     def candidates(self, o: Observation, mode: str, ev: dict[str, ActiveEvent]) -> list[Candidate]:
         g = self.p.get
+        self._mode = mode
         self.pm_hist.append((o.now_s, o.pm25))
         out: list[Candidate] = []
         add = lambda dev, kind, val, layer, why: out.append(Candidate(dev, kind, float(val), layer, why))
         blocked = self.window_blocked(o, ev, mode)
+        self._vent_shortfall(o, mode, ev, blocked)
         grade = self.noise_grade(mode, ev)
         noise = self.p.noise(grade)
         self.info = {"noise_grade": grade, "window_blocked": blocked}
@@ -205,6 +222,13 @@ class RuleEngine:
             add("hood", "need", lv, L2, f"E1 요리 후드 예측 선택 {cook.info.get('peaks', {})}")
             add("purifier", "need", g(c + ("purifier_level_outdoor_bad" if bad_out else "purifier_level")), L2,
                 "E1 요리 청정기")
+        # R4 — 비 오는 날 요리: 보상 급기가 습한 외기를 들이므로 요리 시작과 함께 에어컨 제습을 앞당긴다 (X5 · docs/07 §3.5)
+        sp = self.p.mode(self._mode).get("cooling_setpoint_c")
+        if ("RAIN" in ev and g("recovery.precondition_on_event_start") and "ac" in self.devices and sp is not None
+                and self.ladders.season(o) == "summer"):
+            add("ac", "need", 1, L2, "E1 · 우천 — 에어컨 유지 + 제습 앞당김 (설정 −1 °C, R4)")
+            self.info["ac_override"] = {"mode": "cool", "setpoint": sp + g("recovery.ac_dry_boost_setpoint_c"),
+                                        "fan": noise["ac_fan_max"]}
         if lv > 0:
             self._supply_for(g("appliances.range_hood.flow_m3h")[f"l{lv}"], o, blocked,
                              g(c + "compensating_window_ratio"), add, "E1")
@@ -281,6 +305,37 @@ class RuleEngine:
                              add, "E3")
         else:
             add("dehumidifier", "need", 1, L2, "E3 샤워 실내 제습 (I10 바깥이 더 습함 · I6 해제)")
+
+    def _vent_shortfall(self, o: Observation, mode: str, ev: dict, blocked: list[str]) -> None:
+        """E4 기본 환기 미달 (docs/07 §3.3) — 모드의 소음 상한 안에서 흡기팬(필터 막힘 반영)으로 기본 환기량을 못 채우고
+        창문도 못 쓰면 10분 뒤 진입 → 소음 상한 한 단계 완화 · 필터 교체 알림 1회.
+        해제는 '원래 소음 상한으로도 채울 수 있게 되었을 때'(예: 필터 교체) 5분 — 완화 덕에 채워진 것으로 풀면 다시 미달이 반복된다."""
+        from controller.event_detector import ActiveEvent
+        g = self.p.get
+        sf = "base_ventilation.shortfall."
+        target = self.p.mode(mode).get("base_vent_m3h") or 0.0
+        if not o.occupied or target <= 0.0 or "intake_fan" not in self.devices:
+            self._e4_short_since = None
+            ev.pop("VENT_SHORTFALL", None)
+            return
+        target = max(target, g("base_ventilation.hard_min_m3h"))
+        mode_grade = self.p.mode(mode).get("noise_grade") or "N2"
+        cap_m3h = (self.intake_max_m3h * min(1.0, self.p.noise(mode_grade)["intake_fan_max_rpm"] / self.intake_max_rpm)
+                   * self.filter_factor())
+        lo, hi = g("base_ventilation.window_outdoor_temp_range_c")
+        window_ok = not blocked and not math.isnan(o.outdoor_temp_c) and lo <= o.outdoor_temp_c <= hi
+        short = not window_ok and cap_m3h < target
+        self.info["base_vent_capacity_m3h"] = round(cap_m3h, 1)
+        if "VENT_SHORTFALL" not in ev:
+            self._e4_short_since = (self._e4_short_since or o.now_s) if short else None
+            if short and o.now_s - self._e4_short_since >= g(sf + "hold_s"):
+                ev["VENT_SHORTFALL"] = ActiveEvent("VENT_SHORTFALL", o.now_s, {"capacity_m3h": cap_m3h})
+                self.alerts.append(f"필터 교체 · 흡기팬 점검 — 기본 환기 {target:g} m³/h 미달 (가능 {cap_m3h:.0f})")
+                self._e4_ok_since = None
+        else:
+            self._e4_ok_since = (self._e4_ok_since or o.now_s) if not short else None
+            if self._e4_ok_since is not None and o.now_s - self._e4_ok_since >= g(sf + "release_hold_s"):
+                ev.pop("VENT_SHORTFALL", None)
 
     def _laundry(self, o: Observation, ev, mode: str, noise: dict, add) -> None:
         """E10 — 우선 목표 = 건조 시간 (L4.5). I6 해제: 제습기 + (여름 · 간절기) 에어컨 냉방으로 열 상쇄 · 실링팬 강.

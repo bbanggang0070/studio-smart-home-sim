@@ -142,6 +142,7 @@ class FastActuators:
         self.tau = time_constants
         self.allowed = {f for d in devices for f in DEVICE_FIELDS.get(d, ())}
         self.rejected: dict[str, int] = {}
+        self.ac_fan = "auto"                          # 참값 모델은 풍량을 쓰지 않지만 소음 제약 판정용으로 기록한다
 
     def command(self, cmds: dict[str, Any]) -> None:
         for topic, value in cmds.items():
@@ -156,6 +157,7 @@ class FastActuators:
                 continue
             if field_name == "ac":
                 d = json.loads(value) if isinstance(value, str) else dict(value)
+                self.ac_fan = str(d.get("fan", self.ac_fan))
                 self.target.ac = AcCommand(power=bool(d.get("power", False)), mode=str(d.get("mode", "cool")),
                                            setpoint_c=float(d.get("setpoint", self.target.ac.setpoint_c)))
             else:

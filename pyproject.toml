@@ -1,0 +1,23 @@
+[project]
+name = "studio-smart-home-sim"
+version = "0.1.0"
+description = "원룸 스마트홈 다중 액추에이터 협조 제어 — 고속 모드 환경 모델 · 제어기 · 하네스"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.12",        # 2R2C 열모델 식별 · 변화점 회귀
+    "pandas>=2.2",        # 실험 로그 집계
+    "pyyaml>=6.0",        # config/*.yaml
+    "scikit-learn>=1.4",  # 분위수 GBM (귀가 시각 분포 예측)
+    "matplotlib>=3.8",    # 결과 그래프
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["scripts"]

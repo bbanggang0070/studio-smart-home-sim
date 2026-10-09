@@ -108,19 +108,20 @@ ros2 topic list          # /clock 등 Isaac Sim 토픽이 보이면 성공
 
 ---
 
-## 6. 프로젝트 Python 패키지 (고속 모드 · 분석)
+## 6. 프로젝트 Python 패키지 (고속 모드 · 분석) — uv
 
-ROS 2 노드와 고속 모드 하네스는 **시스템 Python 3.12**(ROS 2 Jazzy와 같은 인터프리터)에서 돌립니다. Isaac Sim 가상환경과 분리합니다.
+고속 모드 하네스 · 환경 모델 · 제어기 단위 테스트는 **저장소 안의 uv 가상환경(`.venv`)** 에서 돌린다.
+시스템 Python · conda · 다른 프로젝트 환경은 건드리지 않는다. 인터프리터는 **시스템 `/usr/bin/python3.12`**(ROS 2 Jazzy와 같은 버전)를 쓴다.
 
 ```bash
-cd ~/workspace/actuator_workspace
-python3.12 -m venv --system-site-packages .venv     # rclpy(ROS 2)를 그대로 보이게
-source .venv/bin/activate
-pip install -r requirements.txt
-python -c "import yaml; yaml.safe_load(open('config/thresholds.yaml')); print('config ok')"
+cd ~/studio-smart-home-sim
+UV_PYTHON_DOWNLOADS=never uv sync --python /usr/bin/python3.12   # pyproject.toml · uv.lock 기준으로 .venv 생성
+uv run pytest                                                     # 단위 테스트
+uv run python -c "import yaml; yaml.safe_load(open('config/thresholds.yaml')); print('config ok')"
 ```
 
----
+- 의존성은 `pyproject.toml`에서 관리한다(`uv add <패키지>`). `requirements.txt`는 참고용으로 남겨 둔다
+- ROS 2 노드(rclpy)는 ROS 2 설치 후 별도로 다룬다 — 제어 로직(`scripts/controller/`) · 환경 모델(`scripts/env_model/`)은 ROS 없이 돈다
 
 ## 7. 첫날 검증 체크리스트 (W02 리스크 항목)
 
@@ -179,15 +180,13 @@ mkdir -p worlds assets scripts/controller launch results
 
 | 항목 | 값 | 확인일 · 담당 |
 |---|---|---|
-| OS / 커널 | | |
-| NVIDIA 드라이버 / CUDA | | |
-| Isaac Sim | | |
-| Python (Isaac Sim / 시스템) | | |
-| ROS 2 배포판 · RMW | | |
-| Effort Sensor 확장 경로 | | |
-| 호환성 검사 결과 | | |
-
----
+| OS / 커널 | Ubuntu 24.04.5 LTS / 7.0.0-31-generic | 2026-10-09 |
+| NVIDIA 드라이버 / CUDA | 580.178.04 / CUDA 13.0 (GPU RTX 5070 Ti 16 GB 인식) — 문서 권장 595+ 미만 | 2026-10-09 |
+| Isaac Sim | **5.1.0-rc.19 — 로컬 설치 없음, Docker 이미지 `teleop-docker`(Isaac Lab 포함) 안 `/isaac-sim`** · 내장 Python 3.11.13 | 2026-10-09 |
+| Python (Isaac Sim / 시스템) | 3.11.13 (Docker 내장) / **3.12.3** (`/usr/bin/python3.12`, uv `.venv`) | 2026-10-09 |
+| ROS 2 배포판 · RMW | 호스트 미설치 · Isaac Sim 브릿지 내장 `jazzy` · `humble` 라이브러리 존재 | 2026-10-09 |
+| Effort Sensor 확장 경로 | `isaacsim.sensors.physics` (`impl/effort_sensor.py` 의 `EffortSensor`) · 대체 `get_measured_joint_efforts()` 존재 — **실행 검증 전** | 2026-10-09 |
+| 호환성 검사 결과 | 미실시 | |
 
 ## 11. 자주 막히는 곳
 

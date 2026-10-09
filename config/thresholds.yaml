@@ -1,5 +1,5 @@
 # ============================================================================
-#  제어 기준값 (Control Thresholds)  --  T1.3 산출물 / v3.1 (2026-10-05)
+#  제어 기준값 (Control Thresholds)  --  T1.3 산출물 / v3.4 (2026-10-09 정합)
 # ----------------------------------------------------------------------------
 #  W01 프로젝트 발표 피드백 3건 반영 개정판.
 #    ① 시나리오 재설계(16->17) → 습도 정책 / 우천·미세먼지 인터록 / 제어 가능성 판정
@@ -204,7 +204,7 @@ smart_home_controller:
         stall_timeout_ms: 500           # 속도 0 지속 시 정지
 
     # ---- 재실 / 절전 (Occupancy) ----------------------------------------
-    #  [개정 v2.0] PIR 단독 → PIR+mmWave 융합. "PIR-validates, mmWave-holds"
+    #  [개정 v2.0] PIR 단독 → PIR+mmWave 융합 → [v3.1] PIR 제거 → [v3.2] 문 이벤트 + 판정 창 (현행)
     occupancy:
       #  [개정 v3.1] PIR 제거. Wi-Fi · 가전 전력이 mmWave 오검출을 교차 검증한다 (docs/08 §1)
       fusion_strategy: 'wifi_power_validate_mmwave_holds'
@@ -239,10 +239,9 @@ smart_home_controller:
           missing_events_hours: 24.0     # Wi-Fi 접속/해제는 있는데 문 이벤트가 없음
           wifi_transitions_min: 2
         fallback: 'fusion_24h'           # 고장 · 문 열어 둠 → v3.1 융합 규칙
-      vacancy_timeout_s: 60.0      # [변경] 300 → 60초.
-                                   #   v1.0의 300초는 "PIR이 정지 인체를 놓치므로" 보정용이었다.
-                                   #   mmWave가 정지 인체를 잡으므로 단축 가능.
-                                   #   현재 목적은 오검출 채터링 억제다.
+      vacancy_timeout_s: 60.0      # [v3.2] 정상 동작(문 기반)에서는 쓰지 않는다 — 빈방 확정은 door_gating.judge_window_s.
+                                   #   폴백 융합에서 mmWave 신호 소실 후 '클리어' 판정 지연으로만 쓴다
+                                   #   (외출 확정은 departure_confirm_min 15분).
       # pir_debounce_s — v3.1 PIR 제거로 삭제
       mmwave_hold_s: 3.0           # mmWave 신호 유실 허용 시간
       require_all_clear: true      # 퇴실 판정에 mmWave · Wi-Fi · 전력 모두 클리어 요구

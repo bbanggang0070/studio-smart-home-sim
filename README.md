@@ -354,7 +354,7 @@ L0 로컬 하드 보호  >  L1 안전 인터록  >  L2 건강·재산 이벤트 
   └─────────────────────────────┘
 ```
 
-### 6.3 토픽 인터페이스 (50개)
+### 6.3 토픽 인터페이스 (52개)
 
 <details>
 <summary><b>센서 12 · 명령 15 · 상태 25 — 펼쳐보기</b></summary>
@@ -362,7 +362,7 @@ L0 로컬 하드 보호  >  L1 안전 인터록  >  L2 건강·재산 이벤트 
 **센서**
 ```text
 /studio/sensor/illuminance /temperature /humidity        Float32  10 Hz
-/studio/sensor/occupancy                                 Bool     10 Hz   ← PIR+mmWave 융합
+/studio/sensor/occupancy                                 Bool     10 Hz   ← [v3.2] 문 이벤트 + 판정 창 3분 (폴백: 융합)
 /studio/sensor/occupant_zone                             String   변경 시  ← desk/bed/kitchen/room/none
 /studio/sensor/window_motor_current                      Float32  50 Hz   ← 리플 카운팅 입력
 /studio/sensor/outdoor_pm_grade                          String   변경 시  ← 에어코리아 API
@@ -787,7 +787,7 @@ actuator_workspace/
 | 5 | **조도는 계산값이다** | W12 카메라 대조로 모델 오차를 정량 제시 |
 | 6 | **mmWave 1개로 방 전 구석을 못 덮는다** | 침대 · 책상을 겨냥한 설치로 한정 |
 | ~~7~~ | ~~필터 급기가 불가능하다~~ | ✅ **v3.0 해소** — 필터 흡기팬 · 양압 환기 |
-| ~~8~~ | ~~실내 공기질을 측정하지 않는다~~ | ✅ **v3.0 해소** — CO₂ · PM2.5 실측 |
+| ~~8~~ | ~~실내 공기질을 측정하지 않는다~~ | ✅ **v3.0 해소** — PM2.5 실측 (CO₂는 v3.4부터 재실 기본 환기로 보장 · 참값 검증) |
 | 9 | **가전 동특성은 정격 기반 1차 근사** | 인버터 등 내부 제어 미반영. 계수 민감도로 제시 |
 | 10 | **난방은 범위 밖** | 겨울 시나리오는 실내 21 °C 유지를 가정 |
 | 11 | **실내 공기는 균일 혼합 가정** | 요리 PM 공간 분포 · 센서 위치 효과는 1차 지연으로만 근사 |

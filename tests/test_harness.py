@@ -55,7 +55,7 @@ def test_same_seed_same_log(hcfg, tmp_path):
 
 
 def test_unimplemented_controller_is_reported_not_crashed(hcfg, tmp_path):
-    res = run_batch(["B6"], reps=1, out_dir=tmp_path, hcfg=hcfg, progress=_quiet)
+    res = run_batch(["C9"], baselines=["B"], reps=1, out_dir=tmp_path, hcfg=hcfg, progress=_quiet)  # B 는 아직 미구현
     assert res[0].status == C.ERROR
     assert "구현되지 않았다" in res[0].notes[0]
 

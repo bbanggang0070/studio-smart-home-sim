@@ -200,10 +200,10 @@ scenarios:
       - at_s: 1800
         set: { outdoor_pm25_ugm3: 40.0 }
 
-    expect:
+    expect:                        # settle_s: E1 진입 허용 지연 (pass_criteria 'within 90') 만큼 뒤부터 본다
       window_open_ratio: { max: 0.0 }
-      intake_fan_rpm:    { min: 1800.0, during: cooking }
-      range_hood_level:  { eq: 1, during: cooking }
+      intake_fan_rpm:    { min: 1800.0, during: cooking, settle_s: 90 }
+      range_hood_level:  { eq: 1, during: cooking, settle_s: 90 }
 
     pass_criteria:
       - "event_entered('COOKING') within 90 after cooking_start"

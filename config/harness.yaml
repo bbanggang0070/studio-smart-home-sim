@@ -38,9 +38,9 @@ outdoor_api:
 #  아직 구현되지 않은 것은 'unimplemented' — 실행하면 명확한 오류로 멈춘다.
 #  --controller hold 로 덮어쓰면 하네스 자체만 검증할 수 있다 (판정은 대부분 FAIL 이 정상).
 controllers:
-  A: unimplemented                # W10 T10.v4 — 장치 · 가전 독립 제어 (가전 내장 자동)
-  B: unimplemented                # W09–W10 — 협조, 히스테리시스 없음
-  proposed: unimplemented         # W09 — smart_home_controller (규칙 + 모드 + 이벤트 · 6계층 중재)
+  A: "controller.baseline_a:BaselineA"   # docs/03 §6 — 장치 · 가전 독립 (가전 내장 자동 · 사용자 후드 모델)
+  B: unimplemented                # W09–W10 — 협조, 히스테리시스 없음 (히스테리시스 구현 후 proposed 의 변형으로 연결)
+  proposed: "controller.smart_home:SmartHomeController"   # W09 v1 — 규칙 + 모드 + 이벤트 · 6계층 중재
 
 # ---- 가전 프로파일 — 세계(참값)에 존재하는 장치 (docs/06 §7 · thresholds appliances.profiles 와 같은 구성) ----
 #  프로파일에 없는 장치로 가는 명령은 무시되고 결과 notes 에 기록된다 (X8 · X2 의 전제).

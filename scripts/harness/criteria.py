@@ -5,6 +5,7 @@
     <식>                              식이 모든 시각에서 참 (스칼라면 그 값)
     <식> for all t                    위와 같음
     <식> during <label>               injections 의 label 구간 안에서 항상 참
+    <식> during <label> settle <N>    구간 시작 N 초 뒤부터 (감지 지연 허용 · expect 의 settle_s)
     <식> when <조건식>                 조건식이 참인 시각에서 항상 참 (해당 시각이 없으면 참)
     <식> within <N> after <앵커>       앵커 ~ 앵커+N 초 사이에 한 번이라도 참 (감지 · 진입 · 회복 시점)
     <식> by <N> after <앵커>           앵커+N 초 시각에 참 ("N초 안에 ~로 돌아온다" — 앵커 직후에 이미 참인 경우를 걸러냄)
@@ -120,7 +121,7 @@ _ANCHOR_RE = r"(?P<anchor>[A-Za-z_][A-Za-z0-9_]*|[0-9.]+)"
 _FORMS = [
     ("within", re.compile(rf"^(?P<expr>.+?)\s+within\s+(?P<n>[0-9.]+)\s+after\s+{_ANCHOR_RE}\s*$")),
     ("by", re.compile(rf"^(?P<expr>.+?)\s+by\s+(?P<n>[0-9.]+)\s+after\s+{_ANCHOR_RE}\s*$")),
-    ("during", re.compile(r"^(?P<expr>.+?)\s+during\s+(?P<label>[A-Za-z_][A-Za-z0-9_]*)\s*$")),
+    ("during", re.compile(r"^(?P<expr>.+?)\s+during\s+(?P<label>[A-Za-z_][A-Za-z0-9_]*)(?:\s+settle\s+(?P<settle>[0-9.]+))?\s*$")),
     ("when", re.compile(r"^(?P<expr>.+?)\s+when\s+(?P<cond>.+)$")),
     ("forall", re.compile(r"^(?P<expr>.+?)\s+for\s+all\s+t\s*$")),
 ]
@@ -204,6 +205,8 @@ def evaluate(df: pd.DataFrame, criteria: list[str], expect: dict[str, dict], anc
     texts = list(criteria)
     for alias, rule in (expect or {}).items():
         scope = f" during {rule['during']}" if "during" in rule else " for all t"
+        if "settle_s" in rule:                   # 감지 지연 허용 — 구간 시작 + settle_s 부터 본다
+            scope += f" settle {rule['settle_s']}"
         for key, op in (("max", "<="), ("min", ">="), ("eq", "==")):
             if key in rule:
                 texts.append(f"{alias} {op} {rule[key]}{scope}")
@@ -257,6 +260,7 @@ def _evaluate_one(text: str, ev: _Evaluator, t: np.ndarray, anchors: dict[str, f
             if label not in intervals:
                 raise NameError(f"label '{label}' 없음 (있는 label: {sorted(intervals)})")
             s, e = intervals[label]
+            s += float(m["settle"] or 0.0)
             ok = _all(ev.eval(m["expr"]), (t >= s) & (t < e))
             return CriterionResult(text, PASS if ok else FAIL, f"구간 {s:.0f}–{e:.0f}s")
         if form == "when":

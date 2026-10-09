@@ -75,6 +75,9 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
         user_cmds[T.C_ACTIVITY] = world.activity
     ctrl_state: dict[str, Any] = {}
     reasons_fn = getattr(controller, "reasons", None)
+    # 제어기 시각 = 하루 기준 초 (시나리오 time_of_day + 경과) — ROS 노드도 같은 기준(현지 자정부터 초)을 쓴다
+    hh, mm = str(sc["initial"].get("time_of_day", "00:00")).split(":")
+    clock0 = (int(hh) * 60 + int(mm)) * 60.0
 
     rows: list[dict[str, Any]] = []
     src, extra_power = tl.sources_at(0.0)
@@ -96,7 +99,7 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
         inbox.update(acts.state_topics())
         inbox.update(ctrl_state)
         inbox.update(user_cmds)
-        outbox = controller.step(now, inbox) or {}
+        outbox = controller.step(clock0 + now, inbox) or {}
         ctrl_state.update({tp: v for tp, v in outbox.items() if tp.startswith(f"{T.P}/state/")})
         acts.command(outbox)
 

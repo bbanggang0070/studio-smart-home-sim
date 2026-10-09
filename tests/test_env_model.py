@@ -306,3 +306,14 @@ def test_infiltration_model_switch(cfg, model, alt):
     assert pos["q_inf_alt_m3h"] == pytest.approx(expected[alt])
     neg = m.step(1.0, ActuatorCommands(range_hood_level=2), ext)          # 음압 — 두 식이 같다
     assert neg["q_inf_m3h"] == pytest.approx(neg["q_inf_alt_m3h"])
+
+
+def test_open_window_supplies_hood_makeup_air(cfg):
+    """후드 + 창문 20 % → 보충 공기 대부분이 창문으로 (B7 '후드 가동 중 Q_net ≥ −50' 의 물리 근거)."""
+    model = RoomModel.from_conditions(cfg, 24.0, 50.0, 12.0, 600.0)
+    ext = ExternalConditions(outdoor_temp_c=20.0, outdoor_rh_pct=55.0)
+    closed = model.step(1.0, ActuatorCommands(range_hood_level=1), ext)
+    opened = model.step(1.0, ActuatorCommands(range_hood_level=1, window_open_ratio=0.2), ext)
+    assert closed["q_net_m3h"] == pytest.approx(-300.0)
+    assert opened["q_net_m3h"] >= -50.0
+    assert opened["q_inf_m3h"] < closed["q_inf_m3h"] / 5

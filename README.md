@@ -704,6 +704,7 @@ actuator_workspace/
 │   ├── user_modes.yaml                # [v3.0] 사용자 모드 · 소음 등급 · 스케줄
 │   ├── environment_model.yaml         # 환경 · 가전 효과 계수 (W08)
 │   ├── actuator_limits.yaml · lighting_calibration.yaml
+│   ├── baselines.yaml                 # 비교군 설정 (Baseline A 가전 내장 자동 · 사용자 후드 모델)
 │   ├── harness.yaml                   # 하네스 설정 (적분 · 로그 · 지표 상수 · baseline → 제어기)
 │   └── scenario_profiles.yaml         # 시나리오 40개 (현재 B6 · B7 · C9)
 ├── worlds/lowcost_studio_room.usd
@@ -718,7 +719,7 @@ actuator_workspace/
 │   ├── power_monitor_node.py          # [v3.1] 기기 전력 상태 머신 · 수동 조작
 │   ├── energy_predictor_node.py       # [v3.1] 귀가 분위수 · 열모델 식별 · 변화점 회귀 · 프리쿨링 최적화
 │   ├── smart_home_controller_node.py
-│   ├── controller/                    # [v3.0] mode_manager · event_detector · rule_engine · means_ladder · arbiter
+│   ├── controller/                    # 순수 Python 제어기 — smart_home · mode_manager · event_detector · rule_engine · predictor · arbiter · baseline_a
 │   ├── env_model/                     # 고속 모드 환경 참값 모델 (순수 Python · ROS 비의존)
 │   ├── interfaces/topics.py           # 토픽 계약 53개 상수 (docs/02 §6)
 │   ├── harness/                       # 하네스 — 시나리오 전개 · 주입 · 고속 세계 · 판정 · 집계

@@ -279,6 +279,11 @@ class RoomModel:
         )
         q_intake = self._intake_flow(act.intake_fan_rpm)
         q_exhaust = self._fan_flow(act.exhaust_fan_rpm, "appliances.exhaust_fan.")
+        # 배기 부족분 중 열린 창문이 받는 몫 — 창문은 큰 개구라 틈새보다 먼저 보충 공기를 받는다
+        deficit = max(0.0, q_exhaust + q_hood - q_intake)
+        q_win += deficit * air_balance.window_makeup_share(
+            act.window_open_ratio, g("window.opening_width_max_m"), g("window.opening_height_m"),
+            g("window.crack_leakage_area_m2"))
         q_inf0 = g("air_balance.base_infiltration_ach") * v
         net = q_intake + q_win - q_exhaust - q_hood
         inf_model = g("air_balance.infiltration_model")

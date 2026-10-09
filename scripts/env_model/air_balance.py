@@ -58,6 +58,12 @@ def alternative_model(model: str) -> str:
     return INFILTRATION_MODELS[1 - INFILTRATION_MODELS.index(model)]
 
 
+def window_makeup_share(open_ratio: float, width_max_m: float, height_m: float, crack_area_m2: float) -> float:
+    """기계 배기 부족분 중 열린 창문으로 들어오는 몫 (같은 압력차 → 유량 ∝ 개구 면적)."""
+    area = max(0.0, min(open_ratio, 1.0)) * width_max_m * height_m
+    return area / (area + crack_area_m2) if area > 0.0 else 0.0
+
+
 def window_flow_m3h(
     open_ratio: float,
     t_in: float,

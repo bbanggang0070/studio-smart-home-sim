@@ -98,6 +98,7 @@ smart_home_controller:
         bad:       { window_max_pct:   0.0, fan_max_rpm:  600.0, require_positive_pressure: true }
         very_bad:  { window_max_pct:   0.0, fan_max_rpm:    0.0, require_positive_pressure: true }
       grade_bounds_ugm3: [15.0, 35.0, 75.0]   # 환경부 PM2.5 예보 등급 (좋음|보통|나쁨|매우나쁨 경계)
+      grade_representative_ugm3: { good: 10.0, moderate: 25.0, bad: 55.0, very_bad: 100.0 }   # [v3.4.3] draft — 등급만 받을 때 예측(후드 3안)에 쓰는 대표값
       cross_check_with_indoor: true           # API 등급 급변 시 실내 센서 추세로 교차 확인
       grade_debounce_s: 60.0        # 등급 변동 채터링 방지
       improve_hold_s: 300.0         # 등급 개선 후 완화까지 대기 (오판 방지)
@@ -419,6 +420,8 @@ smart_home_controller:
       sensor_model: 'PMS7003'
       target_ugm3: 15.0
       bad_ugm3: 35.0
+      purifier_level_above_target: 1   # [v3.4.3] 평상시 청정기 — 목표 초과 1단 · 나쁨 초과 2단
+      purifier_level_above_bad: 2
       recovery_target_ugm3: 35.0       # 지표 #10 회복 기준
 
     # ---- 결로 (Condensation) — [신설 v3.0] --------------------------------------
@@ -433,6 +436,8 @@ smart_home_controller:
         ceiling_fan_reverse: 0.08      # 표면 대류 증가 → 표면온도 상승
         blind_closed: 0.20             # 유리-블라인드 사이 공기 정체 → 표면온도 하강
         blind_slat_45: 0.14
+      blind_slat_min_deg: 30.0         # [v3.4.3] 이 각도 이상 → '슬랫 45°' 저항으로 추정
+      blind_closed_min_deg: 60.0       # [v3.4.3] 이 각도 이상 → '닫힘' 저항으로 추정
       warn_margin_c: 2.0               # Δ < 2.0 → 경고 (L5)
       critical_margin_c: 0.5           # Δ < 0.5 → 위험 (L2)
       release_margin_c: 3.0
@@ -477,6 +482,19 @@ smart_home_controller:
           pm_other: 'unknown_no_heat'     # [v3.4] 원인 미상 — 후드 끔 · 청정기
         hood_level_selection: 'predictive'   # {0,1,2} 3안을 10분 앞까지 예측해 PM 피크 최소안
         hood_prediction_horizon_s: 600.0
+        #  [v3.4.3 · 2026-10-09] 제어기 구현값 — 예측 모델 · 단수 선택 · 청정기 (docs/06 §3.3 · docs/07 §5.4)
+        hood_prediction:
+          step_s: 10.0
+          reevaluate_s: 60.0             # 예측을 다시 하는 주기 (그 사이 단수 고정)
+          deposition_rate_per_h: 0.2     # 제어용 PM 모델 침착률
+          nominal_source_mg_per_min: 1.5 # 진입 직후 잔차로 발생량을 추정할 수 없을 때의 사전값
+          source_estimate_after_s: 120.0 # 이 시간 이후에는 PM 기울기 잔차로 추정한 발생량을 쓴다
+          peak_tolerance_pct: 15.0       # draft — 최선안 대비 피크가 이 이내면 더 낮은 단(소음 · 음압 · 에너지가 싼 쪽)을 고른다
+        steam_hood_level: 1              # 열만 있고 연기가 없음(물 끓이기) → 후드 약 · 청정기 그대로
+        pm_rise_for_smoke_ugm3: 10.0     # draft — 진입 후 PM 이 이만큼 오르면 '열 + 연기' (요리), 아니면 '열만' (수증기)
+        purifier_level: 2                # 요리 중 청정기 (외기 양호)
+        purifier_level_outdoor_bad: 3    # 요리 중 청정기 (외기 나쁨 이상)
+        compensating_window_ratio: 0.2   # I3 보상 급기 창문 (good_air_window_pct 상한)
       condensation: { layer_warn: 5, layer_critical: 2 }   # E2 — 수치는 condensation 블록
       shower:                          # E3 [v3.4] — docs/07 §3.4
         rh_rise_pct_in_5min: 8.0
@@ -486,16 +504,18 @@ smart_home_controller:
         radar_silence_bonus_s: 300.0   # 재실 고정 중 레이더 무신호 = 욕실 사용 → 신뢰도 가산
         release_dewpoint_above_pre_c: 1.0
         max_duration_min: 40.0
+        min_hold_s: 300.0              # [v3.4.3] 진입 직후엔 욕실 습기가 계속 들어오므로 최소 유지
         noise_grade_override: 'N2'     # 수면 모드면 N1
-        exhaust_level: 'high'
+        exhaust_level: 'high'            # = 유효 소음 등급의 배기팬 상한
+        compensating_window_ratio: 0.2   # [v3.4.3] I3 균형 급기 창문 (창문 불가 시 흡기팬이 배기량을 맞춘다)
         overrides: ['I6']
         budget: { indoor_temp_change_c: 1.0, noise_grade: 'N2' }
         layer: 2
       vent_shortfall: { layer: 2 }                          # E4 [v3.4] — 수치는 base_ventilation.shortfall
       rain: { layer: 1 }                                    # E5 — weather 블록
       outdoor_pm: { layer: 1, min_grade: 'bad' }            # E6
-      arrival: { source: 'pir_entrance', only_in_mode: 'AWAY' }               # E7
-      departure: { vacancy_min: 30.0 }                                        # E8
+      arrival: { source: 'door_open', only_in_mode: 'AWAY' }                  # E7 [v3.2] 문 열림 (PIR 제거)
+      departure: { source: 'door_gating' }                                    # E8 [v3.2] 문 닫힘 + 판정 창 (occupancy.door_gating) · 폴백은 departure_confirm_min
       appliance_no_response: { max_resend: 2, layer: 1, power_confirm_s: 10.0 }  # E9 — v3.1 전력 1차 확인
       laundry_drying:                  # E10 [v3.1]
         trigger: ['washer_spin_end', 'user_declare']

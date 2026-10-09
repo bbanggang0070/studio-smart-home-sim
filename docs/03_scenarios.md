@@ -853,6 +853,7 @@ scenarios:
 | `external.heating_setpoint_c` | 겨울 난방 경계 조건 (가정 A13) — 없으면 난방 없음 |
 | `external.wind_speed_ms` | 창문 풍압 환기용 — 없으면 `environment_model.yaml` 기본값 |
 | `pass_criteria` 문법 | `<식>` · `for all t` · `during <label>` · `when <조건>` · `within N after <앵커>`(구간 안에 한 번이라도) · **`by N after <앵커>`(그 시각에 참 — 회복 판정용)** · `event_entered('E')` · `value_at('<별칭>', 앵커)` · `baseline_X.<지표>` — 상세: `scripts/harness/criteria.py` |
+| `expect.<별칭>.settle_s` | 구간 시작 N 초 뒤부터 판정 — 감지 지연 허용 (C9: E1 진입 허용 90 s 와 맞춤) |
 | 판정 상태 | PASS · FAIL · **PENDING**(비교할 baseline 결과 없음) · **ERROR**(문법 · 열 없음) · **N/A**(baseline X 자신의 실행에서 `baseline_X.*` 비교) |
 | 미지원 주입 | 하네스가 아직 처리하지 못하는 주입(레이더 · Wi-Fi · 고장 등)은 무시하지 않고 `summary.csv` 의 `notes` 에 남긴다 |
 
@@ -906,3 +907,4 @@ scenarios:
 | 2026-10-07 | v2.6 | **EXP-5 추가 (논문용)** — 에너지 제어 방식 비교(질문별 모델 vs LSTM vs 심층 RL) · 시나리오 수 · 실행 횟수 변동 없음 · 계획 [`10`](10_energy_control_comparison_study.md) |
 | 2026-10-09 | v2.7 | 최신 계획 정합 — B4 입력 · 판정을 PIR 클리어 60 s에서 **문 닫힘 + 판정 창 3분(180 ± 2 s)** 으로 정정 |
 | 2026-10-09 | v2.8 | §8 스키마 보충 — 하네스 v0.1 구현 (`label` · `heating_setpoint_c` · `wind_speed_ms` · 판정 문법 `by` · `when` · `during` · PENDING/ERROR/N/A · 미지원 주입 기록) |
+| 2026-10-09 | v2.9 | §8 `expect.settle_s` 추가 — C9 기대 동작(후드 약 · 흡기 100 %)을 E1 진입 허용 지연(90 s) 뒤부터 판정 |

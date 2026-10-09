@@ -29,6 +29,11 @@ environment_model:
     #  Q_inf = Q_inf0 + max(0, -Q_net)
     air_balance:
       base_infiltration_ach: 0.3       # Q_inf0 = 0.3 ACH × V = 12.6 m³/h (민감도 대상 — W13 T13.v3)
+      #  틈새 유입 식 선택 — docs/06 §5.1 의 식과 주석이 다르다 (2026-10-09 보고)
+      #    additive      : Q_inf = Q_inf0 + max(0, -Q_net)       (식 · 기본값) — 양압에서도 기저 침기 유지
+      #    positive_zero : Q_net > 0 이면 0, 아니면 위와 같음     (주석) — 양압이면 틈새 유입 없음
+      #  관측값 q_inf_alt_m3h 에 '다른 쪽 식'의 값을 함께 남겨, 재실행 없이 차이를 확인할 수 있다.
+      infiltration_model: 'additive'
       penetration_factor: 0.8          # 틈새 유입 PM 침투율 p
 
     # ---- 창문 자연 환기 — draft ------------------------------------------------

@@ -281,10 +281,13 @@ class RoomModel:
         q_exhaust = self._fan_flow(act.exhaust_fan_rpm, "appliances.exhaust_fan.")
         q_inf0 = g("air_balance.base_infiltration_ach") * v
         net = q_intake + q_win - q_exhaust - q_hood
+        inf_model = g("air_balance.infiltration_model")
         flows = air_balance.AirFlows(
             intake=q_intake, window=q_win, exhaust=q_exhaust, hood=q_hood,
-            infiltration=air_balance.infiltration_m3h(q_inf0, net),
+            infiltration=air_balance.infiltration_m3h(q_inf0, net, inf_model),
         )
+        # 진단용 — 다른 쪽 식의 값 (상태에는 반영하지 않는다)
+        q_inf_alt = air_balance.infiltration_m3h(q_inf0, net, air_balance.alternative_model(inf_model))
         q_oa = flows.outdoor_air
 
         # 가전 · 발생원
@@ -377,9 +380,9 @@ class RoomModel:
         for k, p_w in power.items():
             s.energy_wh[k] = s.energy_wh.get(k, 0.0) + p_w * hrs
 
-        return self._observe(ext, act, flows, power, cond_g_h, r_si, h_heat)
+        return self._observe(ext, act, flows, power, cond_g_h, r_si, h_heat, q_inf_alt)
 
-    def _observe(self, ext, act, flows, power, cond_g_h, r_si, h_heat) -> dict:
+    def _observe(self, ext, act, flows, power, cond_g_h, r_si, h_heat, q_inf_alt) -> dict:
         g = self.cfg.get
         s = self.state
         b, c = self._b, self._c
@@ -411,6 +414,7 @@ class RoomModel:
             "q_exhaust_m3h": flows.mech_exhaust,
             "q_net_m3h": flows.net_supply,
             "q_inf_m3h": flows.infiltration,
+            "q_inf_alt_m3h": q_inf_alt,
             "condensation_rate_g_h": cond_g_h,
             "condensate_g": s.condensate_g,
             "laundry_moisture_g": s.laundry_moisture_g,

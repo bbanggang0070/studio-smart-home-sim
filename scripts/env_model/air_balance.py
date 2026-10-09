@@ -42,8 +42,20 @@ class AirFlows:
         return self.supply + self.infiltration
 
 
-def infiltration_m3h(base_m3h: float, net_supply_m3h: float) -> float:
+INFILTRATION_MODELS = ("additive", "positive_zero")
+
+
+def infiltration_m3h(base_m3h: float, net_supply_m3h: float, model: str = "additive") -> float:
+    """틈새 유입. docs/06 §5.1 의 식(additive)과 주석(positive_zero)이 달라 둘 다 둔다."""
+    if model not in INFILTRATION_MODELS:
+        raise ValueError(f"infiltration_model 은 {INFILTRATION_MODELS} 중 하나여야 한다: {model!r}")
+    if model == "positive_zero" and net_supply_m3h > 0.0:
+        return 0.0
     return base_m3h + max(0.0, -net_supply_m3h)
+
+
+def alternative_model(model: str) -> str:
+    return INFILTRATION_MODELS[1 - INFILTRATION_MODELS.index(model)]
 
 
 def window_flow_m3h(

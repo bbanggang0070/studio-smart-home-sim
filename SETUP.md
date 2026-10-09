@@ -61,7 +61,24 @@ git config core.quotepath false   # 한글 파일명(docs/weekly)이 깨져 보�
 
 ---
 
-## 4. Isaac Sim 설치 (pip · 가상환경)
+## 4-A. ✅ 현행 — Isaac Sim 5.1 Docker 전용 컨테이너 (2026-10-09 결정 · 방법 A)
+
+이 PC에는 다른 프로젝트용 이미지 `teleop-docker`(Isaac Sim 5.1 · Isaac Lab)가 이미 있다. **이미지는 공유하되 컨테이너 · 캐시는 이 프로젝트 전용**으로 쓴다.
+로컬 설치 · 드라이버 업그레이드 없이 쓸 수 있고, 다른 프로젝트 환경을 건드리지 않는다.
+
+```bash
+tools/isaac/run.sh python tools/isaac/check_effort_sensor.py   # 헤드리스 스크립트 (Effort Sensor 검증)
+tools/isaac/run.sh gui                                         # GUI (X11)
+tools/isaac/run.sh shell                                       # 컨테이너 셸
+```
+
+- 이미지 entrypoint(다른 프로젝트 패키지 설치)를 우회하고 `/isaac-sim/python.sh` 를 직접 쓴다
+- 캐시 · 로그: `~/docker/studio-isaac/` · 저장소는 컨테이너의 `/workspace/studio` 에 마운트
+- **Isaac Sim 쪽 Python은 3.11**(이미지 내장)이다. 시뮬레이터 스크립트(`tools/isaac/`, 이후 Scene · 브릿지)는 3.11에서 돌고,
+  제어기 · 환경 모델 · 하네스는 호스트 uv `.venv`(3.12)에서 돈다 — 둘 사이는 ROS 2 토픽으로만 연결한다
+- 아래 §4(pip 6.1 설치)는 **대안**으로 남겨 둔다 (드라이버 595+ 필요)
+
+## 4. (대안) Isaac Sim 6.1 설치 (pip · 가상환경)
 
 ```bash
 cd ~/workspace
@@ -182,10 +199,10 @@ mkdir -p worlds assets scripts/controller launch results
 |---|---|---|
 | OS / 커널 | Ubuntu 24.04.5 LTS / 7.0.0-31-generic | 2026-10-09 |
 | NVIDIA 드라이버 / CUDA | 580.178.04 / CUDA 13.0 (GPU RTX 5070 Ti 16 GB 인식) — 문서 권장 595+ 미만 | 2026-10-09 |
-| Isaac Sim | **5.1.0-rc.19 — 로컬 설치 없음, Docker 이미지 `teleop-docker`(Isaac Lab 포함) 안 `/isaac-sim`** · 내장 Python 3.11.13 | 2026-10-09 |
+| Isaac Sim | **5.1.0-rc.19 — Docker 이미지 `teleop-docker` 안 `/isaac-sim`, 전용 컨테이너 `tools/isaac/run.sh`(§4-A)** · 내장 Python 3.11.13 · 헤드리스 실행 확인 | 2026-10-09 |
 | Python (Isaac Sim / 시스템) | 3.11.13 (Docker 내장) / **3.12.3** (`/usr/bin/python3.12`, uv `.venv`) | 2026-10-09 |
 | ROS 2 배포판 · RMW | 호스트 미설치 · Isaac Sim 브릿지 내장 `jazzy` · `humble` 라이브러리 존재 | 2026-10-09 |
-| Effort Sensor 확장 경로 | `isaacsim.sensors.physics` (`impl/effort_sensor.py` 의 `EffortSensor`) · 대체 `get_measured_joint_efforts()` 존재 — **실행 검증 전** | 2026-10-09 |
+| Effort Sensor 확장 경로 | `isaacsim.sensors.physics.EffortSensor` (prim_path = 루트/조인트명) · 대체 `get_measured_joint_efforts()` — **✅ 실증 PASS** (0 N → 300 N) | 2026-10-09 |
 | 호환성 검사 결과 | 미실시 | |
 
 ## 11. 자주 막히는 곳

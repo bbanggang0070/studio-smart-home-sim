@@ -292,3 +292,17 @@ def test_winter_heating_holds_21c(cfg):
     obs = run(model, 3 * 3600, ActuatorCommands(humidifier=True), ext, occ=Occupancy(1, "sleeping"), dt=10.0)
     assert obs["temperature_c"] == pytest.approx(21.0, abs=0.5)
     assert obs["heating_w"] > 0.0
+
+
+@pytest.mark.parametrize("model, alt", [("additive", "positive_zero"), ("positive_zero", "additive")])
+def test_infiltration_model_switch(cfg, model, alt):
+    """docs/06 §5.1 식 · 주석 불일치 — 두 식을 스위치로 고르고, 다른 쪽 값을 진단용으로 남긴다."""
+    c = cfg.with_overrides({"air_balance.infiltration_model": model})
+    m = RoomModel.from_conditions(c, 26.0, 55.0, 12.0, 600.0)
+    ext = ExternalConditions(outdoor_temp_c=24.0, outdoor_rh_pct=60.0)
+    pos = m.step(1.0, ActuatorCommands(intake_fan_rpm=2000.0), ext)       # 양압 — 두 식이 다르다
+    expected = {"additive": 12.6, "positive_zero": 0.0}
+    assert pos["q_inf_m3h"] == pytest.approx(expected[model])
+    assert pos["q_inf_alt_m3h"] == pytest.approx(expected[alt])
+    neg = m.step(1.0, ActuatorCommands(range_hood_level=2), ext)          # 음압 — 두 식이 같다
+    assert neg["q_inf_m3h"] == pytest.approx(neg["q_inf_alt_m3h"])

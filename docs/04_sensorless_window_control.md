@@ -383,8 +383,9 @@ Isaac Sim의 Effort Sensor는 **회전 조인트에서는 토크를, 직선(Pris
 창문은 Prismatic 조인트이므로 그대로 적용된다.
 
 ```python
-from isaacsim.sensors.experimental.physics import EffortSensor
+from isaacsim.sensors.physics import EffortSensor   # Isaac Sim 5.1 실측 경로 (experimental 아님)
 
+# prim_path = <Articulation 루트>/<조인트 이름> — 루트 경로로 Articulation을 만들고 이름으로 DOF를 찾는다
 window_effort = EffortSensor(prim_path="/World/window/window_prismatic_joint")
 
 def read_motor_current() -> float:
@@ -393,6 +394,8 @@ def read_motor_current() -> float:
     tau_m = F * R_PINION / (ETA * GEAR_RATIO)              # [N·m]
     return tau_m / K_T + I_NO_LOAD                          # [A]
 ```
+
+> ✅ **2026-10-09 실증** (`tools/isaac/check_effort_sensor.py`, Isaac Sim 5.1): Prismatic 조인트를 벽에 밀면 자유 이동 0 N → **300 N(드라이브 최대 힘)** 로 상승. `EffortSensor` 와 `get_measured_joint_efforts()` 값이 일치한다.
 
 보조 API로 `get_measured_joint_forces()` / `get_measured_joint_efforts()` 도 사용 가능하며,
 실제 접촉력 검증에는 **Contact Sensor**를 병행한다.
@@ -595,3 +598,4 @@ window_sensorless:
 | 일자 | 버전 | 내용 |
 |---|---|---|
 | 2026-09-12 | v1.0 | 신규 작성. W01 발표 피드백 ③ 반영. HC-SR04 제거, 전류 리플 기반 센서리스 anti-pinch 채택, 랙-피니언(B방식) 확정 |
+| 2026-10-09 | v1.1 | Effort Sensor 실측 경로 정정(`isaacsim.sensors.physics`, Isaac Sim 5.1) · Prismatic 반력 읽기 실증 결과 기록 |

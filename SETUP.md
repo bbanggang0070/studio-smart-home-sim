@@ -180,7 +180,7 @@ mkdir -p worlds assets scripts/controller launch results
 
 > 일정상 오늘(2026-10-06)은 W05입니다. 환경 구성이 끝나면 [`docs/00_project_schedule.md`](docs/00_project_schedule.md)의 W02–W05 항목을 함께 따라잡습니다.
 
-**처음 읽을 문서:** [`README.md`](README.md) → [`docs/09_signal_actuator_map.md`](docs/09_signal_actuator_map.md) (한 장 요약) → [`docs/02`](docs/02_scope_definition.md) (토픽 52개 · 가정) → [`docs/07`](docs/07_modes_rules_events.md) (규칙 · 이벤트) → [`docs/03`](docs/03_scenarios.md) (시나리오 · 판정 기준)
+**처음 읽을 문서:** [`README.md`](README.md) → [`docs/09_signal_actuator_map.md`](docs/09_signal_actuator_map.md) (한 장 요약) → [`docs/02`](docs/02_scope_definition.md) (토픽 53개 · 가정) → [`docs/07`](docs/07_modes_rules_events.md) (규칙 · 이벤트) → [`docs/03`](docs/03_scenarios.md) (시나리오 · 판정 기준)
 
 ---
 

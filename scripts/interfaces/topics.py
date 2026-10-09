@@ -1,4 +1,4 @@
-"""ROS 2 토픽 계약 — docs/02 §6 (52개: 센서 12 · 명령 15 · 상태 25).
+"""ROS 2 토픽 계약 — docs/02 §6 (53개: 센서 13 · 명령 15 · 상태 25).
 
 제어기 · 하네스(고속 모드) · ROS 노드(물리 모드)가 같은 이름을 쓴다.
 고속 모드에서는 메시지 대신 파이썬 값으로 주고받는다 — String(JSON) 토픽은 JSON 문자열 그대로.
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 P = "/studio"
 
-# ---- 센서 (12) -----------------------------------------------------------------
+# ---- 센서 (13) -----------------------------------------------------------------
 S_ILLUMINANCE = f"{P}/sensor/illuminance"                # Float32 · 10 Hz
 S_TEMPERATURE = f"{P}/sensor/temperature"                # Float32 · 10 Hz
 S_HUMIDITY = f"{P}/sensor/humidity"                      # Float32 · 10 Hz
@@ -21,10 +21,11 @@ S_WIFI_PRESENCE = f"{P}/sensor/wifi_presence"            # Bool · 변경 시
 S_DOOR_CONTACT = f"{P}/sensor/door_contact"              # Bool · 변경 시
 S_HOOD_TEMPERATURE = f"{P}/sensor/hood_temperature"      # Float32 · 1 Hz
 S_APPLIANCE_POWER = f"{P}/sensor/appliance_power"        # String(JSON {device: W}) · 1 Hz
+S_WEATHER = f"{P}/sensor/weather"                        # String(JSON {"raining","outdoor_temp_c","outdoor_rh_pct"}) · 변경 시 (v3.4.2)
 
 SENSOR_TOPICS = (
     S_ILLUMINANCE, S_TEMPERATURE, S_HUMIDITY, S_OCCUPANCY, S_OCCUPANT_ZONE, S_WINDOW_MOTOR_CURRENT,
-    S_OUTDOOR_PM_GRADE, S_PM25, S_WIFI_PRESENCE, S_DOOR_CONTACT, S_HOOD_TEMPERATURE, S_APPLIANCE_POWER,
+    S_OUTDOOR_PM_GRADE, S_PM25, S_WIFI_PRESENCE, S_DOOR_CONTACT, S_HOOD_TEMPERATURE, S_APPLIANCE_POWER, S_WEATHER,
 )
 
 # ---- 명령 (15) -----------------------------------------------------------------
@@ -87,9 +88,3 @@ STATE_TOPICS = (
 )
 
 ALL_TOPICS = SENSOR_TOPICS + COMMAND_TOPICS + STATE_TOPICS
-
-# ---- ⚠️ 계약 미정 (2026-10-09 보고) ------------------------------------------------
-#  docs/02 §6 의 52개에는 기상청 입력(강우 · 외기 온습도)을 받는 토픽이 없다.
-#  제어기는 E5(강우) · I10(외기 이슬점) · 결로 여유(외기온)에 이 값이 필요하므로,
-#  계약이 정해질 때까지 아래 임시 토픽으로 넘긴다 (집계 52개에 넣지 않는다).
-PROVISIONAL_WEATHER = f"{P}/sensor/weather"              # String(JSON {"raining","outdoor_temp_c","outdoor_rh_pct"})

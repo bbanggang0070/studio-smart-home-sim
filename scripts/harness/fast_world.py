@@ -204,7 +204,7 @@ def sensor_topics(obs: dict[str, Any], world: WorldInputs, door_open: bool, extr
         T.S_WIFI_PRESENCE: world.occupancy,              # Wi-Fi 모델은 W07
         T.S_OUTDOOR_PM_GRADE: pm_grade(world.ext.outdoor_pm25_ugm3, grade_bounds, grade_names),
         T.S_APPLIANCE_POWER: json.dumps(power, sort_keys=True),
-        T.PROVISIONAL_WEATHER: json.dumps({"raining": world.raining,
+        T.S_WEATHER: json.dumps({"raining": world.raining,
                                            "outdoor_temp_c": world.ext.outdoor_temp_c,
                                            "outdoor_rh_pct": world.ext.outdoor_rh_pct}),
     }

@@ -6,7 +6,7 @@
 ## 먼저 읽을 것
 1. SETUP.md — 환경 · 버전 (§10 기록표의 실제 버전을 따른다)
 2. docs/09_signal_actuator_map.md — 전체 구조 요약 (센서 → 판단 → 액추에이터)
-3. docs/02_scope_definition.md §6 — ROS 2 토픽 52개 (이름 · 타입 · 주기는 여기가 계약)
+3. docs/02_scope_definition.md §6 — ROS 2 토픽 53개 (이름 · 타입 · 주기는 여기가 계약)
 4. docs/07_modes_rules_events.md — 모드 · 이벤트 E1–E15 · 규칙 I1–I10 · 6계층 중재
 5. docs/03_scenarios.md — 시나리오 40개 · 판정 기준 · 자동화 스키마 §8 · 평가 지표 §7
 6. 이번 주 docs/weekly/Wxx_*.md — 태스크 · 완료 기준(DoD)

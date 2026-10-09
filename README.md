@@ -153,7 +153,7 @@ v3.0은 이를 **수단 사다리**로 일반화했다 — 목표마다 수단�
 | | └ **Prismatic / Revolute Joint** | 창문 · 블라인드 · 배기/흡기팬 · **실링팬(정/역)** |
 | | └ emissive 머티리얼 | 가전 ON/단 상태 표시 |
 | **환경 모델** | 집중 정수 모델 (Python) | 온도 · **절대습도 · CO₂ · PM2.5 · 이슬점 · 창 표면온도 · 공기 수지** |
-| **미들웨어** | ROS 2 (토픽 52개) · Isaac Sim ROS 2 Bridge | 센서 · 제어기 · 액추에이터 · 가전 통신 |
+| **미들웨어** | ROS 2 (토픽 53개) · Isaac Sim ROS 2 Bridge | 센서 · 제어기 · 액추에이터 · 가전 통신 |
 | **제어** | Python · **규칙 엔진 + 모드 관리자 + 이벤트 감지기 + 6계층 중재기** | 협조 제어 |
 | | └ 수단 사다리 · 히스테리시스 · 적응형 임계값 | 역할 재분배 · 채터링 · 드리프트 |
 | | └ 리플 카운팅 · Zone 기반 토크 프로파일 | 센서리스 anti-pinch |
@@ -354,10 +354,10 @@ L0 로컬 하드 보호  >  L1 안전 인터록  >  L2 건강·재산 이벤트 
   └─────────────────────────────┘
 ```
 
-### 6.3 토픽 인터페이스 (52개)
+### 6.3 토픽 인터페이스 (53개)
 
 <details>
-<summary><b>센서 12 · 명령 15 · 상태 25 — 펼쳐보기</b></summary>
+<summary><b>센서 13 · 명령 15 · 상태 25 — 펼쳐보기</b></summary>
 
 **센서**
 ```text
@@ -370,6 +370,7 @@ L0 로컬 하드 보호  >  L1 안전 인터록  >  L2 건강·재산 이벤트 
 /studio/sensor/wifi_presence                             Bool     변경 시  ← [v3.1] 휴대폰 접속
 /studio/sensor/door_contact                              Bool     변경 시  ← [v3.2] 현관문 열림
 /studio/sensor/hood_temperature                          Float32   1 Hz   ← [v3.3] 후드 아래 온도
+/studio/sensor/weather                                   String   변경 시  ← [v3.4.2] 기상청 API (강우 · 외기 온습도 JSON)
 /studio/sensor/appliance_power                          String    1 Hz   ← [v3.1] {device: W}
 ```
 
@@ -719,7 +720,7 @@ actuator_workspace/
 │   ├── smart_home_controller_node.py
 │   ├── controller/                    # [v3.0] mode_manager · event_detector · rule_engine · means_ladder · arbiter
 │   ├── env_model/                     # 고속 모드 환경 참값 모델 (순수 Python · ROS 비의존)
-│   ├── interfaces/topics.py           # 토픽 계약 52개 상수 (docs/02 §6)
+│   ├── interfaces/topics.py           # 토픽 계약 53개 상수 (docs/02 §6)
 │   ├── harness/                       # 하네스 — 시나리오 전개 · 주입 · 고속 세계 · 판정 · 집계
 │   ├── scenario_runner.py             # ⭐ 하네스 CLI (물리 / 고속)
 │   ├── experiment_logger_node.py

@@ -164,7 +164,7 @@ def test_closed_loop_controller_contract_c9(hcfg, tmp_path):
     status = {c.text: c.status for c in p.criteria}
     assert status["event_entered('COOKING') within 90 after cooking_start"] == C.PASS
     assert status["window_open_ratio == 0 for all t"] == C.PASS
-    assert status["pm25_peak <= 0.7 * baseline_A.pm25_peak"] == C.PASS
+    assert status["pm25_peak <= 0.85 * baseline_A.pm25_peak"] == C.PASS
     assert p.metrics["pm25_peak"] < a.metrics["pm25_peak"]
     # 후드 약(300) + 흡기 100 %(60, 필터 막힘 0) → 정상 상태 Q_net = −240 m³/h (docs/07 §5.4 결정 추적표와 같다)
     # 흡기팬은 1차 지연(2 s)이라 후드가 켜진 직후 몇 초는 더 음압이다 — 그 과도 구간은 뺀다

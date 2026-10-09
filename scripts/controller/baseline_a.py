@@ -6,7 +6,8 @@
   청정기      내장 자동 (켜져 있을 때) — 자체 PM 단계
   후드        사용자 모델 — 요리 시작 2분 후 강 · 끝나면 끔 · 습관적으로 창문 개방
   실링팬 · 흡기팬  수동 고정 (약 · OFF)
-창문 · 블라인드 · 배기팬 · 조명의 v1.1 단독 규칙은 이 시나리오들에서 쓰이지 않아 W10 T10.v4 에서 더한다.
+  창문 · 배기팬 v1.1 단독 온도 규칙 — 28 °C 이상이면 열고 25 °C 이하에서 닫는다 (강우 · 외기 · 냉방을 모른다)
+블라인드 · 조명 단독 규칙은 W10 T10.v4 에서 더한다.
 """
 
 from __future__ import annotations
@@ -30,12 +31,18 @@ class BaselineA:
             self.cfg = yaml.safe_load(f)["baseline_a"]
 
     def reset(self, params: dict[str, Any]) -> None:
-        app = (params.get("scenario") or {}).get("initial", {}).get("appliances") or {}
-        # 사용자가 켜 둔 가전만 내장 자동으로 돈다
-        self.ac_on = bool((app.get("ac") or {}).get("power", False))
-        self.dehum_on = bool(app.get("dehumidifier", False))
-        self.hum_on = bool(app.get("humidifier", False))
-        self.purifier_on = int(app.get("purifier_level", 0)) > 0
+        sc = params.get("scenario") or {}
+        app = sc.get("initial", {}).get("appliances") or {}
+        # 사용자가 켜 둔 가전만 내장 자동으로 돈다 — 시나리오가 지정하면 그것을 따른다
+        auto = (sc.get("baseline_a") or {}).get("auto_appliances")
+        if auto is None:
+            auto = [k for k, on in (("ac", (app.get("ac") or {}).get("power", False)),
+                                    ("dehumidifier", app.get("dehumidifier", False)),
+                                    ("humidifier", app.get("humidifier", False)),
+                                    ("purifier", int(app.get("purifier_level", 0)) > 0)) if on]
+        self.ac_on, self.dehum_on = "ac" in auto, "dehumidifier" in auto
+        self.hum_on, self.purifier_on = "humidifier" in auto, "purifier" in auto
+        self._venting = False
         self._cook_seen_at: float | None = None
         self._dehum_run = self._hum_run = False
 
@@ -53,7 +60,14 @@ class BaselineA:
         else:
             self._cook_seen_at, on = None, False
         out[T.C_RANGE_HOOD_LEVEL] = int(c["user_hood"]["level"]) if on else 0
-        out[T.C_WINDOW_OPEN_RATIO] = float(c["user_hood"]["window_habit_ratio"]) if on else 0.0
+
+        # 창문 · 배기팬 단독 온도 규칙 + 후드 사용 습관 (각자 자기 조건만 본다)
+        tr, temp = c["temperature_rule"], float(inbox[T.S_TEMPERATURE])
+        self._venting = temp >= tr["vent_on_c"] or (self._venting and temp > tr["vent_off_c"])
+        window = max(float(tr["window_ratio"]) if self._venting else 0.0,
+                     float(c["user_hood"]["window_habit_ratio"]) if on else 0.0)
+        out[T.C_WINDOW_OPEN_RATIO] = window
+        out[T.C_FAN_RPM] = float(tr["exhaust_rpm"]) if self._venting else 0.0
 
         if self.purifier_on:
             lo, hi = c["purifier_auto_bounds_ugm3"]

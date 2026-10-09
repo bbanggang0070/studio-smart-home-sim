@@ -218,3 +218,287 @@ scenarios:
       - infiltration_volume
       - energy_wh
       - rule_violation_count
+
+  # ---- B8 · 여름 냉방 기본 — 사다리 상위 칸 (docs/03 §2) --------------------------------
+  - id: B8
+    tier: 1
+    name: "여름 냉방 기본"
+    duration_s: 3600
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261008
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 31.0
+      humidity_pct: 55.0
+      co2_ppm: 600.0
+      pm25_ugm3: 12.0
+      illuminance_lux: 600.0       # 낮 — 일사
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "14:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances:
+        ac: { power: false }
+        purifier_level: 0
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: 33.0
+      outdoor_rh_pct: 50.0
+      outdoor_illuminance_lux: 60000.0
+    pass_criteria:
+      - "window_open_ratio <= 0.1 for all t"                  # I2 · 외기가 더 뜨거워 창문 칸 건너뜀
+      - "blind_angle_deg >= 70 within 60 after 0"             # ① 차광
+      - "ceiling_fan > 0 within 60 after 0"                   # ③ 실링팬 정회전
+      - "ac_cool within 60 after 0"                           # ⑤ 에어컨
+      - "ac_setpoint == 27 when ac_cool"                      # I5 26 → 27 완화
+      - "operative_temperature <= 27 by 1800 after 0"         # 체감온도 ≤ 27 °C
+      # IR 역확인 CONFIRMED 는 appliance_bridge (W10 T10.v3) 이후 판정한다
+    metrics: [energy_wh, rule_violation_count]
+
+  # ---- B9 · 겨울 건조 가습 (docs/03 §2) ----------------------------------------------
+  - id: B9
+    tier: 1
+    name: "겨울 건조 가습"
+    duration_s: 7200
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261009
+    run_mode: fast
+    appliance_profile: full
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 28.0
+      co2_ppm: 600.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 350.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "20:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 0.0
+      outdoor_rh_pct: 60.0
+      heating_setpoint_c: 21.0     # 가정 A13
+    pass_criteria:
+      - "humidity >= 40 within 7200 after 0"
+      - "dew_margin >= 2.0 for all t"                        # 결로 여유 Δ ≥ 2.0 °C 상시
+      - "humidifier + dehumidifier <= 1 for all t"           # I1
+    metrics: [condensation_exposure_s, energy_wh, rule_violation_count]
+
+  # ---- C1 · 고온 + 고습 + 우천 (docs/03 §3) ------------------------------------------
+  - id: C1
+    tier: 2
+    name: "고온 + 고습 + 우천"
+    duration_s: 3600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261101
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    baseline_a: { auto_appliances: [ac] }   # 에어컨은 켜 둔 채 자체 온도조절 (docs/03 C1 Baseline 대비)
+    initial:
+      user_mode: NORMAL
+      temperature_c: 31.0
+      humidity_pct: 78.0
+      co2_ppm: 600.0
+      pm25_ugm3: 12.0
+      illuminance_lux: 400.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "15:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: rain
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 29.0
+      outdoor_rh_pct: 95.0
+      outdoor_illuminance_lux: 10000.0
+    pass_criteria:
+      - "window_open_ratio == 0 for all t"                   # E5
+      - "ac_power within 10 after 0"                         # 강우 감지 후 10 s 이내 에어컨 기동
+      - "humidity <= 60 within 1800 after 0"                 # 30분 내 RH ≤ 60 %
+      - "exhaust_fan_rpm == 0 for all t"                     # I10 — 바깥이 더 습하다
+      - "energy_wh <= baseline_A.energy_wh"
+    metrics: [energy_wh, rule_violation_count]
+
+  # ---- C5 · 수면 중 + 고온 — 소음 제약 (docs/03 §3) ------------------------------------
+  - id: C5
+    tier: 2
+    name: "수면 중 + 고온"
+    duration_s: 3600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261105
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: SLEEP
+      temperature_c: 29.5
+      humidity_pct: 55.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 0.0
+      occupancy: true
+      occupant_zone: bed
+      time_of_day: "23:30"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 24.0
+      outdoor_rh_pct: 60.0
+    pass_criteria:
+      - "exhaust_fan_rpm <= 600 for all t"                    # N0
+      - "intake_fan_rpm <= 700 for all t"                     # N0
+      - "window_open_ratio >= 0.39 within 60 after 0"         # 창문 개방 우선 (≥ 40 %, 1차 지연 허용)
+      - "temperature <= 28 within 3600 after 0"               # 예산: 온도 ≤ 28 °C (1시간 내)
+    metrics: [energy_wh, rule_violation_count]
+
+  # ---- C10 · 겨울 가습 ↔ 결로 (docs/03 §3) --------------------------------------------
+  - id: C10
+    tier: 2
+    name: "겨울 가습 ↔ 결로"
+    duration_s: 7200
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261110
+    run_mode: fast
+    appliance_profile: full
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    baseline_a: { auto_appliances: [humidifier] }   # 가습기 자체 설정 60 % (docs/03 C10)
+    initial:
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 30.0
+      co2_ppm: 600.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 350.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "20:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0          # 블라인드 열림
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: -5.0
+      outdoor_rh_pct: 70.0
+      heating_setpoint_c: 21.0
+    pass_criteria:
+      - "dew_margin >= 0 for all t"                          # 결로 노출 시간 0
+      - "humidity >= 50 within 7200 after 0"                 # 최종 RH ≥ 50 % (상한 확장)
+      - "humidifier + dehumidifier <= 1 for all t"           # I1
+    metrics: [condensation_exposure_s, energy_wh, rule_violation_count]
+
+  # ---- C13 · 장마철 제습 — 계절이 수단을 바꾼다 (docs/03 §3) ------------------------------
+  - id: C13
+    tier: 2
+    name: "장마철 제습"
+    duration_s: 3600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261113
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    baseline_a: { auto_appliances: [dehumidifier, ac] }   # 제습기 자체 설정 → 방이 더워져 에어컨이 뒤따른다
+    initial:
+      user_mode: NORMAL
+      temperature_c: 26.0
+      humidity_pct: 80.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "16:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: rain
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 24.0
+      outdoor_rh_pct: 95.0
+      outdoor_illuminance_lux: 5000.0
+    pass_criteria:
+      - "humidity <= 60 within 1800 after 0"                 # 30분 내 RH ≤ 60 %
+      - "dehumidifier == 0 for all t"                        # I6 여름 — 에어컨 제습
+      - "temperature <= 26.05 for all t"                     # 실내 온도 상승 0
+      - "energy_wh <= baseline_A.energy_wh"
+    metrics: [energy_wh, rule_violation_count]
+
+  # ---- C14 · 외출 + 고습 — 부재 중 곰팡이 방어 (docs/03 §3) ------------------------------
+  - id: C14
+    tier: 2
+    name: "외출 + 고습"
+    duration_s: 21600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261114
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    baseline_a: { auto_appliances: [] }   # 외출 시 전부 OFF (docs/03 C14 Baseline 대비)
+    initial:
+      user_mode: AWAY
+      temperature_c: 25.0
+      humidity_pct: 72.0
+      co2_ppm: 450.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 200.0
+      occupancy: false
+      occupant_zone: none
+      time_of_day: "09:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 24.0
+      outdoor_rh_pct: 85.0
+    events:                         # 6시간 동안 외기 습도 상승 · 강우 간헐
+      - { at_s: 3600,  set: { weather: rain,  outdoor_rh_pct: 95.0 } }
+      - { at_s: 7200,  set: { weather: clear, outdoor_rh_pct: 90.0 } }
+      - { at_s: 10800, set: { weather: rain,  outdoor_rh_pct: 97.0 } }
+      - { at_s: 14400, set: { weather: clear, outdoor_rh_pct: 92.0 } }
+    pass_criteria:
+      - "ratio(humidity <= 70) >= 0.95"                      # RH ≤ 70 % 체류율 ≥ 95 %
+      - "window_open_ratio == 0 for all t"                   # 보안
+      - "ac_power == 0 for all t"                            # 제습기 외 가전 가동 0
+      - "humidifier == 0 for all t"
+    metrics: [energy_wh, rule_violation_count]

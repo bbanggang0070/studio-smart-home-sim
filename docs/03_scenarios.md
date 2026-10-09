@@ -859,6 +859,8 @@ scenarios:
 | `external.heating_setpoint_c` | 겨울 난방 경계 조건 (가정 A13) — 없으면 난방 없음 |
 | `external.wind_speed_ms` | 창문 풍압 환기용 — 없으면 `environment_model.yaml` 기본값 |
 | `pass_criteria` 문법 | `<식>` · `for all t` · `during <label>` · `when <조건>` · `within N after <앵커>`(구간 안에 한 번이라도) · **`by N after <앵커>`(그 시각에 참 — 회복 판정용)** · `event_entered('E')` · `value_at('<별칭>', 앵커)` · `baseline_X.<지표>` — 상세: `scripts/harness/criteria.py` |
+| `baseline_a.auto_appliances` | Baseline A 에서 '사용자가 켜 둔' 가전 — 내장 자동이 도는 가전 목록 (없으면 initial 에서 켜진 가전) |
+| `ratio(<조건>)` | 판정 함수 — 조건이 참인 시각의 비율 (체류율, C14) |
 | `expect.<별칭>.settle_s` | 구간 시작 N 초 뒤부터 판정 — 감지 지연 허용 (C9: E1 진입 허용 90 s 와 맞춤) |
 | 판정 상태 | PASS · FAIL · **PENDING**(비교할 baseline 결과 없음) · **ERROR**(문법 · 열 없음) · **N/A**(baseline X 자신의 실행에서 `baseline_X.*` 비교) |
 | 미지원 주입 | 하네스가 아직 처리하지 못하는 주입(레이더 · Wi-Fi · 고장 등)은 무시하지 않고 `summary.csv` 의 `notes` 에 남긴다 |
@@ -916,3 +918,4 @@ scenarios:
 | 2026-10-09 | v2.9 | §8 `expect.settle_s` 추가 — C9 기대 동작(후드 약 · 흡기 100 %)을 E1 진입 허용 지연(90 s) 뒤부터 판정 |
 | 2026-10-09 | v2.10 | **C9 외기 조건 나쁨(52) → 매우나쁨(150)** (후드 약/강 교차점 · A 대비 목표 미달은 결정 대기) · **B6 판정 시간 120 s → 300 s · 20분 → 30분** (가정 A22 습기 유입 속도와 E3 진입 조건의 물리적 하한에 맞춤) |
 | 2026-10-09 | v2.11 | **지표 #10 · C9 목표 개정** — PM 피크 Baseline A 대비 −30 % → **−15 % 이상 + 추정 소비전력량 A 이하** (참값 모델 결과 반영) |
+| 2026-10-09 | v2.12 | §8 `baseline_a.auto_appliances` · `ratio()` · 시나리오 B8 · B9 · C1 · C5 · C10 · C13 · C14 를 scenario_profiles 에 수록 |

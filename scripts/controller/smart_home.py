@@ -13,6 +13,7 @@ from typing import Any
 
 from controller.arbiter import Decision, merge
 from controller.event_detector import GRADE_ORDER, EventDetector
+from controller.ladders import ac_json
 from controller.mode_manager import ModeManager
 from controller.params import ControllerParams, load_params
 from controller.rule_engine import RuleEngine
@@ -30,10 +31,11 @@ DEVICE_TOPIC = {
     "dehumidifier": (T.C_DEHUMIDIFIER, bool, "dehumidifier"),
     "humidifier": (T.C_HUMIDIFIER, bool, "humidifier"),
     "ceiling_fan": (T.C_CEILING_FAN, int, "ceiling_fan"),
+    "ac": (T.C_AC, None, "ac"),                         # JSON — 사다리가 정한 모드 · 설정온도로 만든다
 }
 # 아무 요구가 없을 때의 값 — 요구가 사라지면 끈다 (블라인드 · 실링팬은 요구가 있을 때만 움직인다)
 DEFAULTS = {"window": 0.0, "exhaust": 0.0, "intake": 0.0, "hood": 0.0, "purifier": 0.0,
-            "dehumidifier": 0.0, "humidifier": 0.0}
+            "dehumidifier": 0.0, "humidifier": 0.0, "ac": 0.0}
 
 
 class SmartHomeController:
@@ -44,10 +46,14 @@ class SmartHomeController:
 
     def reset(self, params: dict[str, Any]) -> None:
         self.baseline = params.get("baseline", "proposed")
+        # Baseline B = 협조는 하되 히스테리시스 · 최소 유지 시간 없음 (docs/03 §6)
+        self.hysteresis = self.baseline != "B"
         self.psy = Psychro(self.p)
         self.modes = ModeManager(self.p)
+        if not self.hysteresis:
+            self.modes.hysteresis_s = 0.0
         self.events = EventDetector(self.p, self.psy)
-        self.rules = RuleEngine(self.p, self.psy)
+        self.rules = RuleEngine(self.p, self.psy, hysteresis=self.hysteresis)
         self.devices = self.rules.devices
         self._reasons: list[str] = []
 
@@ -61,6 +67,7 @@ class SmartHomeController:
         cands = self.rules.candidates(o, mode, ev)
         decided = merge(cands, {k: v for k, v in DEFAULTS.items() if DEVICE_TOPIC[k][2] in self.devices})
         self._i7_check(o, decided)
+        self._i1_check(decided)
 
         out: dict[str, Any] = {}
         self._reasons = []
@@ -68,7 +75,10 @@ class SmartHomeController:
             topic, cast, profile_name = DEVICE_TOPIC[dev]
             if profile_name not in self.devices:
                 continue
-            out[topic] = cast(round(d.value) if cast is int else d.value)
+            if dev == "ac":
+                out[topic] = ac_json(self.rules.info, d.value > 0)
+            else:
+                out[topic] = cast(round(d.value) if cast is int else d.value)
             self._reasons.append(f"{dev}={out[topic]} ← {' / '.join(d.reasons)}")
 
         info = self.rules.info
@@ -80,6 +90,13 @@ class SmartHomeController:
                                            "i10_dew_diff_c": info.get("i10_dew_diff_c")})
         out[T.T_CONTROL_FEASIBILITY] = "FEASIBLE"     # 판정 로직은 W09 T9.7
         return out
+
+    def _i1_check(self, decided: dict[str, Decision]) -> None:
+        """I1 — 제습기 ⟂ 가습기. 둘 다 켜지면 가습을 끈다 (결로 · 습기 쪽이 재산 보호에 가깝다)."""
+        dh, hu = decided.get("dehumidifier"), decided.get("humidifier")
+        if dh and hu and dh.value > 0 and hu.value > 0:
+            hu.value = 0.0
+            hu.reasons.append("I1 제습기 ⟂ 가습기")
 
     def _i7_check(self, o, decided: dict[str, Decision]) -> None:
         """I7 — 외기 나쁨 이상에서 급기 없는 배기 금지: 흡기가 배기량을 못 맞추면 배기를 줄인다."""

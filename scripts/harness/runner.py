@@ -112,7 +112,12 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
                               ("window_open_ratio", "blind_angle_deg", "exhaust_fan_rpm", "intake_fan_rpm",
                                "range_hood_level", "purifier_level", "dehumidifier", "humidifier",
                                "ceiling_fan", "ceiling_light_pct", "desk_light_pct")}, row)
+            ac = acts.actual.ac
             row["act.ac"] = acts.state_topics()[T.T_AC]
+            row["act.ac_power"] = ac.power
+            row["act.ac_cool"] = ac.power and ac.mode == "cool"
+            row["act.ac_dry"] = ac.power and ac.mode == "dry"
+            row["act.ac_setpoint"] = ac.setpoint_c
             for tp in (T.S_TEMPERATURE, T.S_HUMIDITY, T.S_PM25, T.S_HOOD_TEMPERATURE, T.S_OCCUPANCY,
                        T.S_DOOR_CONTACT, T.S_OUTDOOR_PM_GRADE):
                 row[tp] = inbox[tp]

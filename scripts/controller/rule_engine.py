@@ -5,8 +5,8 @@
     dehumidifier(0/1) · humidifier(0/1) · ceiling_fan(−2…2)
 
 v1 범위: L1 강우 · 외기 등급 · I2 / L2 요리(I3 보상 급기 · 후드 예측) · 샤워(I10 · 균형 급기) · 결로 위험 /
-         L3 외출 보안 / L4 소음 등급 · 금지 장치 / L5 재실 기본 환기 · 실내 PM · 결로 경고.
-냉방 · 제습 · 가습 · 조명 사다리와 E4 · E7–E15 는 W09–W10 에 같은 틀로 더한다.
+         L3 외출 보안 / L4 소음 등급 · 금지 장치 / L5 재실 기본 환기 · 실내 PM · 결로 경고 · 냉방 · 제습 · 가습 사다리(ladders.py).
+조명 사다리와 E4 · E7–E15 는 W09–W10 에 같은 틀로 더한다.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from collections import deque
 
 from controller.arbiter import Candidate
 from controller.event_detector import GRADE_ORDER, ActiveEvent
+from controller.ladders import ComfortLadders
 from controller.params import ControllerParams
 from controller.predictor import HoodPredictor, Plan
 from controller.signals import Observation, Psychro
@@ -24,7 +25,7 @@ L0, L1, L2, L3, L4, L5, L6 = 0, 1, 2, 3, 4, 5, 6
 
 
 class RuleEngine:
-    def __init__(self, p: ControllerParams, psy: Psychro):
+    def __init__(self, p: ControllerParams, psy: Psychro, hysteresis: bool = True):
         self.p, self.psy = p, psy
         self.pred = HoodPredictor(p)
         g = p.get
@@ -37,6 +38,7 @@ class RuleEngine:
         self._i10_open = False
         self._hood_next_eval = -math.inf
         self.info: dict = {}
+        self.ladders = ComfortLadders(p, psy, self, hysteresis)
 
     # ---- 도우미 ----
 
@@ -132,6 +134,9 @@ class RuleEngine:
 
         # -- L5 쾌적 --
         self._base_ventilation(o, mode, blocked, add)
+        self.info.update(self.ladders.apply(o, mode, blocked, noise, add))
+        if mode in ("AWAY",) and "ac" in self.devices:
+            add("ac", "cap", 0, L3, "외출 — 냉방 정지")
         pm = "indoor_pm."
         if o.pm25 > g(pm + "bad_ugm3"):
             add("purifier", "need", g(pm + "purifier_level_above_bad"), L5, "실내 PM 나쁨")

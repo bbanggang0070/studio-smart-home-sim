@@ -16,6 +16,7 @@
     지표 이름 (pm25_peak 등) · baseline_<X>.<지표>  (같은 반복의 다른 baseline 결과)
     event_entered('NAME')            제어기가 /studio/state/active_events 에 NAME 을 낸 시각들
     value_at('<별칭>', <앵커|숫자>)    그 시각의 값
+    ratio(<조건식>)                   조건이 참인 시각의 비율 (체류율)
 
 평가할 수 없는 판정(다른 baseline 이 아직 없음 등)은 PENDING 으로 남긴다 — FAIL 과 구분한다.
 baseline_<X>.* 를 쓰는 판정은 baseline X 자신의 실행에서는 N/A (자기 자신과 비교하지 않는다).
@@ -53,6 +54,13 @@ ALIASES = {
     "q_net": "truth.q_net_m3h",
     "q_inf": "truth.q_inf_m3h",
     "hood_temperature": "truth.hood_temperature_c",
+    "operative_temperature": "truth.operative_temp_c",
+    "ac_power": "act.ac_power",
+    "ac_cool": "act.ac_cool",
+    "ac_dry": "act.ac_dry",
+    "ac_setpoint": "act.ac_setpoint",
+    "blind_angle_deg": "act.blind_angle_deg",
+    "condensate": "truth.condensate_g",
 }
 
 PASS, FAIL, PENDING, ERROR, NA = "PASS", "FAIL", "PENDING", "ERROR", "N/A"
@@ -199,7 +207,8 @@ def evaluate(df: pd.DataFrame, criteria: list[str], expect: dict[str, dict], anc
     def value_at(alias: str, when: float) -> float:
         return float(np.interp(when, t, df[ALIASES[alias]].to_numpy(dtype=float)))
 
-    funcs = {"event_entered": lambda name: _active_event_mask(df, name), "value_at": value_at}
+    funcs = {"event_entered": lambda name: _active_event_mask(df, name), "value_at": value_at,
+             "ratio": lambda cond: float(np.mean(np.asarray(cond, dtype=bool)))}
     ev = _Evaluator(names, funcs, baselines)
 
     texts = list(criteria)
@@ -244,7 +253,7 @@ def _evaluate_one(text: str, ev: _Evaluator, t: np.ndarray, anchors: dict[str, f
             if start is None:
                 raise NameError(f"앵커 '{a}' 없음 (있는 앵커: {sorted(anchors)})")
             end = start + float(m["n"])
-            arr = np.broadcast_to(np.asarray(ev.eval(m["expr"])), t.shape)
+            arr = np.broadcast_to(np.asarray(ev.eval(m["expr"])).astype(bool), t.shape)
             if form == "by":
                 if end > t[-1]:
                     raise NameError(f"판정 시각 {end:.0f}s 가 실행 시간({t[-1]:.0f}s)을 넘는다")

@@ -191,3 +191,68 @@ def test_c9_proposed_behaviour(tmp_path):
 def test_b6_proposed_passes(tmp_path):
     res = run_batch(["B6"], baselines=["proposed"], reps=1, out_dir=tmp_path, progress=lambda *_: None)
     assert res[0].status == C.PASS, [(c.status, c.text, c.detail) for c in res[0].criteria]
+
+
+# ---- 쾌적 사다리 (docs/06 §4) -------------------------------------------------------------
+
+
+def _weather(t_out, rh_out, rain=False):
+    return json.dumps({"raining": rain, "outdoor_temp_c": t_out, "outdoor_rh_pct": rh_out})
+
+
+def test_cooling_ladder_skips_window_when_outside_hotter_and_relaxes_ac(params):
+    c = _ctrl(params)
+    out = c.step(14 * 3600, inbox(**{T.S_TEMPERATURE: 31.0, T.S_HUMIDITY: 55.0, T.S_ILLUMINANCE: 600.0,
+                                     T.S_WEATHER: _weather(33.0, 50.0)}))
+    ac = json.loads(out[T.C_AC])
+    assert out[T.C_WINDOW_OPEN_RATIO] == 0.0
+    assert out[T.C_BLIND_ANGLE] == params.get("setpoints.blind_shade_angle_deg")
+    assert out[T.C_CEILING_FAN] > 0
+    assert ac["power"] and ac["mode"] == "cool"
+    assert ac["setpoint"] == 26.0 + params.get("interaction_rules.I5_ceiling_fan_setpoint_relax_c")
+
+
+def test_cooling_ladder_prefers_free_cooling_then_escalates(params):
+    c = _ctrl(params)
+    hot = {T.S_TEMPERATURE: 29.5, T.S_WEATHER: _weather(24.0, 60.0)}
+    out = c.step(0, inbox(**hot))
+    assert out[T.C_WINDOW_OPEN_RATIO] > 0.0 and not json.loads(out[T.C_AC])["power"]
+    out = c.step(params.get("comfort_ladders.escalate_to_ac_after_s") + 1, inbox(**hot))
+    assert json.loads(out[T.C_AC])["power"]                          # 무료 냉방 부족 → 승격
+
+
+def test_humid_outside_blocks_vent_cooling_and_uses_ac(params):
+    c = _ctrl(params)
+    out = c.step(0, inbox(**{T.S_TEMPERATURE: 31.0, T.S_HUMIDITY: 78.0, T.S_WEATHER: _weather(29.0, 95.0, True)}))
+    assert out[T.C_FAN_RPM] == 0.0                                   # I10 — 배기로 습기를 들이지 않는다
+    assert json.loads(out[T.C_AC])["power"]
+
+
+def test_humidify_cap_extension_by_ceiling_fan_reverse(params):
+    c = _ctrl(params)
+    out = c.step(0, inbox(**{T.S_TEMPERATURE: 21.0, T.S_HUMIDITY: 30.0, T.S_WEATHER: _weather(-5.0, 70.0)}))
+    assert out[T.C_HUMIDIFIER] is True
+    assert out[T.C_CEILING_FAN] == -1                                # I4 상한 확장
+    assert out[T.C_DEHUMIDIFIER] is False                            # I1
+
+
+def test_away_dehumidifies_with_dehumidifier_not_ac(params):
+    c = _ctrl(params)
+    out = c.step(0, inbox(**{T.C_MODE: "AWAY", T.S_OCCUPANCY: False, T.S_TEMPERATURE: 25.0,
+                             T.S_HUMIDITY: 72.0, T.S_WEATHER: _weather(24.0, 90.0)}))
+    assert out[T.C_DEHUMIDIFIER] is True
+    assert not json.loads(out[T.C_AC])["power"]
+    assert out[T.C_WINDOW_OPEN_RATIO] == 0.0
+
+
+def test_baseline_b_has_no_hysteresis(params):
+    b = SmartHomeController(params)
+    b.reset({"baseline": "B"})
+    assert b.modes.hysteresis_s == 0.0
+    assert b.rules.ladders._band("cooling_off_band_c") == 0.0
+
+
+@pytest.mark.parametrize("sid", ["B8", "B9", "C5", "C10", "C14"])
+def test_comfort_scenarios_pass(sid, tmp_path):
+    res = run_batch([sid], baselines=["proposed"], reps=1, out_dir=tmp_path, progress=lambda *_: None)
+    assert res[0].status == C.PASS, [(c.status, c.text, c.detail) for c in res[0].criteria]

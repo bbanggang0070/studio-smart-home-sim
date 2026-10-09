@@ -175,7 +175,7 @@ class RuleEngine:
             cook.info["hood_level"] = lv
             add("hood", "need", lv, L2, "E1 수증기 (열만) 후드 약")
         else:
-            lv = self._choose_hood(o, cook, blocked, noise)
+            lv = self._choose_hood(o, cook, blocked, noise, outdoor_polluted="OUTDOOR_PM" in ev)
             add("hood", "need", lv, L2, f"E1 요리 후드 예측 선택 {cook.info.get('peaks', {})}")
             add("purifier", "need", g(c + ("purifier_level_outdoor_bad" if bad_out else "purifier_level")), L2,
                 "E1 요리 청정기")
@@ -183,12 +183,20 @@ class RuleEngine:
             self._supply_for(g("appliances.range_hood.flow_m3h")[f"l{lv}"], o, blocked,
                              g(c + "compensating_window_ratio"), add, "E1")
 
-    def _choose_hood(self, o, cook: ActiveEvent, blocked, noise) -> int:
+    def _choose_hood(self, o, cook: ActiveEvent, blocked, noise, outdoor_polluted: bool) -> int:
         g = self.p.get
         hp = "events.cooking.hood_prediction."
-        # 열이 꺼진 뒤에는 다시 고르지 않는다 — 해제 · 잔류 운전까지 마지막 단수 유지 (docs/07 §5.4 추적표)
-        if "hood_level" in cook.info and (cook.info.get("heat_ended") or o.now_s < self._hood_next_eval):
-            return cook.info["hood_level"]
+        heat_ended = bool(cook.info.get("heat_ended"))
+        # 열이 꺼진 뒤 — 외기가 깨끗하면 마지막 단수를 유지해 해제 · 잔류 운전까지 간다 (docs/07 §5.4 추적표).
+        # 외기 오염(E6) 중이면 '발생원 없음'으로 한 번 더 예측해 고른다 — 후드 음압이 오염 외기를 끌어들이는 것을 막는다
+        # (docs/09 §5: 외기 오염 시 약 · 강 · 끔 중 실내 PM 이 가장 낮을 단수)
+        if "hood_level" in cook.info:
+            if heat_ended and not outdoor_polluted:
+                return cook.info["hood_level"]
+            if heat_ended and cook.info.get("post_heat_chosen"):
+                return cook.info["hood_level"]
+            if not heat_ended and o.now_s < self._hood_next_eval:
+                return cook.info["hood_level"]
         pm_out = g("air_quality.grade_representative_ugm3")[o.outdoor_pm_grade]
         purifier = g("events.cooking." + ("purifier_level_outdoor_bad" if "outdoor_pm_bad" in blocked
                                           else "purifier_level"))
@@ -200,7 +208,10 @@ class RuleEngine:
             else:
                 plans.append(Plan(lv, 0.0, q_hood, purifier))   # 창문이 보충 공기를 받는다 (큰 개구)
         slope = self._pm_slope_per_h(o.now_s)
-        if o.now_s - cook.since_s < g(hp + "source_estimate_after_s") or slope is None:
+        if heat_ended:
+            source = 0.0                                    # 요리 끝 — 발생원 없음
+            cook.info["post_heat_chosen"] = True
+        elif o.now_s - cook.since_s < g(hp + "source_estimate_after_s") or slope is None:
             source = self.pred.nominal_ug_h
         else:
             current = Plan(o.hood_level, self.intake_max_m3h * o.intake_rpm / self.intake_max_rpm,

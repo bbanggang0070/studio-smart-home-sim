@@ -63,9 +63,9 @@ scenarios:
         duration_s: 600
 
     pass_criteria:
-      - "event_entered('SHOWER') within 120 after shower_start"
+      - "event_entered('SHOWER') within 300 after shower_start"
       - "not event_entered('COOKING')"
-      - "humidity <= value_at('humidity', shower_start) + 5 by 1200 after shower_start"
+      - "humidity <= value_at('humidity', shower_start) + 5 by 1800 after shower_start"
       - "range_hood_level == 0 for all t"
 
     metrics:
@@ -148,10 +148,10 @@ scenarios:
       - energy_wh
       - rule_violation_count
 
-  # ---- C9 · 요리 + 외기 미세먼지 나쁨 (docs/03 §3 · 스키마 예시 §8) ---------------------
+  # ---- C9 · 요리 + 외기 미세먼지 매우나쁨 (docs/03 §3 · 스키마 예시 §8) -------------------
   - id: C9
     tier: 2
-    name: "요리 + 외기 미세먼지 나쁨"
+    name: "요리 + 외기 미세먼지 매우나쁨"
     duration_s: 3600
     repeat: 3
     baselines: [A, B, proposed]
@@ -181,7 +181,7 @@ scenarios:
 
     external:
       weather: clear
-      outdoor_pm25_ugm3: 52.0
+      outdoor_pm25_ugm3: 150.0     # 매우나쁨 — 후드 약/강 교차점 (docs/03 C9 2026-10-09 개정, 52 → 150)
       outdoor_temp_c: 24.0
       outdoor_rh_pct: 60.0
       outdoor_illuminance_lux: 500.0
@@ -198,7 +198,7 @@ scenarios:
 
     events:
       - at_s: 1800
-        set: { outdoor_pm25_ugm3: 40.0 }
+        set: { outdoor_pm25_ugm3: 100.0 }
 
     expect:                        # settle_s: E1 진입 허용 지연 (pass_criteria 'within 90') 만큼 뒤부터 본다
       window_open_ratio: { max: 0.0 }

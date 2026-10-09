@@ -421,7 +421,7 @@ smart_home_controller:
       target_ugm3: 15.0
       bad_ugm3: 35.0
       purifier_level_above_target: 1   # [v3.4.3] 평상시 청정기 — 목표 초과 1단 · 나쁨 초과 2단
-      purifier_level_above_bad: 2
+      purifier_level_above_bad: 3      # 2026-10-09: 2 → 3 (docs/09 '청정기 PM 높으면 가동' · 요리 후 회복 지연 개선)
       recovery_target_ugm3: 35.0       # 지표 #10 회복 기준
 
     # ---- 결로 (Condensation) — [신설 v3.0] --------------------------------------

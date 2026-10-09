@@ -138,6 +138,11 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
             n += cnt
     out["actuation_count"] = float(n)
 
+    # 쾌적 — 모드 냉방 목표 + margin 을 넘은 누적 시간 (냉방을 하지 않는 비교군과 에너지를 견줄 때 함께 본다)
+    sp = (ctx or {}).get("cooling_setpoint_c")
+    out["overheat_time_s"] = (float((df["truth.temperature_c"] > sp + cfg_metrics["overheat_margin_c"]).sum() * dt_s)
+                              if sp is not None else math.nan)
+
     # 지표 #9 — 재실 중 기본 환기 충족률 · 참값 CO2 기준 이하 비율 (제어에 쓰지 않는 검증값)
     ctx = ctx or {}
     occ_col = T.S_OCCUPANCY

@@ -209,7 +209,8 @@ scenarios:
       - "event_entered('COOKING') within 90 after cooking_start"
       - "window_open_ratio == 0 for all t"
       - "pm25_peak <= 0.85 * baseline_A.pm25_peak"     # 지표 #10 — 2026-10-09 −30 % → −15 %
-      - "energy_wh <= baseline_A.energy_wh"
+      - "energy_wh <= 1.1 * baseline_A.energy_wh"      # 2026-10-10 — 쾌적 냉방분 허용 (A 는 냉방하지 않음)
+      - "overheat_time_s <= baseline_A.overheat_time_s"   # 쾌적을 함께 본다 (냉방 목표 + 0.5 °C 초과 시간)
       - "pm25 <= 35 within 1200 after cooking_end"
 
     metrics:
@@ -540,6 +541,7 @@ scenarios:
       - "dew_margin >= 0.5 within 1800 after 0"              # 30분 내 Δ ≥ 0.5 °C
       - "temperature >= 19.0 for all t"                      # 실내 온도 하락 ≤ 2 °C
       - "humidifier == 0 for all t"
+      - "condensation_exposure_s < baseline_A.condensation_exposure_s"   # 2026-10-10 추가 — 결로 노출 A 대비 감소
     metrics: [condensation_exposure_s, energy_wh, rule_violation_count]
 
   # ---- C8 · 고온 + 외기 미세먼지 — 등급형 제약 (docs/03 §3) ---------------------------------
@@ -623,7 +625,7 @@ scenarios:
       - "window_open_ratio <= 0.1 for all t"                 # I2
       - "base_vent_compliance >= 0.95"                       # 기본 환기 40 m³/h 충족 ≥ 95 %
       - "co2_compliance >= 0.95"                             # (검증) 참값 CO2 ≤ 800 ppm 체류율
-      - "energy_wh <= baseline_B.energy_wh"                  # 히스테리시스 없는 협조 대비 감소
+      - "actuation_count <= 0.5 * baseline_B.actuation_count"   # 지표 #8 — 2026-10-10 에너지 → 장치 전환 50 % 이상 감소
     metrics: [base_vent_compliance, co2_compliance, energy_wh, rule_violation_count]
 
   # ---- C12 · 수면 중 + 기본 환기 (docs/03 §3) ------------------------------------------

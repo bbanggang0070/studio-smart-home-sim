@@ -29,6 +29,7 @@ metrics:
   rh_recovery_abs_pct: 60.0       # 지표 #14 — 또는 60 %
   co2_reference_ppm: { study: 800.0, other: 1000.0 }   # 지표 #9 (참값 검증)
   base_vent_tolerance_m3h: 0.5    # 지표 #9 — 기본 환기 충족 판정 허용 오차 (rpm 반올림)
+  overheat_margin_c: 0.5          # 지표 #1 보조 — 모드 냉방 목표 + 0.5 °C 초과 누적 시간 (overheat_time_s)
   # 지표 #8 — 장치 전환(구동) 횟수: 이산 장치는 값이 바뀔 때마다, 연속 장치는 아래 폭 이상 바뀔 때 1회
   actuation_columns: [act.ac_cool, act.ac_dry, act.ceiling_fan, act.purifier_level, act.range_hood_level,
                       act.dehumidifier, act.humidifier]

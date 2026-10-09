@@ -1,0 +1,183 @@
+# ============================================================================
+#  환경 참값 모델 계수 (Environment Truth Model)  --  v0.1 (2026-10-09) · 기획 v3.4
+# ----------------------------------------------------------------------------
+#  설계 근거: docs/06 §3.1 · §5 (공기 수지 · CO2 · PM · 절대습도 · 결로 · 온도)
+#             docs/08 §4.3 · §4.4 · §5.3-1 · §6 (빨래 건조 · 제습기 잠열 · 참값 3R3C · 인버터 COP)
+#
+#  ★ 참값(시뮬레이터) 전용 파일이다. 제어기는 이 파일을 읽지 않는다.
+#    제어기가 쓰는 값은 thresholds.yaml 에 있다. 같은 물리량(결로 R_si · 공기 수지 등)이 양쪽에
+#    중복되는 것은 의도된 것이다 — EXP-4 · EXP-5 에서 참값 파라미터만 따로 흔들어
+#    "제어용 모델 ≠ 참값 모델"(docs/08 §5.3-1)을 보장한다.
+#
+#  ★ ROS 2 파라미터 규칙을 지킨다 (environment_state_node 가 같은 파일을 쓸 수 있게):
+#    숫자로 시작하는 키 금지 · null 금지 (-1.0 사용).
+#
+#  [상태] draft — 'draft' 표시 값은 문서에 수치가 없어 문헌 · 정격 기반으로 정한 임시값이다.
+#         W08(환경 모델) · W10 T10.w1(3R3C) 에서 확정하고, 민감도는 W13 에서 본다.
+# ============================================================================
+
+environment_model:
+  ros__parameters:
+
+    # ---- 방 ------------------------------------------------------------------
+    room:
+      volume_m3: 42.0                  # 3.5 × 5.0 × 2.4 (docs/06 §5.1 · 가정 A1)
+      floor_area_m2: 17.5
+
+    # ---- 공기 수지 (docs/06 §5.1) ----------------------------------------------
+    #  Q_sup = Q_intake + Q_window_in · Q_exh = Q_exhaust + Q_hood · Q_net = Q_sup - Q_exh
+    #  Q_inf = Q_inf0 + max(0, -Q_net)
+    air_balance:
+      base_infiltration_ach: 0.3       # Q_inf0 = 0.3 ACH × V = 12.6 m³/h (민감도 대상 — W13 T13.v3)
+      penetration_factor: 0.8          # 틈새 유입 PM 침투율 p
+
+    # ---- 창문 자연 환기 — draft ------------------------------------------------
+    #  문서에 개방률 → 환기량 식이 없다. 단측 환기 근사(BS 5925 계열)를 쓴다.
+    #    Q = Cd·A/3·sqrt(g·h·|ΔT|/T_mean) + c_w·A·U_wind     A = 개방률 × 최대 개구 면적
+    #  검산: 10 % 개방 · ΔT 5 K · 풍속 2 m/s → 약 42 m³/h (기본 환기 '창문 10 %'와 같은 크기)
+    window:
+      opening_width_max_m: 0.70        # 레일 유효 이동 (가정 A2-1)
+      opening_height_m: 1.2            # draft — 창 높이 문서 미정
+      discharge_coefficient: 0.6       # draft
+      wind_coefficient: 0.025          # draft — 단측 환기 풍압 계수
+      default_wind_speed_ms: 2.0       # draft — 시나리오가 풍속을 주지 않을 때
+      glazing_area_m2: 1.8             # draft — 1.5 m × 1.2 m (창 폭: 가정 A2-1)
+      glazing_u_w_m2k: 2.8             # 복층유리 (가정 A14)
+
+    # ---- 결로 (docs/06 §5.5) ---------------------------------------------------
+    #  T_s = T_in - R_si/(R_si + R_rest)·(T_in - T_out) · Δ = T_s - T_dew
+    condensation:
+      magnus_b: 17.62
+      magnus_c: 243.12
+      r_rest_m2k_w: 0.247              # 1/U - 0.11
+      r_si_default_m2k_w: 0.11
+      r_si_ceiling_fan_reverse_m2k_w: 0.08
+      r_si_blind_closed_m2k_w: 0.20
+      r_si_blind_slat_45_m2k_w: 0.14
+      blind_slat_min_deg: 30.0         # draft — 이 각도 이상이면 '슬랫 45°' 저항
+      blind_closed_min_deg: 60.0       # draft — 이 각도 이상이면 '닫힘' 저항 (차광 75° 포함)
+      surface_mass_transfer_ms: 0.0025 # draft — 결로 시 창 표면 수분 제거 (h_c / (ρ·c_p) 근사)
+
+    # ---- 열모델 — 참값 3R3C (docs/08 §5.3-1 · §6.1) — draft ----------------------
+    #  노드: 공기(T) · 가구/침구/내벽(T_m) · 외벽(T_e). 이웃 세대와 맞닿은 면은 단열(같은 온도)로 본다.
+    #  C_air·dT/dt  = (T_m-T)·G_am + (T_e-T)·G_ae + (T_out-T)·(G_glz + ρc·Q_oa) + H_air
+    #  C_m·dT_m/dt  = (T-T_m)·G_am + H_solar·f_mass
+    #  C_e·dT_e/dt  = (T-T_e)·G_ae + (T_out-T_e)·G_eo
+    thermal:
+      air_capacity_wh_per_k: 60.0      # draft — 공기 14 Wh/K + 가벼운 가구 표면 (유효 4배)
+      mass_capacity_wh_per_k: 1500.0   # draft — 가구 · 침구 · 내벽
+      envelope_capacity_wh_per_k: 800.0  # draft — 외벽 콘크리트 0.2 m × 6.6 m²
+      air_mass_conductance_w_per_k: 180.0     # draft — 내부 표면 ~60 m² × 3 W/m²K
+      air_envelope_conductance_w_per_k: 51.0  # draft — 외벽 내표면 6.6 m² × 7.7 W/m²K
+      envelope_outdoor_conductance_w_per_k: 3.3  # draft — 외벽 U 0.5 × 6.6 m²
+      air_heat_capacity_wh_per_m3k: 0.335     # ρc (docs/06 §5.6)
+      solar_luminous_efficacy_lm_per_w: 105.0 # draft — 외부 조도 → 일사 [W/m²] 환산
+      solar_heat_gain_fraction: 0.6    # draft — 투과광 중 실내 열로 남는 비율 (SHGC 근사)
+      solar_to_mass_fraction: 0.6      # draft — 일사열 중 축열 질량에 흡수되는 비율
+      blind_transmittance_open: 0.85   # thresholds lighting_model 과 같은 초기값 (참값 사본)
+      blind_transmittance_shaded: 0.12 # 75° 차광
+      blind_shade_angle_deg: 75.0
+
+    # ---- 재실자 (1인 기준 · 가정 A3 · A22) --------------------------------------
+    occupant:
+      sensible_heat_w: { seated: 70.0, sleeping: 45.0 }    # draft — ASHRAE 착석 · 수면 현열
+      moisture_g_per_h: { seated: 50.0, sleeping: 40.0 }   # docs/06 §5.4 (수면은 draft)
+      co2_ppm_m3_per_h: { seated: 18000.0, sleeping: 13000.0 }  # docs/06 §5.2
+
+    # ---- CO2 참값 — 검증 전용, 제어기 구독 금지 (지표 #9 · EXP-3) ------------------
+    co2:
+      outdoor_ppm: 420.0
+
+    # ---- 실내 PM2.5 (docs/06 §5.3) ---------------------------------------------
+    pm:
+      deposition_rate_per_h: 0.2       # k_dep
+
+    # ---- 조명 발열 (W08 T8.1b · 시나리오 C4) — draft -----------------------------
+    lighting:
+      ceiling_light_w: 40.0            # draft — LED 천장등 (약 100 lm/W 기준)
+      desk_lamp_w: 8.0                 # draft
+
+    # ---- 후드 아래 온도 (가정 A21) ----------------------------------------------
+    hood_sensor:
+      plume_k_per_w: 0.025             # draft — 조리 열 800 W → 후드 하단 +20 K (E1 진입 8 K 를 넉넉히 넘김)
+      time_constant_s: 20.0            # 가정 A21
+
+    # ---- 빨래 건조 (docs/08 §4.3) -----------------------------------------------
+    #  E = k_l·A·(w_sat(T) - w)·(1 + c_v·v_air)  — k_l·A 는 교정 조건에서 코드가 계산한다
+    laundry:
+      initial_moisture_g: 2000.0
+      calibration_temp_c: 24.0
+      calibration_rh_pct: 60.0
+      calibration_hours: 10.0
+      air_speed_gain: 0.6              # c_v
+      falling_rate_fraction: 0.2       # draft — 잔여 수분이 이 비율 아래면 감률 건조
+      ceiling_fan_air_speed_ms: { low: 0.5, high: 1.0 }   # draft
+
+    # ---- 가전 (docs/06 §3.1 · 정격 가정) -----------------------------------------
+    appliances:
+      ac:
+        cooling_capacity_w: 2300.0     # 6평형
+        sensible_heat_ratio: 0.85      # draft — 정격에서 잠열 약 345 W ≈ 0.5 L/h (제원과 일치)
+        min_plr: 0.15                  # draft — 인버터 최저 부하율 (이하 단속 운전)
+        modulation_w_per_k: 1500.0     # draft — 설정온도 편차 1 K 당 냉방 출력
+        thermo_off_band_c: 0.5         # draft — 설정 −0.5 °C 아래면 써모오프(송풍)
+        fan_only_power_w: 30.0         # docs/08 §6.3 송풍 20–100 W
+        dry_mode_removal_g_per_h: 500.0
+        dry_mode_sensible_w: 500.0     # draft
+        latent_rh_floor_pct: 30.0      # draft — 이 RH 이하에서는 코일 응축이 사라진다
+        latent_rh_full_pct: 60.0       # draft
+        cop_plr_points: [0.1, 0.2, 0.3, 0.5, 0.75, 1.0]   # docs/08 §6.2 — PLR 0.3–0.5 최대 · 0.2 미만 급감
+        cop_values:     [2.0, 3.0, 4.5, 4.8, 4.0, 3.3]   # draft
+      dehumidifier:
+        rated_g_per_h: 417.0           # 10 L/일 @27 °C · 60 %
+        derate_temp_low_c: 18.0
+        derate_factor_low: 0.5
+        derate_temp_high_c: 27.0
+        derate_factor_high: 1.0
+        derate_factor_min: 0.3         # draft — 18 °C 아래 외삽 하한
+        rh_reference_pct: 60.0         # draft — 제거량 ∝ RH/60 (상한 1.2)
+        rh_factor_max: 1.2
+        power_w: 200.0
+        latent_heat_wh_per_g: 0.68     # 응축 잠열 → 발열 ≈ 480 W (docs/08 §4.4)
+      humidifier:
+        rated_g_per_h: 300.0
+        power_w: 30.0
+        type: 'ultrasonic'             # ultrasonic | impeller | steam
+        evaporative_cooling: true      # 초음파 · 임펠러는 물방울 증발이 공기 열을 뺏는다
+        pm_mg_per_min_ultrasonic_tap: 0.05   # draft — 초음파 + 수돗물 미네랄 입자
+        pm_emission_relative: { ultrasonic: 1.0, impeller: 0.33, steam: 0.0 }
+      ceiling_fan:
+        power_w: { low: 30.0, high: 50.0 }
+        perceived_cooling_c: { low: 0.8, high: 1.5 }   # 체감온도 (물리 온도는 바꾸지 않는다)
+      intake_fan:
+        max_m3h: 60.0
+        max_rpm: 2000.0
+        filter_efficiency_pm25: 0.90   # η
+        filter_replace_hours: 2000.0
+        filter_flow_loss_at_replace: 0.4   # 교체 시점 유량 감소율 (누적 가동 시간 선형)
+        power_w: 5.0
+      exhaust_fan:
+        max_m3h: 50.0
+        max_rpm: 2000.0
+        power_w: 3.0
+      purifier:
+        cadr_m3h: { l1: 70.0, l2: 130.0, l3: 200.0 }
+        power_w: { l1: 10.0, l2: 20.0, l3: 40.0 }
+      range_hood:
+        flow_m3h: { l1: 300.0, l2: 450.0 }
+        capture_efficiency: 0.6        # ε — 요리 PM 국소 포집
+        power_w: { l1: 80.0, l2: 150.0 }
+
+    # ---- 수치 적분 ----------------------------------------------------------------
+    integration:
+      max_substep_s: 5.0               # 오일러 적분 최대 보폭 — 공기 노드 시정수(≥ 약 500 s)보다 충분히 작게
+
+    # ---- 물성 ----------------------------------------------------------------------
+    physics:
+      water_latent_heat_wh_per_g: 0.68   # 물 증발 · 응축 잠열 (≈ 2,450 J/g) — 에어컨 잠열 · 가습기 증발 냉각
+
+    # ---- 난방 — 경계 조건 (가정 A13: 겨울 실내 21 °C 유지, 제어 범위 밖) — draft ----------
+    #  시나리오가 ExternalConditions.heating_setpoint_c 를 주면 이상적 온도조절 난방이 공기 노드에 열을 넣는다.
+    heating:
+      capacity_w: 3000.0               # draft — 원룸 보일러 · 바닥난방 등가 출력
+      modulation_w_per_k: 2000.0       # draft — 설정온도 편차 1 K 당 출력

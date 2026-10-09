@@ -717,10 +717,13 @@ actuator_workspace/
 │   ├── energy_predictor_node.py       # [v3.1] 귀가 분위수 · 열모델 식별 · 변화점 회귀 · 프리쿨링 최적화
 │   ├── smart_home_controller_node.py
 │   ├── controller/                    # [v3.0] mode_manager · event_detector · rule_engine · means_ladder · arbiter
+│   ├── env_model/                     # 고속 모드 환경 참값 모델 (순수 Python · ROS 비의존)
 │   ├── scenario_runner.py             # ⭐ 하네스 (물리 / 고속)
 │   ├── experiment_logger_node.py
 │   └── analyze_results.py
 ├── launch/studio_smart_home.launch.py
+├── tests/                             # pytest (uv run pytest)
+├── pyproject.toml · uv.lock           # uv 환경 (Python 3.12)
 └── results/ raw/ · sweep/ · validation/ · figures/ · summary.csv
 ```
 

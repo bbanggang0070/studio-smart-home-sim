@@ -105,11 +105,16 @@ environment_model:
     lighting:
       ceiling_light_w: 40.0            # draft — LED 천장등 (약 100 lm/W 기준)
       desk_lamp_w: 8.0                 # draft
-      #  조도 참값 (천장 BH1750 위치) = 외부 조도 × 주광률 × 블라인드 투과율 + 천장등 · 스탠드 기여 (W05 캘리브레이션으로 확정)
-      daylight_factor: 0.02            # draft — 주광률 2 % (원룸 측창)
-      ceiling_lux_at_full: 380.0       # thresholds lighting_model 과 같은 초기값 (참값 사본)
-      desk_lux_at_sensor_full: 60.0    # draft — 스탠드 100 % 가 천장 센서에 주는 조도
-      desk_lux_at_desk_full: 520.0     # 스탠드 100 % 책상면 조도 (참값 — 책상 조도 추정 오차 평가용)
+      #  조도 참값 — 위치별: 작업면 주광 = 외부 조도 × 주광률 × 블라인드 투과율 · 센서 주광 = 작업면 주광 × daylight_sensor_ratio
+      #  천장등 · 스탠드 기여는 W05 T5.7 캘리브레이션 (config/lighting_calibration.yaml · 2026-10-11)
+      daylight_factor: 0.02            # draft — 주광률 2 % (원룸 측창, 작업면 기준)
+      daylight_sensor_ratio: 0.38      # draft — 주광의 센서/작업면 비 (W08 창 주광 렌더로 확정)
+      ceiling_lux_at_sensor_full: 98.3
+      ceiling_lux_at_floor_full: 256.6
+      ceiling_lux_at_desk_full: 203.4
+      desk_lux_at_sensor_full: 39.6
+      desk_lux_at_desk_full: 875.1
+      desk_lux_at_floor_full: 47.1
 
     # ---- 후드 아래 온도 (가정 A21) ----------------------------------------------
     hood_sensor:

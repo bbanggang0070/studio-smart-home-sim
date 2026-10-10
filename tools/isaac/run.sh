@@ -44,9 +44,12 @@ TTY_ARGS=()
 [[ -t 0 ]] && TTY_ARGS=(-it)
 
 exec docker run --rm "${TTY_ARGS[@]}" --name "$NAME" \
-  --gpus all --network host \
+  --gpus all --network host --ipc host \
   -e ACCEPT_EULA=Y -e PRIVACY_CONSENT=Y -e OMNI_KIT_ACCEPT_EULA=YES \
   -e ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-7}" \
+  -e ROS_DISTRO=jazzy -e RMW_IMPLEMENTATION=rmw_fastrtps_cpp -e FASTDDS_BUILTIN_TRANSPORTS=UDPv4 \
+  -e LD_LIBRARY_PATH="$ISAAC/exts/isaacsim.ros2.bridge/jazzy/lib" \
+  -e PYTHONPATH="/workspace/studio/scripts" \
   "${X11_ARGS[@]}" \
   -v "$CACHE/kit:$ISAAC/kit/cache:rw" \
   -v "$CACHE/ov:/root/.cache/ov:rw" \

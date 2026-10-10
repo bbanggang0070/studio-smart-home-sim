@@ -14,6 +14,7 @@ luminous_flux_lm:
 lux_at_full:
   ceiling_at_sensor: 98.3
   ceiling_at_desk: 203.4
+  desk_at_floor: 47.1
   ceiling_at_floor: 256.6
   desk_at_sensor: 39.6
   desk_at_desk: 875.1

@@ -1,8 +1,10 @@
 """조명 · 조도 (docs/07 §2.1 모드 조명 · L6) + 가상 조도 페일세이프 (docs/08 §2.2 · X3).
 
-목표: 모드의 lighting {target, lux, cct, ceiling_lux, off_after_min}
-  천장등 % = (천장 목표 − 주광) / ceiling_lux_at_full       주광 = 측정 − 자기 조명 기여
-  스탠드 % = (책상 목표 − 주광 − k_geo × 천장 기여) / desk_lux_at_full   (책상 조도 센서 없이 추정 — docs/02 §2.5)
+목표: 모드의 lighting {target, lux, cct, ceiling_lux, off_after_min} — lux 는 작업면(바닥 · 책상) 기준
+  천장 센서(아래를 봄)는 반사광만 받아 작업면보다 낮게 읽는다 (W05 T5.7 · config/lighting_calibration.yaml) →
+  작업면 주광 = (센서 측정 − 자기 조명의 센서 기여) / daylight_sensor_ratio
+  천장등 % = (방 목표 − 작업면 주광) / ceiling_lux_at_floor_full
+  스탠드 % = (책상 목표 − 작업면 주광 − 천장등의 책상 기여) / desk_lux_at_desk_full   (책상 조도 센서 없이 추정 — docs/02 §2.5)
   수면: off_after_min 뒤 소등 · 외출 · 빈방 절전: 소등 · 눈부심(700 lux 초과) → 블라인드 차광 (620 lux 해제)
 조도 센서가 무효(NaN · 범위 밖)면 마지막 유효값을 hold_last_valid_s 동안 쓰고, 그 뒤 가상 조도(시각 · 비 · 블라인드)로 계속 제어한다.
 """
@@ -36,13 +38,14 @@ class Lighting:
         lm = "lighting_model."
         frac = min(max(o.blind_deg / g("setpoints.blind_shade_angle_deg"), 0.0), 1.0)
         tau = g(lm + "outdoor_transmittance_open") + frac * (g(lm + "outdoor_transmittance_shaded") - g(lm + "outdoor_transmittance_open"))
-        return out * g(lm + "daylight_factor") * tau + self._own_light(o)
+        # 센서 눈금으로 돌려준다 (측정값 대신 쓰므로)
+        return out * g(lm + "daylight_factor") * tau * g(lm + "daylight_sensor_ratio") + self._own_light(o)
 
     def _own_light(self, o: Observation) -> float:
         g = self.p.get
         lm = "lighting_model."
-        return (g(lm + "ceiling_lux_at_full") * o.ceiling_pct / 100.0
-                + g(lm + "desk_lux_at_ceiling_sensor_full") * o.desk_pct / 100.0)
+        return (g(lm + "ceiling_lux_at_sensor_full") * o.ceiling_pct / 100.0       # 자기 조명의 센서 기여
+                + g(lm + "desk_lux_at_sensor_full") * o.desk_pct / 100.0)
 
     def measured(self, o: Observation) -> tuple[float, bool]:
         """→ (쓸 조도, 새로 페일세이프에 들어갔나)."""
@@ -76,15 +79,17 @@ class Lighting:
             add("ceiling_light", "force", 0, L6, "조명 소등 (빈방 · 외출 · 수면 경과)")
             add("desk_light", "force", 0, L6, "스탠드 소등")
             return info
-        daylight = max(0.0, lux - self._own_light(o))
+        daylight = max(0.0, lux - self._own_light(o)) / g(lm + "daylight_sensor_ratio")   # 작업면 주광 추정
+        info["daylight_workplane_lux"] = round(daylight, 1)
         ceil_target = m.get("ceiling_lux", m["lux"]) if m["target"] == "desk" else m["lux"]
-        c_pct = min(100.0, max(0.0, (ceil_target - daylight) / g(lm + "ceiling_lux_at_full") * 100.0))
+        c_pct = min(100.0, max(0.0, (ceil_target - daylight) / g(lm + "ceiling_lux_at_floor_full") * 100.0))
         add("ceiling_light", "need", c_pct, L6, f"조명 — 천장 {ceil_target:g} lux 목표 ({mode})")
         if cooling:
             add("ceiling_light", "cap", g("setpoints.ceiling_light_thermal_cap_pct"), L5, "고온 — 조명 발열 상한 (C4)")
         if m["target"] == "desk":
-            desk_from_ceiling = g(lm + "ceiling_to_desk_k_geo") * g(lm + "ceiling_lux_at_full") * c_pct / 100.0
-            d_pct = min(100.0, max(0.0, (m["lux"] - daylight - desk_from_ceiling) / g(lm + "desk_lux_at_full") * 100.0))
+            c_eff = min(c_pct, g("setpoints.ceiling_light_thermal_cap_pct")) if cooling else c_pct   # 고온 상한이 걸린 실제 밝기
+            desk_from_ceiling = g(lm + "ceiling_lux_at_desk_full") * c_eff / 100.0
+            d_pct = min(100.0, max(0.0, (m["lux"] - daylight - desk_from_ceiling) / g(lm + "desk_lux_at_desk_full") * 100.0))
             add("desk_light", "need", d_pct, L6, f"스탠드 — 책상 {m['lux']:g} lux 목표 (추정)")
         else:
             add("desk_light", "need", 0, L6, "스탠드 — 모드 목표 없음")

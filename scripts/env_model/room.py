@@ -412,11 +412,12 @@ class RoomModel:
         th = "thermal."
         frac = min(max(act.blind_angle_deg / g(th + "blind_shade_angle_deg"), 0.0), 1.0)
         tau = g(th + "blind_transmittance_open") + frac * (g(th + "blind_transmittance_shaded") - g(th + "blind_transmittance_open"))
-        daylight = max(ext.outdoor_illuminance_lux, 0.0) * g("lighting.daylight_factor") * tau
-        lux = (daylight + g("lighting.ceiling_lux_at_full") * act.ceiling_light_pct / 100.0
-               + g("lighting.desk_lux_at_sensor_full") * act.desk_light_pct / 100.0)
-        desk_lux = daylight + g("lighting.desk_lux_at_desk_full") * act.desk_light_pct / 100.0 \
-            + g("lighting.ceiling_lux_at_full") * act.ceiling_light_pct / 100.0
+        daylight = max(ext.outdoor_illuminance_lux, 0.0) * g("lighting.daylight_factor") * tau   # 작업면 주광
+        pc, pd = act.ceiling_light_pct / 100.0, act.desk_light_pct / 100.0
+        lux = (daylight * g("lighting.daylight_sensor_ratio")                                # 천장 센서 위치
+               + g("lighting.ceiling_lux_at_sensor_full") * pc + g("lighting.desk_lux_at_sensor_full") * pd)
+        desk_lux = daylight + g("lighting.ceiling_lux_at_desk_full") * pc + g("lighting.desk_lux_at_desk_full") * pd
+        floor_lux = daylight + g("lighting.ceiling_lux_at_floor_full") * pc + g("lighting.desk_lux_at_floor_full") * pd
         fan_lv = int(act.ceiling_fan)
         perceived = 0.0
         if fan_lv > 0:
@@ -435,6 +436,7 @@ class RoomModel:
             "operative_temp_c": s.temp_c - perceived,
             "illuminance_lux": lux,
             "desk_illuminance_lux": desk_lux,
+            "floor_illuminance_lux": floor_lux,          # 방 작업면 (바닥 중앙) — 모드 조도 목표의 기준면
             "heating_w": h_heat,
             "ac_state": self.ac_state,
             "mass_temp_c": s.mass_temp_c,

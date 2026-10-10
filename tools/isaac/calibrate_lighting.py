@@ -193,6 +193,7 @@ def main() -> None:
         "physical_luminance_nit": {"ceiling": round(phys_c, 1), "desk": round(phys_d, 1)},
         "luminous_flux_lm": {"ceiling": phi_c, "desk": phi_d},
         "lux_at_full": {"ceiling_at_sensor": round(c_sens, 1), "ceiling_at_desk": round(c_desk, 1),
+                        "desk_at_floor": round(at("desk", 100, "floor"), 1),
                         "ceiling_at_floor": round(c_floor, 1), "desk_at_sensor": round(d_sens, 1),
                         "desk_at_desk": round(d_desk, 1)},
         "ceiling_to_desk_k_geo": round(k_geo, 3),

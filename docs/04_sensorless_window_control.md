@@ -612,3 +612,4 @@ window_sensorless:
 | 2026-09-12 | v1.0 | 신규 작성. W01 발표 피드백 ③ 반영. HC-SR04 제거, 전류 리플 기반 센서리스 anti-pinch 채택, 랙-피니언(B방식) 확정 |
 | 2026-10-09 | v1.1 | Effort Sensor 실측 경로 정정(`isaacsim.sensors.physics`, Isaac Sim 5.1) · Prismatic 반력 읽기 실증 결과 기록 |
 | 2026-10-11 | v1.2 | §6-1 시뮬레이션의 Zone A–D 반력 근거 — 스프링식 레일 씰 패드 + 엔드존 경사로 + 압착 씰 · 기준 프로파일 `models/window_reference_profile.csv` (W05 T5.8) |
+| 2026-10-11 | v1.3 | §3.7 로컬 계층 구현 메모 — 운동 방향으로 미는 힘만 판정(제동 · 감속 힘 제외) · 기동 150 ms 블랭킹 · Zone D 는 전류 기준 끔 + 덜 닫혔을 때(> 3 mm) 반력 백업 · 이동 방향은 지령 램프 속도로 (정지 오차 때문에 '새 출발'을 놓쳐 기동 피크 오작동하던 문제) · `scripts/sim/window_local.py` |

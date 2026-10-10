@@ -110,8 +110,22 @@ isaacsim                                        # 첫 실행은 셰이더 컴파
 >   Isaac Sim 컨테이너(§4-A)와 같은 호스트 네트워크에서 DDS 가 서로 보이게 한다
 > - 두 컨테이너 모두 `ROS_DOMAIN_ID=7` · `RMW_IMPLEMENTATION=rmw_fastrtps_cpp` 로 맞춘다
 > - 저장소는 컨테이너에 `-v $PWD:/ws` 로 마운트 — 제어기 · 하네스 코드는 그대로 쓰고 rclpy 래퍼 노드만 컨테이너에서 실행한다
-> - 실행 스크립트는 W08–W09 ROS 브릿지 작업(10/19–22)에서 `tools/ros/run.sh` 로 만든다
-> 아래 deb 설치 절차는 호스트 설치를 택하는 다른 PC용으로 남겨 둔다.
+> - 아래 deb 설치 절차는 호스트 설치를 택하는 다른 PC용으로 남겨 둔다.
+
+**실행 (2026-10-11 구현 · W06)**
+
+```bash
+tools/ros/run.sh build                                   # 처음 한 번 — studio-ros:jazzy (ros:jazzy-ros-base + numpy · yaml)
+tools/isaac/run.sh python scripts/sim/isaac_actuator_bridge.py          # (터미널 1) Isaac 액추에이터 브릿지 — 내장 Jazzy rclpy
+tools/ros/run.sh ros2 launch launch/studio_smart_home.launch.py stub:=true   # (터미널 2) 제어기 · 가전 브릿지 (+ W07 전 센서 스텁)
+tools/ros/run.sh node tools/ros/check_topics.py         # 토픽 계약 55개 연결 점검
+tools/ros/run.sh node tools/ros/bridge_test.py          # W06 DoD 자동 검증 (브릿지만 띄운 상태에서)
+tools/ros/run.sh stop                                    # 남은 ROS 컨테이너 정리 (timeout 은 docker 클라이언트만 끝낸다)
+```
+
+- 두 컨테이너 모두 `--network host --ipc host` · `ROS_DOMAIN_ID=7` · Fast DDS **UDP 전송만**(`FASTDDS_BUILTIN_TRANSPORTS=UDPv4`).
+  Isaac 은 root · ROS 컨테이너는 호스트 사용자로 돌아 공유 메모리 전송 권한이 엇갈리면 메시지가 오지 않는다 (2026-10-11 확인).
+- Isaac 쪽 rclpy 는 이미지 내장 `/isaac-sim/exts/isaacsim.ros2.bridge/jazzy` (Python 3.11) — `tools/isaac/run.sh` 가 `ROS_DISTRO` · `LD_LIBRARY_PATH` 를 넣는다.
 
 공식 절차: [ROS 2 Jazzy — Ubuntu (deb)](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)
 

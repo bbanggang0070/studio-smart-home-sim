@@ -195,6 +195,7 @@ smart_home_controller:
         local_cutoff_enabled: true       # 브릿지 단 즉시 차단 활성
         local_cutoff_current_a: 1.80     # 로컬 하드 컷오프 (상위 판정보다 보수적)
         local_cutoff_force_n: 120.0      # 반력 기준 백업 컷오프
+        seal_closed_tolerance_m: 0.003   # [v3.4.10] draft — Zone D 에서는 전류 기준을 끄고, 반력 백업도 이보다 덜 닫혔을 때만 (다 닫혀 씰을 누르는 정상 상태 제외)
         local_acts_in_physics_step: true # 물리 콜백 내부에서 실행 (통신 없음)
         report_only_upstream: true       # 로컬은 정지만, 정책 판단은 상위가 담당
         upstream_timeout_ms: 500         # 상위 응답 없으면 로컬이 정지 유지
@@ -281,13 +282,18 @@ smart_home_controller:
     # ---- 조명 모델 및 캘리브레이션 (Lighting Model) ------------------------
     #  [신설 v2.0] Light Prim의 intensity는 lux가 아니라 렌더러 상대 단위다.
     #  intensity ↔ lux 매핑을 여기서 정의한다. W05 캘리브레이션으로 확정.
+    #  [v3.4.10 · W05 T5.7 확정 2026-10-11] config/lighting_calibration.yaml (경로 추적 · 정격 광속 천장 4,000 lm · 스탠드 800 lm)
+    #  천장 센서(BH1750, 아래를 봄)는 반사광만 받아 작업면보다 낮게 읽는다 → 제어기는 센서 값을 작업면 조도로 환산해
+    #  모드 목표(작업면 lux — user_modes lighting)와 비교한다. 위치별 100 % 조도:
     lighting_model:
-      ceiling_lux_at_full: 380.0   # 천장등 100% 시 바닥 중앙 조도 [lux]  (TBD W05)
-      desk_lux_at_full: 520.0      # 스탠드 100% 시 책상면 조도 [lux]    (TBD W05)
+      ceiling_lux_at_sensor_full: 98.3     # 천장등 → 천장 센서
+      ceiling_lux_at_floor_full: 256.6     # 천장등 → 바닥 중앙 (방 작업면 — 모드 lux 목표의 기준면)
+      ceiling_lux_at_desk_full: 203.4      # 천장등 → 책상면 (= 센서 × 2.07, 옛 ceiling_to_desk_k_geo)
+      desk_lux_at_sensor_full: 39.6        # 스탠드 → 천장 센서 (자기 조명 기여 빼기용)
+      desk_lux_at_desk_full: 875.1         # 스탠드 → 책상면 (갓 원뿔 60°)
+      daylight_sensor_ratio: 0.38          # draft — 주광의 센서/작업면 비 (천장등의 센서/바닥 비를 임시로 · W08 창 주광 렌더로 확정)
       distance_falloff: 'inverse_square'
-      ceiling_to_desk_k_geo: 0.72  # 천장 조도 → 책상면 기하 계수 (센서 없이 추정)
-      desk_lux_at_ceiling_sensor_full: 60.0   # [v3.4.3] draft — 스탠드 100 % 가 천장 센서에 주는 조도 (자기 조명 기여 빼기용)
-      daylight_factor: 0.02        # [v3.4.3] draft — 가상 조도: 외부 조도 → 실내 (주광률)
+      daylight_factor: 0.02        # [v3.4.3] draft — 외부 조도 → 실내 작업면 (주광률, 정의상 작업면 기준)
       outdoor_transmittance_open: 0.85   # 블라인드 개방 시 창 투과율
       outdoor_transmittance_shaded: 0.12 # 차광 시
       camera_validation_enabled: false   # W12 오프라인 대조 시에만 true

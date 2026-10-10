@@ -29,6 +29,7 @@ intake_fan_joint:
 ceiling_fan_joint:
   type: revolute_velocity
   max_rpm: 200.0                     # 강 ≈ 200 rpm · 약 ≈ 100 rpm (역회전 = 음수)
+  levels_rpm: [0.0, 100.0, 200.0]    # /studio/cmd/ceiling_fan 단 0 · 1(약) · 2(강) → rpm (부호 = 방향)
   max_torque_nm: 2.0
   drive: { type: force, stiffness: 0.0, damping: 0.5 }
 entrance_door_joint:
@@ -36,3 +37,9 @@ entrance_door_joint:
   range_deg: [0.0, 100.0]
   max_torque_nm: 60.0
   drive: { type: force, stiffness: 200.0, damping: 40.0 }
+bridge:                              # isaac_actuator_bridge (W06)
+  physics_hz: 120.0                  # scene_layout physics.steps_per_second 와 같게
+  state_hz: 20.0                     # 액추에이터 상태 토픽 (명령→반응 지연 측정 해상도 50 ms)
+  current_hz: 50.0                   # /studio/sensor/window_motor_current
+  render_every_n_steps: 2            # GUI 일 때만
+

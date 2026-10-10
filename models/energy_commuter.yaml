@@ -2,14 +2,14 @@
 persona: commuter
 generated_by: tools/energy/train_energy_model.py
 thermal_2r2c:
-  ca: 48.3226
-  cm: 1385.98
+  ca: 48.3241
+  cm: 1386.07
   rim: 0.00429459
-  rao: 0.0505372
+  rao: 0.0505455
   rmo: 10.0
-  gs: 0.29171
-  go: 12.792
-  q0: 88.5422
+  gs: 0.767698
+  go: 12.779
+  q0: 88.5574
   eta: 1.0
 thermal_fit:
   days: 14

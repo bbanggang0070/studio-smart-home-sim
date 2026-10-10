@@ -44,6 +44,7 @@ class Ramp:
     rate: float                 # 단위/s
     value: float = 0.0
     goal: float = 0.0
+    velocity: float = 0.0       # 직전 스텝의 지령 속도 — 0 이면 지령상 정지 (로컬 컷오프의 이동 방향 · 기동 판정)
 
     def set_goal(self, goal: float) -> None:
         self.goal = goal
@@ -53,7 +54,8 @@ class Ramp:
         err = self.goal - self.value
         dv = math.copysign(min(abs(err), self.rate * dt), err)
         self.value += dv
-        return self.value, (dv / dt if dt > 0 else 0.0)
+        self.velocity = dv / dt if dt > 0 else 0.0
+        return self.value, self.velocity
 
 
 class IsaacActuators:

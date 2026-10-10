@@ -90,3 +90,33 @@ STATE_TOPICS = (
 )
 
 ALL_TOPICS = SENSOR_TOPICS + COMMAND_TOPICS + STATE_TOPICS
+
+# ---- 메시지 타입 · QoS (docs/02 §6 표 · W06 리스크) -----------------------------
+#  std_msgs 타입 이름. 고속 모드는 쓰지 않는다 — ROS 노드(scripts/nodes · scripts/sim)가 쓴다.
+F32, BOOL, STR, I8 = "Float32", "Bool", "String", "Int8"
+TYPES: dict[str, str] = {
+    S_ILLUMINANCE: F32, S_TEMPERATURE: F32, S_HUMIDITY: F32, S_OCCUPANCY: BOOL, S_OCCUPANT_ZONE: STR,
+    S_WINDOW_MOTOR_CURRENT: F32, S_OUTDOOR_PM_GRADE: STR, S_PM25: F32, S_WIFI_PRESENCE: BOOL, S_DOOR_CONTACT: BOOL,
+    S_HOOD_TEMPERATURE: F32, S_APPLIANCE_POWER: STR, S_WEATHER: STR,
+    C_CEILING_LIGHT: F32, C_DESK_LIGHT: F32, C_DESK_LIGHT_CCT: F32, C_FAN_RPM: F32, C_BLIND_ANGLE: F32,
+    C_WINDOW_OPEN_RATIO: F32, C_MODE: STR, C_AC: STR, C_DEHUMIDIFIER: BOOL, C_HUMIDIFIER: BOOL, C_CEILING_FAN: I8,
+    C_INTAKE_FAN_RPM: F32, C_PURIFIER_LEVEL: I8, C_RANGE_HOOD_LEVEL: I8, C_ACTIVITY: STR, C_COOKTOP_POWER: BOOL,
+    T_CEILING_LIGHT: F32, T_DESK_LIGHT: F32, T_FAN_RPM: F32, T_BLIND_ANGLE: F32, T_WINDOW_OPEN_RATIO: F32,
+    T_WINDOW_POSITION_EST: F32, T_WINDOW_ZONE: STR, T_PINCH_DETECTED: BOOL, T_LIVING_MODE: STR, T_SAFETY_STATE: STR,
+    T_CONTROL_FEASIBILITY: STR, T_AC: STR, T_DEHUMIDIFIER: BOOL, T_HUMIDIFIER: BOOL, T_CEILING_FAN: I8,
+    T_INTAKE_FAN_RPM: F32, T_PURIFIER_LEVEL: I8, T_RANGE_HOOD_LEVEL: I8, T_ACTIVE_EVENTS: STR, T_AIR_BALANCE: F32,
+    T_DEW_MARGIN: F32, T_APPLIANCE_STATES: STR, T_VENTILATION: STR, T_OCCUPANCY_BASIS: STR, T_ENERGY_FORECAST: STR,
+    T_ALERTS: STR,
+}
+
+
+def qos_kind(topic: str) -> str:
+    """'sensor' = BEST_EFFORT(depth 10, 전류는 5) · 'reliable' = 명령 · 상태 (W06 리스크 표)."""
+    return "sensor" if topic in SENSOR_TOPICS else "reliable"
+
+
+# ---- 내부 토픽 (계약 55개 밖 — 같은 계층 노드끼리만) -------------------------------
+#  창문 토크 상한 (W06 T6.3b) — 센서리스 창문 노드(W10)가 Zone 별 토크 프로파일을 브릿지에 전달한다. Float32 (최대 힘의 %)
+I_WINDOW_TORQUE_PCT = f"{P}/internal/window_torque_pct"
+#  시험 전용 (물리 모드 검증 스크립트) — 끼임 물체를 창 레일 경로에 놓기 / 치우기. String: 'rigid_pot' | 'soft_cushion' | 'elastic_sponge' | 'park'
+I_SIM_OBSTACLE = f"{P}/internal/sim_obstacle"

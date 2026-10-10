@@ -240,6 +240,43 @@ def main() -> None:
     cube("/World/window/window_panel/panel_glass", (0, 0, 0), (pw, pt, ph_), rgb=(0.7, 0.85, 0.95), opacity=0.35)
     cube("/World/window/window_panel/motor_unit", (pw / 2 - 0.08, pt / 2 + 0.02, -ph_ / 2 + 0.04),
          (0.10, 0.04, 0.07), rgb=(0.2, 0.2, 0.2), collide=False)
+    # 스프링식 레일 씰 (T5.8 — Zone A · B · C 의 물리적 근거): 패드 + Z 스프링 조인트 + 레일 띠 + 엔드존 경사로
+    ws_, er = wd["weatherstrip"], wd["endzone_ramp"]   # noqa: F841
+    psx, psy, psz = ws_["pad_size_m"]
+    face_y = track_y - pt / 2
+    pad_x0 = wx0 + seal_t + ws_["pad_offset_from_edge_m"]            # 닫힘 때 패드 중심 x
+    rail_top = z0 + 0.001                                              # 벽 윗면보다 1 mm 위 — 패드가 레일 재질에만 닿게
+    # 패드 기준 위치(스프링 0) = 닫힘 때 경사로 꼭대기 위 — 처음부터 파묻히지 않게. 평평한 레일에서는 rise 만큼 내려가 있다
+    pad_c = (pad_x0, face_y - psy / 2 - 0.004, rail_top + er["rise_m"] + psz / 2)   # 패널 면에서 3 mm 이상 띄운다 (레일이 패널에 닿지 않게)
+    pad = rigid("/World/window/weatherstrip_pad", pad_c, mass=ws_["pad_mass_kg"], inertia=(1e-5, 1e-5, 1e-5))
+    pg = cube("/World/window/weatherstrip_pad/geom", (0, 0, 0), (psx, psy, psz), rgb=(0.15, 0.15, 0.15))
+    stripmat = material("/World/materials/weatherstrip", ws_["friction"]["static"], ws_["friction"]["dynamic"])
+    bind(pg, stripmat)
+    strip_y = (pad_c[1], psy + 0.002)
+    strip = cube(f"{frame}/rail_strip", ((wx0 + wx1) / 2, strip_y[0], rail_top - 0.005), (wx1 - wx0, strip_y[1], 0.01),
+                 rgb=(0.4, 0.4, 0.42))
+    bind(strip, stripmat)
+    L_r = wd["travel_m"] * er["length_ratio"]
+    theta = math.atan2(er["rise_m"], L_r)
+    t_r = 0.01
+    xs, xe = pad_x0 + L_r, pad_x0 - psx                               # 경사 시작(낮음) → 끝(높음, 문설주 쪽)
+    xs_ext = xs + 0.02                                                 # 시작점 너머로 연장 — 레일 띠 아래로 묻혀 모서리에 걸리지 않게
+    z_top = lambda x: rail_top + er["rise_m"] * (xs - x) / L_r        # noqa: E731 — 경사 윗면 높이
+    mid = ((xs_ext + xe) / 2, (z_top(xs_ext) + z_top(xe)) / 2)
+    ramp = UsdGeom.Cube.Define(stage, f"{frame}/endzone_ramp")
+    ramp.CreateSizeAttr(1.0)
+    rx = UsdGeom.Xformable(ramp)
+    rx.AddTranslateOp().Set(Gf.Vec3d(mid[0] - math.sin(theta) * t_r / 2, strip_y[0], mid[1] - math.cos(theta) * t_r / 2))
+    rx.AddRotateYOp().Set(math.degrees(theta))
+    rx.AddScaleOp().Set(Gf.Vec3f((xs_ext - xe) / math.cos(theta), strip_y[1], t_r))
+    color(ramp.GetPrim(), (0.5, 0.3, 0.3))
+    UsdPhysics.CollisionAPI.Apply(ramp.GetPrim())
+    bind(ramp.GetPrim(), stripmat)
+    joint("prismatic", "/World/window/weatherstrip_spring", wp, pad, "Z",
+          tuple(pad_c[i] - pc[i] for i in range(3)), (0, 0, 0), lim=(-0.03, 0.03),
+          drive={"stiffness": ws_["spring_n_per_m"], "damping": ws_["spring_damping"], "max": 1000.0})
+    UsdPhysics.DriveAPI(stage.GetPrimAtPath("/World/window/weatherstrip_spring"), "linear") \
+        .GetTargetPositionAttr().Set(-(er["rise_m"] + ws_["preload_m"]))   # 평평한 곳 예압 = preload · 꼭대기 = rise + preload
     joint("prismatic", "/World/window/window_prismatic_joint", wmount, wp, "X", (0, 0, 0), (0, 0, 0),
           lim=(wl["range_m"][0] - wd["seal_compress_m"], wl["range_m"][1]),
           drive={"stiffness": wl["drive"]["stiffness"], "damping": wl["drive"]["damping"], "max": wl["max_force_n"]})

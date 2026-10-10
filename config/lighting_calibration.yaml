@@ -1,0 +1,23 @@
+# 조도 캘리브레이션 결과 — 자동 생성 (tools/isaac/calibrate_lighting.py · W05 T5.7)
+# 암실 · 경로 추적 렌더 · 톤매핑 끔 · 흰 확산 패치(ρ = 0.8)의 휘도로 조도 계산
+version: 1
+generated_by: tools/isaac/calibrate_lighting.py (W05 T5.7)
+renderer_unit_ratio: 0.0009
+ceiling_intensity_at_full: 30000.0
+desk_intensity_at_full: 30000.0
+physical_luminance_nit:
+  ceiling: 3536.8
+  desk: 50660.6
+luminous_flux_lm:
+  ceiling: 4000.0
+  desk: 800.0
+lux_at_full:
+  ceiling_at_sensor: 98.3
+  ceiling_at_desk: 203.4
+  ceiling_at_floor: 256.6
+  desk_at_sensor: 39.6
+  desk_at_desk: 875.1
+ceiling_to_desk_k_geo: 2.07
+linearity_max_dev: 0.0642
+additivity_max_err: 0.0474
+desk_estimate_max_err: 0.016

@@ -9,7 +9,7 @@ window_prismatic_joint:
   max_speed_mps: 0.05                # draft — 70 cm 를 약 14 s
   # 랙-피니언 최대 힘 = 기어비 30 × Kt 0.012 × 효율 0.65 / 반경 0.01 × 전류 → 23.4 N/A · 스톨 5 A ≈ 117 N
   max_force_n: 120.0
-  drive: { type: force, stiffness: 4000.0, damping: 800.0 }   # draft — 위치 드라이브 (W10 에서 토크 지령으로 바뀐다)
+  drive: { type: force, stiffness: 30000.0, damping: 6000.0 } # T5.1 스윕 확정 (2026-10-11 · 레일 씰 마찰 포함) — 오버슈트 0 · 정상오차 0.33 mm · 닫힘 오차 0.72 mm (W10 에서 토크 지령으로 바뀐다)
 blind_joint:
   type: revolute
   range_deg: [0.0, 90.0]

@@ -40,6 +40,21 @@ window:
   seal_compliance: { stiffness: 30000.0, damping: 300.0 }   # draft — 완만한 압착 램프 (W10 튜닝)
   seal_friction: { static: 0.9, dynamic: 0.8 }
   rack_tooth_pitch_m: 0.02          # 시각용
+  # [v0.2 · T5.8] 기준 반력 프로파일의 물리적 근거 — 스프링식 레일 씰 (실제 미닫이의 모헤어 · 롤러 예압)
+  #   패널 앞쪽 끝의 패드를 Z 방향 스프링 조인트로 레일에 예압 → 일정한 주행 마찰 (Zone B) · 정지 > 운동 마찰 → 기동 피크 (Zone A)
+  #   닫힘 쪽 마지막 15 % 레일이 rise 만큼 오르는 경사로 → 스프링이 더 눌려 마찰이 선형으로 오른다 (Zone C)
+  #   PhysX compliant 접촉은 법선력이 겹침에 비례하지 않아(2026-10-11 진단) 스프링 조인트로 결정적으로 만든다
+  weatherstrip:
+    pad_size_m: [0.03, 0.015, 0.02]
+    pad_offset_from_edge_m: 0.03     # 패널 앞쪽(닫힘 쪽) 끝에서
+    preload_m: 0.005
+    spring_n_per_m: 2000.0           # draft — 예압 10 N
+    spring_damping: 20.0
+    pad_mass_kg: 0.05
+    friction: { static: 0.8, dynamic: 0.5 }
+  endzone_ramp:
+    length_ratio: 0.15               # 85–100 % (docs/04 Zone C 시작)
+    rise_m: 0.006                    # draft — 스프링 추가 압축 → 마찰 약 2.2 배
   windowsill_depth_m: 0.22
 
 # ---- 끼임 시험 물체 3종 (T3.4c) — 레일 경로(창 개구부 안)에 놓는다 ----
@@ -78,7 +93,7 @@ ceiling_light:   { pos: [1.75, 2.40, 2.38], size_m: 0.60, intensity: 30000.0 }  
 desk_lamp:       { pos: [0.20, 2.95, 1.15], radius_m: 0.04, intensity: 30000.0, cct_k: 4000.0, cone_deg: 60.0 }   # 갓 — 아래로 원뿔 배광   # draft — 책상면 520 lux @100 %
 mmwave_sensor:   { pos: [1.75, 0.05, 2.30], facing: +Y }
 temp_humidity_sensor: { pos: [1.75, 2.40, 2.35] }
-illuminance_sensor:   { pos: [1.75, 2.80, 2.38] }           # 천장 BH1750 (lighting_model 기준점)
+illuminance_sensor:   { pos: [2.30, 2.40, 2.38] }           # 천장 BH1750 (lighting_model 기준점) — 실링팬 날개 반경 밖 (팬 하우징이 가리지 않게 · T5.7)
 pm25_sensor:     { pos: [0.05, 3.40, 1.20] }
 
 # ---- 재실 영역 (트리거 볼륨 — mmWave 구간과 같은 거리) ----

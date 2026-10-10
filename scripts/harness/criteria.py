@@ -83,6 +83,8 @@ ALIASES = {
     "ceiling_light": "act.ceiling_light_pct",
     "desk_light": "act.desk_light_pct",
     "desk_cct": "act.desk_cct",
+    "desk_illuminance": "truth.desk_illuminance_lux",   # 책상면 조도 참값 (센서 없음 — C4 판정용)
+    "cmd_window": T.C_WINDOW_OPEN_RATIO,
     "cmd_ceiling_light": T.C_CEILING_LIGHT,
     "cmd_desk_light": T.C_DESK_LIGHT,
     "cmd_desk_cct": T.C_DESK_LIGHT_CCT,
@@ -152,6 +154,11 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
     out["condensation_exposure_s"] = float((df["truth.dew_margin_c"] < 0).sum() * dt_s)
     if "pm.ac.state" in df.columns and "truth.ac_state" in df.columns:   # B11 — 전력 기반 상태 판정 정확도
         out["appliance_state_accuracy"] = float((df["pm.ac.state"] == df["truth.ac_state"]).mean())
+    lt = cfg_metrics.get("lux_temp_ok")
+    if lt and "truth.desk_illuminance_lux" in df.columns:       # C4 — 조도 · 온도 동시 유지율 (재실 중)
+        occ = df["truth.occupied"].astype(bool) if "truth.occupied" in df.columns else pd.Series(True, index=df.index)
+        ok = (df["truth.desk_illuminance_lux"] >= lt["desk_lux_min"]) & (df["truth.temperature_c"] <= lt["temp_max_c"])
+        out["lux_temp_ok_ratio"] = float(ok[occ].mean()) if occ.any() else math.nan
     out["ir_tx_ac"] = float(df["bridge.ir_tx_ac"].iloc[-1]) if "bridge.ir_tx_ac" in df.columns else math.nan
     out["rule_violation_count"] = (float(df["ctrl.rule_violations"].iloc[-1])
                                    if "ctrl.rule_violations" in df.columns else math.nan)

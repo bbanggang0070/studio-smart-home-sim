@@ -12,6 +12,7 @@ import json
 from typing import Any
 
 from controller.appliance_guard import ApplianceGuard
+from controller.energy import EnergyPlanner
 from controller.arbiter import Decision, merge
 from controller.event_detector import ActiveEvent
 from controller.event_detector import GRADE_ORDER, EventDetector
@@ -69,8 +70,16 @@ class SmartHomeController:
         self.rules.filter_hours = float((sc.get("initial") or {}).get("filter_hours", 0.0))
         # 사용자 설정 (user_modes.yaml 의 switching 값을 시나리오가 바꿀 수 있다 — 예: B4 외출 자동 전환 끔)
         us = sc.get("user_settings") or {}
+        # 기준선별 사용자 설정 (C16 — B 는 셋백 유지)
+        us = {**us, **((sc.get("user_settings_by_baseline") or {}).get(self.baseline) or {})}
         if "away_auto_enabled" in us:
             self.modes.away_auto = bool(us["away_auto_enabled"])
+        en = self.p.modes.get("energy") or {}
+        strategy = str(us.get("away_strategy", en.get("away_strategy", "auto")))
+        strategy = "precool" if strategy == "auto_precool" else strategy
+        self.rules.energy = EnergyPlanner(self.p, self.p.get("energy.learned_model_file"),
+                                          float(us.get("comfort_weight", en.get("comfort_weight", 1.0))),
+                                          strategy if strategy in ("auto", "setback", "off", "precool") else "auto")
         self.devices = self.rules.devices
         self.guard = ApplianceGuard(self.p)
         self._last_t: float | None = None
@@ -85,6 +94,7 @@ class SmartHomeController:
             self.rules.filter_hours += (now_s - self._last_t) / 3600.0
         self._last_t = now_s
         mode, path = self.modes.update(o)
+        self.rules.home_mode = self.modes._before_away if mode == "AWAY" else mode
         ev = self.events.update(o)
         cands = self.rules.candidates(o, mode, ev)
         decided = merge(cands, {k: v for k, v in DEFAULTS.items() if DEVICE_TOPIC[k][2] in self.devices})
@@ -114,6 +124,8 @@ class SmartHomeController:
         out[T.T_VENTILATION] = json.dumps({"base_vent_m3h": info.get("base_vent_m3h", 0.0),
                                            "window_blocked": info["window_blocked"],
                                            "i10_dew_diff_c": info.get("i10_dew_diff_c")})
+        if "energy_forecast" in info:
+            out[T.T_ENERGY_FORECAST] = json.dumps(info["energy_forecast"])
         out[T.T_CONTROL_FEASIBILITY] = "DEGRADED" if "APPLIANCE_FAULT" in ev else "FEASIBLE"   # 전체 판정은 W09 T9.7
         alerts = sorted(self.rules.alerts + self.events.alerts + self.guard.alerts, key=lambda a: a["t"])
         if alerts:                                     # 사용자 알림 (v3.4.5 전용 토픽)

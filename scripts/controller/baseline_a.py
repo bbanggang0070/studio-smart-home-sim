@@ -45,6 +45,10 @@ class BaselineA:
         self._venting = False
         self._cook_seen_at: float | None = None
         self._dehum_run = self._hum_run = False
+        self.user_ac_away = bool((sc.get("baseline_a") or {}).get("user_ac_away", False))
+        self.user_lights = bool((sc.get("baseline_a") or {}).get("user_lights", False))
+        self._home_since: float | None = None
+        self._was_away = False
 
     def step(self, now_s: float, inbox: dict[str, Any]) -> dict[str, Any]:
         c = self.cfg
@@ -81,6 +85,18 @@ class BaselineA:
             sp = c["humidifier_setpoint_pct"]
             self._hum_run = rh < sp - band or (self._hum_run and rh < sp + band)
             out[T.C_HUMIDIFIER] = self._hum_run
-        if self.ac_on:
+        if self.user_lights:                           # C4 — 어두우면 천장등 최대 (스탠드 · 발열은 생각하지 않는다)
+            out[T.C_CEILING_LIGHT] = float(c["user_ceiling_light_pct"]) if bool(inbox.get(T.S_OCCUPANCY, True)) else 0.0
+        ac_run = self.ac_on
+        if self.user_ac_away:                          # 나갈 때 끄고 귀가 후 수동으로 켠다 (C16 Baseline A)
+            if bool(inbox.get(T.S_OCCUPANCY, True)):
+                self._home_since = self._home_since if self._home_since is not None else now_s
+                ac_run = self.ac_on and now_s - self._home_since >= c["user_ac_on_after_arrival_s"]
+                if not self._was_away:
+                    ac_run = self.ac_on                # 처음부터 집에 있었다 — 켜 둔 상태
+            else:
+                self._home_since, ac_run, self._was_away = None, False, True
+            out[T.C_AC] = json.dumps({"power": ac_run, "mode": "cool", "setpoint": c["ac_setpoint_c"], "fan": "auto"})
+        elif self.ac_on:
             out[T.C_AC] = json.dumps({"power": True, "mode": "cool", "setpoint": c["ac_setpoint_c"], "fan": "auto"})
         return out

@@ -15,6 +15,7 @@ import math
 from collections import deque
 
 from controller.arbiter import Candidate
+from controller.energy import EnergyPlanner, daylight_fn
 from controller.event_detector import GRADE_ORDER, ActiveEvent
 from controller.ladders import ComfortLadders
 from controller.lighting import Lighting
@@ -49,8 +50,50 @@ class RuleEngine:
         self.ladders = ComfortLadders(p, psy, self, hysteresis)
         self.lighting = Lighting(p)
         self._mm_alerted = False
+        self.energy: EnergyPlanner | None = None    # 외출 전략 · 프리쿨링 (smart_home 이 사용자 설정으로 만든다)
+        self.home_mode = "NORMAL"                   # 외출 직전 모드 — 프리쿨링 목표 (smart_home 이 알려 준다)
+        self._energy_last_t: float | None = None
 
     # ---- 도우미 ----
+
+    def _energy_observe(self, o: Observation) -> None:
+        """2R2C 관측기 — 축열 질량 온도를 매 주기 따라간다 (외출 전에도)."""
+        if self.energy is None or math.isnan(o.outdoor_temp_c):
+            return
+        dt = 0.0 if self._energy_last_t is None else o.now_s - self._energy_last_t
+        self._energy_last_t = o.now_s
+        lux = max(0.0, o.illuminance_lux - self.lighting._own_light(o)) if o.illuminance_lux == o.illuminance_lux else 0.0
+        self.energy.observe(o.temp_c, o.outdoor_temp_c, lux, 1.0 if o.occupied else 0.0,
+                            float(o.power_w.get("ac", 0.0)), dt)
+
+    def _away_ac(self, o: Observation, ev: dict[str, ActiveEvent], add) -> None:
+        """L3 외출 — 셋백 · 끄기 · 끄기 + 프리쿨링 (docs/08 §5.3–5.4 · E13)."""
+        sp = self.p.mode(self.home_mode).get("cooling_setpoint_c")
+        # 사용자가 직접 AWAY 를 고른 경우(여행 · 장기 외출 — C14)는 오늘 귀가를 예측하지 않는다
+        if (self.energy is None or sp is None or self.ladders.season(o) != "summer"
+                or math.isnan(o.outdoor_temp_c) or o.user_mode == "AWAY"):
+            add("ac", "cap", 0, L3, "외출 — 냉방 정지")
+            return
+        lux = max(0.0, o.illuminance_lux) if o.illuminance_lux == o.illuminance_lux else 0.0
+        d = self.energy.step(o.tod_s, o.outdoor_temp_c, daylight_fn(self.p, o.tod_s, lux), sp)
+        self.info["energy_forecast"] = d
+        if d["precool_active"]:
+            ev.setdefault("PRECOOL", ActiveEvent("PRECOOL", o.now_s, {"start_tod": d["start_tod"]}))
+            # 습도 동시 제어 — 설정 근처에 왔는데 습도가 모드 상한을 넘으면 제습 운전 (사다리 C1 규칙과 같다)
+            rh_hi = self.p.mode(self.home_mode)["humidity_range_pct"][1]
+            dry = (rh_hi is not None and o.rh_pct > rh_hi
+                   and o.temp_c <= sp + self.p.get("comfort_ladders.ac_dry_within_setpoint_c"))
+            add("ac", "force", 1, L3, f"E13 프리쿨링 — {sp:g} °C" + (" · 제습" if dry else "")
+                + f" (귀가 중앙 {d['arrival_q50'] / 3600:.2f} h)")
+            self.info["ac_override"] = ({"mode": "dry", "setpoint": self.ladders._dry_sp(sp), "fan": "auto"} if dry
+                                        else {"mode": "cool", "setpoint": sp, "fan": "auto"})
+        elif d["strategy"] == "setback":
+            sb = sp + self.p.get("energy.away_strategy.setback_c")
+            add("ac", "force", 1, L3, f"외출 셋백 — {sb:g} °C 유지")
+            self.info["ac_override"] = {"mode": "cool", "setpoint": sb, "fan": "auto"}
+        else:
+            ev.pop("PRECOOL", None)
+            add("ac", "cap", 0, L3, f"외출 — 냉방 정지 (전략 {d['strategy']})")
 
     def filter_factor(self) -> float:
         """필터 막힘에 따른 흡기 유량 비율 (누적 가동 시간 선형 — base_ventilation.shortfall)."""
@@ -188,8 +231,11 @@ class RuleEngine:
             self.alerts.append({"code": "S_MMWAVE", "level": "warning", "t": o.now_s,
                                 "msg": "mmWave 신호 두절 — Wi-Fi · 전력으로만 재실 판단 · 자동 모드는 NORMAL 고정"})
             self._mm_alerted = True
-        if mode in ("AWAY",) and "ac" in self.devices:
-            add("ac", "cap", 0, L3, "외출 — 냉방 정지")
+        self._energy_observe(o)
+        if mode == "AWAY" and "ac" in self.devices:
+            self._away_ac(o, ev, add)
+        elif self.energy is not None:
+            self.energy.end_away()
         pm = "indoor_pm."
         if o.pm25 > g(pm + "bad_ugm3"):
             add("purifier", "need", g(pm + "purifier_level_above_bad"), L5, "실내 PM 나쁨")

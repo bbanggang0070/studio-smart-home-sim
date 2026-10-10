@@ -1362,3 +1362,135 @@ scenarios:
       - "feasibility_is('DEGRADED') when event_entered('APPLIANCE_FAULT')"
       - "ceiling_fan > 0 within 180 after 0"                         # 다른 수단으로 최선 노력
       - "blind_angle >= 70 within 180 after 0"
+
+  - id: C16
+    tier: 2
+    name: "여름 외출 → 귀가 — 셋백 vs 끄기 + 예측 프리쿨링"
+    duration_s: 24600                  # 12:50 – 19:40
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261116
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter                  # 귀가 이력 · 2R2C = models/energy_commuter.yaml (8주 · 14일 학습)
+    power_limit_w: 3000
+    baseline_a: { auto_appliances: [ac], user_ac_away: true }   # A: 나갈 때 끄고 귀가 후 수동으로 켬
+    user_settings_by_baseline:
+      B: { away_strategy: setback }    # B: 셋백 +2 °C 유지
+    initial:
+      user_mode: NORMAL
+      temperature_c: 26.0
+      mass_temp_c: 28.5                # 오전에 냉방한 건 공기뿐 — 구조체는 여름 내내 데워져 있다 (끄는 동안 축열 · docs/08 §5.4)
+      envelope_temp_c: 30.0
+      humidity_pct: 55.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 400.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "12:50"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: true, mode: cool, setpoint_c: 26.0 }, purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 60000.0
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 32.0
+      outdoor_rh_pct: 60.0
+    injections:
+      - { at_s: 600, door: open_close, label: leave, open_s: 8 }      # 13:00 외출
+      - { at_s: 22800, door: open_close, label: arrive, open_s: 8 }   # 19:10 귀가 (분포 중앙 19:00)
+    events:
+      - { at_s: 604, set: { occupancy: false, occupant_zone: none } }
+      - { at_s: 15000, set: { outdoor_illuminance_lux: 30000.0 } }                    # 17:00 해가 기운다
+      - { at_s: 20400, set: { outdoor_illuminance_lux: 8000.0, outdoor_temp_c: 30.0 } }  # 18:30
+      - { at_s: 22800, set: { occupancy: true, occupant_zone: room } }
+      - { at_s: 24000, set: { outdoor_illuminance_lux: 0.0, outdoor_temp_c: 29.0 } }   # 19:30 해 짐
+    pass_criteria:
+      - "event_entered('PRECOOL') within 22800 after 0"             # 끄기 + 기대비용 최소 시각에 프리쿨링
+      - "value_at('temperature', arrive_start) <= 27"               # 귀가 시점 쾌적
+      - "value_at('humidity', arrive_start) <= 60"
+      - "energy_wh <= baseline_B.energy_wh"                         # 셋백 유지보다 적게
+
+  - id: C4
+    tier: 2
+    name: "저조도 + 고온 — 조명 발열 트레이드오프"
+    duration_s: 3600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261104
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    baseline_a: { auto_appliances: [ac], user_lights: true }   # A: 천장등 100 % (발열 고려 없음) + 에어컨 26 °C 자체 온도조절
+    initial:
+      user_mode: STUDY
+      temperature_c: 29.0
+      humidity_pct: 50.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 150.0
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "21:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 0.0
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 28.0
+      outdoor_rh_pct: 60.0
+    pass_criteria:
+      - "desk_illuminance >= 600 when t >= 60"                      # 책상면 600 lux 확보 (스탠드로 국부 보충)
+      - "ceiling_light <= 60 when t >= 60"                           # 고온 — 천장 조명 밝기 상한
+      - "temperature <= 28 by 1800 after 0"                          # 30분 안에 28 °C 이하로
+      - "temperature <= 28 when t >= 1800"                           # 그 뒤 유지
+      - "lux_temp_ok_ratio > baseline_A.lux_temp_ok_ratio"         # 조도 · 온도 동시 유지율 — A(천장등 100 %)보다 높게
+
+  - id: C7
+    tier: 2
+    name: "무재실 + 우천 — 부재 중 방어"
+    duration_s: 1200
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261107
+    run_mode: fast
+    appliance_profile: full
+    season: mid
+    persona: commuter
+    power_limit_w: 3000
+    user_settings: { away_auto_enabled: false }    # 외출 모드가 아니라 빈방 절전(AUTO_SAVING) 상태
+    initial:
+      user_mode: NORMAL
+      temperature_c: 28.5             # 더운 오후 — Baseline A 의 온도 규칙이 창문을 열어 둔다
+      humidity_pct: 55.0
+      co2_ppm: 450.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: false
+      occupant_zone: none
+      time_of_day: "14:00"
+      window_open_ratio: 0.4                       # 창문 40 % 열린 채 절전 진입
+      blind_angle_deg: 30.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 20000.0
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 25.0
+      outdoor_rh_pct: 60.0
+    events:
+      - { at_s: 300, set: { weather: rain, outdoor_rh_pct: 95.0 } }
+    pass_criteria:
+      - "cmd_window == 0 within 5 after 300"                         # 강우 감지 후 5 s 이내 폐쇄 명령 (L1 > L3)
+      - "window_open_ratio <= 0.01 by 600 after 300"                 # 폐쇄 완료
+      - "exhaust_fan_rpm == 0 when t >= 300"                         # 다른 액추에이터는 정지 유지
+      - "intake_fan_rpm == 0 when t >= 300"
+      - "ac_power == 0 for all t"
+      - "purifier_level == 0 for all t"

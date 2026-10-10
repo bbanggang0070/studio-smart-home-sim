@@ -381,7 +381,17 @@ smart_home_controller:
     # ---- 에너지 예측 · 전략 — [신설 v3.1] (docs/08 §5) ---------------------------
     energy:
       #  [v3.1 개정] 질문별 모델 분리 (docs/08 §5.1) — LSTM은 검토 후 제외
-      arrival_model: 'quantile_gbm'      # quantile_gbm | empirical (데이터 부족 초기 폴백)
+      arrival_model: 'empirical'         # quantile_gbm | empirical — [v3.4.6] v1 은 경험 분포 (GBM 비교는 W11 EXP-2)
+      learned_model_file: 'models/energy_commuter.yaml'   # [v3.4.6] tools/energy/train_energy_model.py 산출물
+      planner:                           # [v3.4.6] 기대비용 격자 탐색 (docs/08 §5.3) — draft
+        sim_step_s: 300.0                # 2R2C 예측 적분 보폭
+        after_arrival_horizon_min: 60.0  # 귀가 후 이만큼까지 에너지 · 불쾌를 센다 (전략끼리 같은 창으로 비교)
+        discomfort_margin_c: 1.0         # 냉방 목표 + 1 °C 를 넘는 만큼을 불쾌로 센다
+        discomfort_wh_per_kh: 2000.0     # 불쾌 1 K·h 의 에너지 환산 (λ = 1 기준) — draft · 귀가 직후 쾌적을 무겁게
+        ac_modulation_w_per_k: 1500.0    # 인버터 비례 출력 (명판 기반 근사)
+        ac_band_c: 0.5
+        sample_seed: 7
+        switch_margin_wh: 10.0           # 재계획 때 기대비용이 이만큼 이상 낮아야 전략을 바꾼다 (셋백 ↔ 끄기 채터링 방지)
       arrival_quantiles: [0.1, 0.2, 0.5, 0.8]
       thermal_identification: { model: '2R2C', train_days: 14, refit: 'nightly' }   # 참값은 3R3C
       consumption_model: 'change_point'  # 일 kWh = a + b·max(0, T_out - T_base)

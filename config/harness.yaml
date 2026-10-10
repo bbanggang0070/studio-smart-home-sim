@@ -34,6 +34,7 @@ metrics:
   actuation_columns: [act.ac_cool, act.ac_dry, act.ceiling_fan, act.purifier_level, act.range_hood_level,
                       act.dehumidifier, act.humidifier]
   actuation_continuous: { act.window_open_ratio: 0.05, act.exhaust_fan_rpm: 100.0, act.intake_fan_rpm: 100.0 }
+  lux_temp_ok: { desk_lux_min: 600.0, temp_max_c: 28.0 }   # C4 — 책상 조도 · 실내 온도 동시 유지율 (재실 시간 중)
   user_modes: config/user_modes.yaml   # 지표 #9 — 모드별 기본 환기 목표 (시나리오 initial.user_mode 기준)
 
 # ---- 외기 PM 등급 (에어코리아 API 대체) — 환경부 PM2.5 예보 등급 -----------------
@@ -73,3 +74,26 @@ mmwave:
     kitchen: 1
     room: 4
   wifi_arrival_delay_s: [-30.0, 60.0]   # docs/08 §1.5 — 귀가 시 접속 지연 (음수 = 복도에서 먼저)
+
+# ---- 페르소나 — 에너지 예측 학습 데이터 생성 (docs/08 §5.8 · tools/energy/train_energy_model.py) ----
+#  v1: 평일 귀가 시각 = 정규 분포 + 가끔 늦는 날 (draft). 비균질 마르코프 재실 생성기는 W11 EXP-2 에서 교체.
+personas:
+  commuter:
+    arrival_mean: "19:00"
+    arrival_sd_min: 25.0
+    late_probability: 0.1
+    late_shift_min: 90.0
+    train_weeks: 8
+    weekdays_per_week: 5
+    seed: 20261100
+energy_training:                 # 2R2C 식별용 참값 운전 기록 (draft)
+  days: 14
+  dt_s: 300.0
+  outdoor_mean_c: [27.0, 33.0]   # 날마다 이 범위에서 뽑는 일평균
+  outdoor_swing_c: 4.0           # 일교차 반폭 (15시 최고)
+  outdoor_rh_pct: 60.0
+  sun_peak_lux: [20000.0, 60000.0]
+  ac_setpoints_c: [24.0, 26.0, 28.0]
+  ac_block_h: [1.0, 6.0]         # 에어컨 켬/끔 구간 길이 (무작위)
+  occupied_probability: 0.6
+  seed: 20261101

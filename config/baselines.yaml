@@ -23,6 +23,10 @@ baseline_a:
   humidistat_band_pct: 3.0           # draft — 내장 습도조절 ±폭
   # 에어컨 내장 자동 — 설정온도 26 °C 자체 온도조절 (창문 상태 모름)
   ac_setpoint_c: 26.0
+  # 외출 시 사용자 습관 (시나리오 baseline_a.user_ac_away: true 일 때 — C16) — 나갈 때 끄고 귀가 후 리모컨으로 켠다
+  user_ac_on_after_arrival_s: 120.0  # draft — 들어와 짐 내려놓고 켜기까지
+  # 조명 사용자 습관 (시나리오 baseline_a.user_lights: true 일 때 — C4) — 어두우면 천장등을 최대로 켠다
+  user_ceiling_light_pct: 100.0
   # v1.1 단독 온도 규칙 — 창문 · 배기팬이 '온도만' 본다 (강우 · 외기 · 냉방 상태를 모른다)
   temperature_rule:
     vent_on_c: 28.0

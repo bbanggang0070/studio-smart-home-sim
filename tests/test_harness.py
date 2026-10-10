@@ -63,11 +63,11 @@ def test_unimplemented_controller_is_reported_not_crashed(hcfg, tmp_path):
 
 
 def test_unsupported_injection_is_recorded(hcfg, tmp_path):
-    """아직 처리하지 못하는 주입(IR 무응답 등)은 조용히 무시하지 않고 notes 에 남긴다."""
+    """아직 처리하지 못하는 주입(센서 드리프트 등)은 조용히 무시하지 않고 notes 에 남긴다."""
     import yaml
     scen = load_scenarios(REPO / hcfg["paths"]["scenarios"])
     sc = copy.deepcopy(next(s for s in scen if s["id"] == "B6"))
-    sc["injections"] = sc["injections"] + [{"at_s": 0, "fault": "ir_miss", "probability": 1.0}]
+    sc["injections"] = sc["injections"] + [{"at_s": 0, "fault": "sensor_drift"}]
     path = tmp_path / "sc.yaml"
     path.write_text(yaml.safe_dump({"scenarios": [sc]}, allow_unicode=True), encoding="utf-8")
     cfg = copy.deepcopy(hcfg)

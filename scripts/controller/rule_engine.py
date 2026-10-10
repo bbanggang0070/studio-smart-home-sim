@@ -17,6 +17,7 @@ from collections import deque
 from controller.arbiter import Candidate
 from controller.event_detector import GRADE_ORDER, ActiveEvent
 from controller.ladders import ComfortLadders
+from controller.lighting import Lighting
 from controller.params import ControllerParams
 from controller.predictor import HoodPredictor, Plan
 from controller.signals import Observation, Psychro
@@ -46,6 +47,8 @@ class RuleEngine:
         self.alerts: list[str] = []
         self.info: dict = {}
         self.ladders = ComfortLadders(p, psy, self, hysteresis)
+        self.lighting = Lighting(p)
+        self._mm_alerted = False
 
     # ---- 도우미 ----
 
@@ -175,6 +178,16 @@ class RuleEngine:
         saving = not o.occupied and mode != "AWAY"
         self.info["saving"] = saving
         self.info.update(self.ladders.apply(o, mode, blocked, noise, add, saving=saving))
+        # -- L6 조도 · 조명 --
+        if "ceiling_light" in self.devices or "desk_lamp" in self.devices:
+            li = self.lighting.apply(o, mode, saving, self.ladders.cooling, add)
+            if "alert" in li:
+                self.alerts.append(li.pop("alert"))
+            self.info.update(li)
+        if o.zone == "unknown" and not self._mm_alerted:     # X3 — 레이더 두절: 위치 구분 불가 → AUTO 는 NORMAL
+            self.alerts.append({"code": "S_MMWAVE", "level": "warning", "t": o.now_s,
+                                "msg": "mmWave 신호 두절 — Wi-Fi · 전력으로만 재실 판단 · 자동 모드는 NORMAL 고정"})
+            self._mm_alerted = True
         if mode in ("AWAY",) and "ac" in self.devices:
             add("ac", "cap", 0, L3, "외출 — 냉방 정지")
         pm = "indoor_pm."

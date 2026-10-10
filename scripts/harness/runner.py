@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import math
 import time
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ from harness.scenario import Run, expand_runs, load_scenarios
 from harness.sensing import PersonTruth, SensingWorld
 from controller.params import load_params
 from sensors.occupancy import OccupancyJudge
+from sensors.power_monitor import PowerMonitor
 from harness.timeline import build_timeline
 from interfaces import topics as T
 
@@ -87,6 +89,14 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
                                               phone_with_person=world.phone == "person",
                                               left_phone_home=world.phone == "home"))
     was_present = world.occupancy
+    # 가전 브릿지 · 전력 감시 노드
+    th = load_params().th
+    # IR 누락은 기준선마다 독립 추첨 — 송신 시각 · 내용이 제어기마다 달라 'n번째 송신'끼리 같은 난수를 쓰면
+    # 한 번의 우연(2 %)이 모든 기준선의 첫 명령을 함께 지워 비교가 왜곡된다 (C1). 시드로 재현은 그대로.
+    acts.rng = np.random.default_rng([run.seed, 104729, zlib.crc32(run.baseline.encode())])
+    base_miss = th["appliances"]["ir"]["sim_miss_probability"]
+    pmon = PowerMonitor(th["power_monitor"], th["events"]["appliance_no_response"]["power_confirm_s"])
+    logged_cmds = 0
 
     controller.reset({"scenario": sc, "baseline": run.baseline, "seed": run.seed, "rng": rng})
     user_cmds: dict[str, Any] = {T.C_MODE: world.user_mode}
@@ -103,6 +113,7 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
     obs = model.step(0.0, acts.actual, world.ext, src, world.occupancy_model())   # 초기 관측 (적분 없음)
     steps = int(round(duration / dt))
     next_log = 0.0
+    last_ac_cmd: dict[str, Any] = {}
     for k in range(steps + 1):
         now = k * dt
         for change in tl.events_between(now - dt if k else -1.0, now + 1e-9 if k == 0 else now):
@@ -131,18 +142,35 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
                    for iv in tl.active_kind(now, "curtain")}
         extra_s = {int(iv.spec["neighbor"].get("gate", 6)): float(iv.spec["neighbor"].get("static_energy", 45.0))
                    for iv in tl.active_kind(now, "neighbor")}
+        if tl.active_kind(now, "mmwave_lost"):                    # mmWave 신호 두절 — 노드가 구간 신호를 못 받는다
+            sensing.judge.mmwave_lost = True
         occ, wifi, contact = sensing.step(now, tl.door_open_at(now), bool(tl.active_kind(now, "wifi")),
                                           extra_power, extra_m, extra_s)
+        for iv in tl.instants_between(now - dt if k else -1.0, now, "manual"):
+            acts.manual(iv.spec["manual"]["device"], iv.spec["manual"]["action"])
+        miss = tl.active_kind(now, "ir_miss")
+        acts.ir_miss_p = float(miss[0].spec.get("probability", 1.0)) if miss else base_miss
+        for dev, tcmd in acts.cmd_log[logged_cmds:]:
+            pmon.note_command(dev, tcmd)
+        logged_cmds = len(acts.cmd_log)
+        plug_power = {**{d: obs["appliance_power_w"].get(d, 0.0) for d in ("ac", "dehumidifier", "humidifier")},
+                      **extra_power}
+        app_states = pmon.update(now, plug_power)
 
         inbox = sensor_topics(obs, world, contact, extra_power,
                               grade["pm_grade_bounds_ugm3"], grade["pm_grade_names"], occ=occ, wifi=wifi)
         inbox[T.T_OCCUPANCY_BASIS] = occ.basis                    # 재실 노드가 내는 상태 토픽
+        inbox[T.T_APPLIANCE_STATES] = json.dumps(app_states)      # 전력 감시 노드
+        if tl.active_kind(now, "lux_invalid"):
+            inbox[T.S_ILLUMINANCE] = float("nan")                  # 조도 센서 무효값
         inbox.update(acts.state_topics())
         inbox.update(ctrl_state)
         inbox.update(user_cmds)
         outbox = controller.step(clock0 + now, inbox) or {}
         ctrl_state.update({tp: v for tp, v in outbox.items() if tp.startswith(f"{T.P}/state/")})
-        acts.command(outbox)
+        acts.command(outbox, now)
+        if T.C_AC in outbox:                           # 제어기가 마지막으로 낸 에어컨 명령 (IR 누락과 무관한 '결정')
+            last_ac_cmd = json.loads(outbox[T.C_AC])
 
         if now + 1e-9 >= next_log:
             row: dict[str, Any] = {"time_s": now}
@@ -156,11 +184,23 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
             ac = acts.actual.ac
             row["act.ac"] = acts.state_topics()[T.T_AC]
             row["act.ac_power"] = ac.power
+            row["cmd.ac_power"] = bool(last_ac_cmd.get("power", False))
+            row["cmd.ac_sent"] = T.C_AC in outbox      # 이 주기에 에어컨 명령을 냈나 (E9 · E12 판정)
             row["act.ac_cool"] = ac.power and ac.mode == "cool"
             row["act.ac_dry"] = ac.power and ac.mode == "dry"
             row["act.ac_setpoint"] = ac.setpoint_c
             row["act.ac_fan"] = acts.ac_fan
             row["act.cooktop_power"] = acts.cooktop_relay
+            row["act.desk_cct"] = acts.desk_cct
+            row["bridge.ir_tx_ac"] = acts.ir_tx["ac"]
+            row["pm.ac.state"] = app_states.get("ac", {}).get("state", "")
+            row["pm.ac.source"] = app_states.get("ac", {}).get("source", "")
+            row["pm.ac.run"] = row["pm.ac.state"] == "run"
+            row["pm.ac.fan_only"] = row["pm.ac.state"] == "fan_only"
+            row["pm.ac.manual"] = row["pm.ac.source"] == "manual"
+            row["power.ac_w"] = obs["appliance_power_w"].get("ac", 0.0)
+            row["truth.illuminance_lux"] = obs["illuminance_lux"]
+            row[T.S_ILLUMINANCE] = inbox[T.S_ILLUMINANCE]
             for tp in (T.S_TEMPERATURE, T.S_HUMIDITY, T.S_PM25, T.S_HOOD_TEMPERATURE, T.S_OCCUPANCY,
                        T.S_DOOR_CONTACT, T.S_OUTDOOR_PM_GRADE):
                 row[tp] = inbox[tp]

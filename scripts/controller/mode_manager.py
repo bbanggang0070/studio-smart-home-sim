@@ -47,6 +47,8 @@ class ModeManager:
                 continue                      # DEPARTURE 는 아래 외출 경로에서 처리
             if w.get("occupied") and not o.occupied:
                 continue
+            if o.zone == "unknown" and ("zone" in w or "zone_not" in w):
+                continue                      # 레이더 두절 — 위치로 고르는 규칙은 건너뛴다 (X3 → NORMAL)
             if "zone" in w and o.zone != w["zone"]:
                 continue
             if "zone_not" in w and o.zone == w["zone_not"]:

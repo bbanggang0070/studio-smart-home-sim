@@ -1,0 +1,104 @@
+"""조명 · 조도 (docs/07 §2.1 모드 조명 · L6) + 가상 조도 페일세이프 (docs/08 §2.2 · X3).
+
+목표: 모드의 lighting {target, lux, cct, ceiling_lux, off_after_min}
+  천장등 % = (천장 목표 − 주광) / ceiling_lux_at_full       주광 = 측정 − 자기 조명 기여
+  스탠드 % = (책상 목표 − 주광 − k_geo × 천장 기여) / desk_lux_at_full   (책상 조도 센서 없이 추정 — docs/02 §2.5)
+  수면: off_after_min 뒤 소등 · 외출 · 빈방 절전: 소등 · 눈부심(700 lux 초과) → 블라인드 차광 (620 lux 해제)
+조도 센서가 무효(NaN · 범위 밖)면 마지막 유효값을 hold_last_valid_s 동안 쓰고, 그 뒤 가상 조도(시각 · 비 · 블라인드)로 계속 제어한다.
+"""
+
+from __future__ import annotations
+
+import math
+
+from controller.params import ControllerParams
+from controller.signals import Observation
+
+L5, L6 = 5, 6
+
+
+class Lighting:
+    def __init__(self, p: ControllerParams):
+        self.p = p
+        self._last_valid: tuple[float, float] | None = None   # (시각, 값)
+        self._sleep_since: float | None = None
+        self._glare = False
+        self.virtual = False
+        self.alerted = False
+
+    def _virtual_lux(self, o: Observation) -> float:
+        g = self.p.get
+        v = "virtual_sensors.lux."
+        h = (o.tod_s / 3600.0) % 24.0
+        rise, sset = g(v + "sunrise_h"), g(v + "sunset_h")
+        sun = math.sin(math.pi * (h - rise) / (sset - rise)) if rise < h < sset else 0.0
+        out = g(v + "clear_sky_peak_lux") * sun * (g(v + "rain_factor") if o.raining else 1.0)
+        lm = "lighting_model."
+        frac = min(max(o.blind_deg / g("setpoints.blind_shade_angle_deg"), 0.0), 1.0)
+        tau = g(lm + "outdoor_transmittance_open") + frac * (g(lm + "outdoor_transmittance_shaded") - g(lm + "outdoor_transmittance_open"))
+        return out * g(lm + "daylight_factor") * tau + self._own_light(o)
+
+    def _own_light(self, o: Observation) -> float:
+        g = self.p.get
+        lm = "lighting_model."
+        return (g(lm + "ceiling_lux_at_full") * o.ceiling_pct / 100.0
+                + g(lm + "desk_lux_at_ceiling_sensor_full") * o.desk_pct / 100.0)
+
+    def measured(self, o: Observation) -> tuple[float, bool]:
+        """→ (쓸 조도, 새로 페일세이프에 들어갔나)."""
+        g = self.p.get
+        lo, hi = g("sensor_failsafe.illuminance_valid_range")
+        val = o.illuminance_lux
+        if val == val and lo <= val <= hi:                    # NaN 이 아니고 범위 안
+            self._last_valid, self.virtual = (o.now_s, val), False
+            return val, False
+        if self._last_valid and o.now_s - self._last_valid[0] <= g("sensor_failsafe.hold_last_valid_s"):
+            return self._last_valid[1], False
+        entered = not self.virtual
+        self.virtual = True
+        return self._virtual_lux(o), entered
+
+    def apply(self, o: Observation, mode: str, saving: bool, cooling: bool, add) -> dict:
+        g = self.p.get
+        lm = "lighting_model."
+        lux, entered = self.measured(o)
+        m = self.p.mode(mode)["lighting"]
+        info = {"lux_used": round(lux, 1), "lux_virtual": self.virtual}
+        if entered and not self.alerted:
+            info["alert"] = {"code": "S_LUX", "level": "warning", "t": o.now_s,
+                             "msg": "조도 센서 무효 — 가상 조도(시각 · 날씨 · 블라인드)로 계속 제어"}
+            self.alerted = True
+        self._sleep_since = (self._sleep_since or o.now_s) if mode == "SLEEP" else None
+        off = (not o.occupied or saving or m.get("target") == "none" or mode == "AWAY"
+               or (self._sleep_since is not None and o.now_s - self._sleep_since >= (m.get("off_after_min") or 0) * 60.0
+                   and m.get("off_after_min")))
+        if off:
+            add("ceiling_light", "force", 0, L6, "조명 소등 (빈방 · 외출 · 수면 경과)")
+            add("desk_light", "force", 0, L6, "스탠드 소등")
+            return info
+        daylight = max(0.0, lux - self._own_light(o))
+        ceil_target = m.get("ceiling_lux", m["lux"]) if m["target"] == "desk" else m["lux"]
+        c_pct = min(100.0, max(0.0, (ceil_target - daylight) / g(lm + "ceiling_lux_at_full") * 100.0))
+        add("ceiling_light", "need", c_pct, L6, f"조명 — 천장 {ceil_target:g} lux 목표 ({mode})")
+        if cooling:
+            add("ceiling_light", "cap", g("setpoints.ceiling_light_thermal_cap_pct"), L5, "고온 — 조명 발열 상한 (C4)")
+        if m["target"] == "desk":
+            desk_from_ceiling = g(lm + "ceiling_to_desk_k_geo") * g(lm + "ceiling_lux_at_full") * c_pct / 100.0
+            d_pct = min(100.0, max(0.0, (m["lux"] - daylight - desk_from_ceiling) / g(lm + "desk_lux_at_full") * 100.0))
+            add("desk_light", "need", d_pct, L6, f"스탠드 — 책상 {m['lux']:g} lux 목표 (추정)")
+        else:
+            add("desk_light", "need", 0, L6, "스탠드 — 모드 목표 없음")
+        add("desk_cct", "need", m["cct_k"], L6, f"색온도 {m['cct_k']:g} K ({mode})")
+        # 눈부심 — 차광 (B2 · 히스테리시스 700 / 620). 블라인드를 닫으면 측정 주광이 줄어 바로 풀리므로
+        # '블라인드를 열었을 때의 주광'으로 환산해 판단한다 (차광 ↔ 개방 채터링 방지)
+        il = "illuminance."
+        frac = min(max(o.blind_deg / g("setpoints.blind_shade_angle_deg"), 0.0), 1.0)
+        t_open, t_sh = g(lm + "outdoor_transmittance_open"), g(lm + "outdoor_transmittance_shaded")
+        open_equiv = daylight * t_open / (t_open + frac * (t_sh - t_open))
+        if open_equiv > g(il + "over_bright_lux"):
+            self._glare = True
+        elif open_equiv < g(il + "shade_release_lux"):
+            self._glare = False
+        if self._glare:
+            add("blind", "need", g("setpoints.blind_shade_angle_deg"), L6, "눈부심 — 블라인드 차광")
+        return info

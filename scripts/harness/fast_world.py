@@ -149,9 +149,33 @@ class FastActuators:
         self.rejected: dict[str, int] = {}
         self.ac_fan = "auto"                          # 참값 모델은 풍량을 쓰지 않지만 소음 제약 판정용으로 기록한다
         self.cooktop_relay = True                     # 플러그형 인덕션 계량 플러그 (false = 차단)
+        # 가전 브릿지 (L0 자리) — IR 기기는 명령이 바뀔 때만 송신 · 수신 실패 확률 · 송신 횟수
+        self.ir_devices = {"ac": T.C_AC, "purifier": T.C_PURIFIER_LEVEL}
+        self.ir_last: dict[str, Any] = {}
+        self.ir_tx: dict[str, int] = {"ac": 0, "purifier": 0}
+        self.ir_miss_p = 0.0
+        self.rng = None
+        self.cmd_log: list[tuple[str, float]] = []    # (기기, 시각) — 전력 감시 노드의 원인 판정용
+        self.desk_cct = 0.0
 
-    def command(self, cmds: dict[str, Any]) -> None:
+    def command(self, cmds: dict[str, Any], now: float = 0.0) -> None:
         for topic, value in cmds.items():
+            if topic == T.C_DESK_LIGHT_CCT:
+                self.desk_cct = float(value)
+                continue
+            dev = next((d for d, tp in self.ir_devices.items() if tp == topic), None)
+            if dev is not None:                       # IR — 바뀐 명령만 송신, 수신 실패면 기기는 모른다
+                if self.ir_last.get(dev) == value:
+                    continue
+                self.ir_last[dev] = value
+                self.ir_tx[dev] += 1
+                self.cmd_log.append((dev, now))
+                if self.rng is not None and self.rng.random() < self.ir_miss_p:
+                    continue
+            elif topic in (T.C_DEHUMIDIFIER, T.C_HUMIDIFIER):
+                name = "dehumidifier" if topic == T.C_DEHUMIDIFIER else "humidifier"
+                if bool(getattr(self.target, name)) != bool(value):
+                    self.cmd_log.append((name, now))
             if topic == T.C_COOKTOP_POWER:
                 if "cooktop_plug" in self.allowed_devices:
                     self.cooktop_relay = bool(value)
@@ -174,6 +198,16 @@ class FastActuators:
                                            setpoint_c=float(d.get("setpoint", self.target.ac.setpoint_c)))
             else:
                 setattr(self.target, field_name, CMD_TO_FIELD[topic][1](value))
+
+    def manual(self, device: str, action: str) -> None:
+        """사용자가 리모컨 · 스위치로 직접 조작 (제어기를 거치지 않는다)."""
+        on = action == "on"
+        if device == "ac":
+            self.target.ac = replace(self.target.ac, power=on)
+            self.actual.ac = replace(self.target.ac)
+        elif device in ("dehumidifier", "humidifier"):
+            setattr(self.target, device, on)
+            setattr(self.actual, device, on)
 
     def update(self, dt: float) -> None:
         for name in FIELD_TO_STATE:
@@ -212,7 +246,7 @@ def sensor_topics(obs: dict[str, Any], world: WorldInputs, door_open: bool, extr
         T.S_HUMIDITY: obs["humidity_pct"],
         T.S_PM25: obs["pm25_ugm3"],
         T.S_HOOD_TEMPERATURE: obs["hood_temperature_c"],
-        T.S_ILLUMINANCE: world.illuminance_lux,          # 조도 모델은 W08 T8.3 — 지금은 시나리오 값
+        T.S_ILLUMINANCE: obs["illuminance_lux"],         # 천장 BH1750 위치 참값 (W08 T8.3)
         T.S_OCCUPANCY: occ.occupied if occ else world.occupancy,
         T.S_OCCUPANT_ZONE: occ.zone if occ else (world.occupant_zone if world.occupancy else "none"),
         T.S_DOOR_CONTACT: door_open,
@@ -234,4 +268,6 @@ def make_model(env_cfg, sc: dict[str, Any]) -> RoomModel:
         pm25_ugm3=float(ini.get("pm25_ugm3", 12.0)),
         co2_ppm=float(ini.get("co2_ppm", 600.0)),
         filter_hours=float(ini.get("filter_hours", 0.0)),
+        mass_temp_c=ini.get("mass_temp_c"),           # 선택 — 공기만 데워진 상태 등 (B11)
+        envelope_temp_c=ini.get("envelope_temp_c"),
     )

@@ -31,6 +31,13 @@ class ComfortLadders:
         self._escalated = False
         self._ac_on = False
 
+    def _dry_sp(self, sp: float) -> float:
+        """에어컨 제습 운전 설정 — 냉방 목표보다 낮춰 둔다. 제습 운전도 실내가 설정 아래로 내려가면 압축기가 멈춰
+        (써모오프) 습기를 못 뺀다 (C13 — 26 °C · 80 %). 사용자 설정 범위 하한으로 클램프."""
+        g = self.p.get
+        cl = "comfort_ladders."
+        return max(g(cl + "ac_dry_min_setpoint_c"), sp - g(cl + "ac_dry_setpoint_below_c"))
+
     def _band(self, key: str) -> float:
         return self.p.get(f"comfort_ladders.{key}") if self.hyst else 0.0
 
@@ -150,7 +157,7 @@ class ComfortLadders:
                 else:
                     self._ac_dry = False
                 why = "냉방 ⑤ 에어컨" + (" (승격 — 무료 냉방 부족)" if escalate else "") + (f" (I5 +{relax:g} °C)" if relax else "")
-                ac_cmd = ("dry", sp_ac, why + " → 제습 모드 (냉방 + 제습)") if self._ac_dry else ("cool", sp_ac, why)
+                ac_cmd = ("dry", self._dry_sp(sp_ac), why + " → 제습 모드 (냉방 + 제습)") if self._ac_dry else ("cool", sp_ac, why)
         info["cooling"] = self.cooling
 
         # ---- 제습 수단 ----
@@ -164,7 +171,7 @@ class ComfortLadders:
                 add("intake", "need", self.rules.intake_rpm_for(self.rules.exhaust_m3h(rpm)), L5, "제습 ② 균형 급기")
             elif season == "summer" and ac_allowed:
                 if ac_cmd is None:
-                    ac_cmd = ("dry", sp, "제습 ③ 에어컨 제습 (I6 여름)")
+                    ac_cmd = ("dry", self._dry_sp(sp), "제습 ③ 에어컨 제습 (I6 여름)")
             else:
                 add("dehumidifier", "need", 1, L5, f"제습 ③ 제습기 (I6 {season})")
         info["dehumidifying"] = self.dehumidifying
@@ -208,8 +215,8 @@ class ComfortLadders:
         return min(100.0, 100.0 * math.exp(gamma - b * o.temp_c / (c + o.temp_c)))
 
 
-def ac_json(info: dict, on: bool) -> str:
+def ac_json(info: dict, on: bool, seq: int = 0) -> str:
     if not on or "ac" not in info:
-        return json.dumps({"power": False, "mode": "cool", "setpoint": 26.0, "fan": "auto"})
+        return json.dumps({"power": False, "mode": "cool", "setpoint": 26.0, "fan": "auto", "seq": seq})
     a = info["ac"]
-    return json.dumps({"power": True, "mode": a["mode"], "setpoint": a["setpoint"], "fan": a["fan"]})
+    return json.dumps({"power": True, "mode": a["mode"], "setpoint": a["setpoint"], "fan": a["fan"], "seq": seq})

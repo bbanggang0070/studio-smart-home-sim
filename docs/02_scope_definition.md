@@ -683,3 +683,4 @@ v2.0까지는 제어기 노드가 모든 판단을 했다. 그 구조에서는 *
 | 2026-10-09 | v3.4.3 | 지표 #10 목표 개정 — PM 피크 Baseline A 대비 **−30 % → −15 % 이상 + 에너지 A 이하** (참값 모델에서 A의 후드 강 + 창문이 예상보다 효과적이어서 −30 % 는 도달 불가 · 제안 제어기는 C9 에서 피크 −20 % · 에너지 −46 %) |
 | 2026-10-10 | v3.4.4 | 지표 #10 에서 '에너지 A 이하' 조건 삭제 — 에너지 · 쾌적 비교는 냉방 시나리오에서 따로 본다 (C9 판정은 PM 피크 −15 % · PM 회복) |
 | 2026-10-10 | v3.4.5 | **토픽 53 → 55개** — 명령 `/studio/cmd/cooktop_power`(E15 플러그형 인덕션 차단) · 상태 `/studio/state/alerts`(사용자 알림 전용 — `safety_state` 는 창문 안전 상태로 한정) |
+| 2026-10-10 | v3.4.6 | 토픽 변경 없음 · thresholds 추가 — 에어컨 가동 구간 > 100 W · IR 상태 재송신 주기(`appliances.ir.state_refresh_s`) · 에어컨 제습 운전 설정 하향(`comfort_ladders.ac_dry_setpoint_below_c` · `ac_dry_min_setpoint_c`) · ROS 2 는 공식 `ros:jazzy` Docker 컨테이너로 실행 (SETUP §5) |

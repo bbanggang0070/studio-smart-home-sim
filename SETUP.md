@@ -100,6 +100,15 @@ isaacsim                                        # 첫 실행은 셰이더 컴파
 
 ## 5. ROS 2 Jazzy 설치 + Isaac Sim 브릿지
 
+> **이 PC의 결정 (2026-10-10): 호스트에 ROS 2 를 설치하지 않는다 — 공식 `ros:jazzy` Docker 컨테이너에서 돌린다.**
+> 같은 PC에서 다른 프로젝트(manipulator_ws)가 호스트 환경을 쓰고 있어 건드리지 않기 위함이다.
+> - 이미지: `ros:jazzy-ros-base` (필요 시 `ros-jazzy-rmw-fastrtps-cpp` 추가) · 컨테이너는 `--network host --ipc host` 로 띄워
+>   Isaac Sim 컨테이너(§4-A)와 같은 호스트 네트워크에서 DDS 가 서로 보이게 한다
+> - 두 컨테이너 모두 `ROS_DOMAIN_ID=7` · `RMW_IMPLEMENTATION=rmw_fastrtps_cpp` 로 맞춘다
+> - 저장소는 컨테이너에 `-v $PWD:/ws` 로 마운트 — 제어기 · 하네스 코드는 그대로 쓰고 rclpy 래퍼 노드만 컨테이너에서 실행한다
+> - 실행 스크립트는 W08–W09 ROS 브릿지 작업(10/19–22)에서 `tools/ros/run.sh` 로 만든다
+> 아래 deb 설치 절차는 호스트 설치를 택하는 다른 PC용으로 남겨 둔다.
+
 공식 절차: [ROS 2 Jazzy — Ubuntu (deb)](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)
 
 ```bash
@@ -201,7 +210,7 @@ mkdir -p worlds assets scripts/controller launch results
 | NVIDIA 드라이버 / CUDA | 580.178.04 / CUDA 13.0 (GPU RTX 5070 Ti 16 GB 인식) — 문서 권장 595+ 미만 | 2026-10-09 |
 | Isaac Sim | **5.1.0-rc.19 — Docker 이미지 `teleop-docker` 안 `/isaac-sim`, 전용 컨테이너 `tools/isaac/run.sh`(§4-A)** · 내장 Python 3.11.13 · 헤드리스 실행 확인 | 2026-10-09 |
 | Python (Isaac Sim / 시스템) | 3.11.13 (Docker 내장) / **3.12.3** (`/usr/bin/python3.12`, uv `.venv`) | 2026-10-09 |
-| ROS 2 배포판 · RMW | 호스트 미설치 · Isaac Sim 브릿지 내장 `jazzy` · `humble` 라이브러리 존재 | 2026-10-09 |
+| ROS 2 배포판 · RMW | **Jazzy — 공식 `ros:jazzy` Docker 컨테이너(§5, 호스트 미설치 유지)** · Fast DDS · `ROS_DOMAIN_ID=7` · Isaac Sim 브릿지 내장 `jazzy` 라이브러리 존재 | 2026-10-10 |
 | Effort Sensor 확장 경로 | `isaacsim.sensors.physics.EffortSensor` (prim_path = 루트/조인트명) · 대체 `get_measured_joint_efforts()` — **✅ 실증 PASS** (0 N → 300 N) | 2026-10-09 |
 | 호환성 검사 결과 | 미실시 | |
 

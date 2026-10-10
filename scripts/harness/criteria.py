@@ -22,6 +22,9 @@
     basis_is('FALLBACK')             재실 판정 근거(occupancy_basis)가 그 값인 시각
     alert_raised('E15')              /studio/state/alerts 에 그 코드의 알림이 나온 뒤의 시각
     ac_fan_is('low')                 에어컨이 꺼져 있거나 그 풍량인 시각
+    mode_is('SLEEP')                 제어기가 낸 유효 생활 모드(living_mode)가 그 값인 시각
+    feasibility_is('DEGRADED')       control_feasibility 가 그 값인 시각
+    cmd_* 별칭은 제어기가 낸 명령값 — 내지 않은 주기는 직전 값을 이어 쓴다
 
 평가할 수 없는 판정(다른 baseline 이 아직 없음 등)은 PENDING 으로 남긴다 — FAIL 과 구분한다.
 baseline_<X>.* 를 쓰는 판정은 baseline X 자신의 실행에서는 N/A (자기 자신과 비교하지 않는다).
@@ -61,6 +64,7 @@ ALIASES = {
     "hood_temperature": "truth.hood_temperature_c",
     "operative_temperature": "truth.operative_temp_c",
     "ac_power": "act.ac_power",
+    "cmd_ac_power": "cmd.ac_power",                    # 명령(결정) 기준 — IR 누락 · 재송신과 분리해 볼 때
     "ac_cool": "act.ac_cool",
     "ac_dry": "act.ac_dry",
     "ac_setpoint": "act.ac_setpoint",
@@ -76,6 +80,19 @@ ALIASES = {
     "occupied_truth": "truth.occupied",
     "occupancy_alerts": "occ.alerts",
     "cooktop_power": "act.cooktop_power",
+    "ceiling_light": "act.ceiling_light_pct",
+    "desk_light": "act.desk_light_pct",
+    "desk_cct": "act.desk_cct",
+    "cmd_ceiling_light": T.C_CEILING_LIGHT,
+    "cmd_desk_light": T.C_DESK_LIGHT,
+    "cmd_desk_cct": T.C_DESK_LIGHT_CCT,
+    "cmd_exhaust_rpm": T.C_FAN_RPM,
+    "cmd_intake_rpm": T.C_INTAKE_FAN_RPM,
+    "ac_sent": "cmd.ac_sent",
+    "ir_tx_ac": "bridge.ir_tx_ac",
+    "pm_ac_run": "pm.ac.run",                          # 전력 감시가 판정한 에어컨 상태 (B11)
+    "pm_ac_fan_only": "pm.ac.fan_only",
+    "ac_manual_detected": "pm.ac.manual",
 }
 
 PASS, FAIL, PENDING, ERROR, NA = "PASS", "FAIL", "PENDING", "ERROR", "N/A"
@@ -133,6 +150,9 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
     energy_cols = [c for c in df.columns if c.startswith("energy_wh.")]
     out["energy_wh"] = float(df[energy_cols].iloc[-1].sum()) if energy_cols else math.nan
     out["condensation_exposure_s"] = float((df["truth.dew_margin_c"] < 0).sum() * dt_s)
+    if "pm.ac.state" in df.columns and "truth.ac_state" in df.columns:   # B11 — 전력 기반 상태 판정 정확도
+        out["appliance_state_accuracy"] = float((df["pm.ac.state"] == df["truth.ac_state"]).mean())
+    out["ir_tx_ac"] = float(df["bridge.ir_tx_ac"].iloc[-1]) if "bridge.ir_tx_ac" in df.columns else math.nan
     out["rule_violation_count"] = (float(df["ctrl.rule_violations"].iloc[-1])
                                    if "ctrl.rule_violations" in df.columns else math.nan)
 
@@ -260,7 +280,8 @@ def evaluate(df: pd.DataFrame, criteria: list[str], expect: dict[str, dict], anc
              intervals: dict[str, tuple[float, float]], metrics: dict[str, float],
              baselines: dict[str, dict], own_baseline: str = "") -> list[CriterionResult]:
     t = df["time_s"].to_numpy()
-    names: dict[str, Any] = {a: df[c].to_numpy(dtype=float) for a, c in ALIASES.items() if c in df.columns}
+    names: dict[str, Any] = {a: (df[c].ffill() if a.startswith("cmd_") else df[c]).to_numpy(dtype=float)
+                             for a, c in ALIASES.items() if c in df.columns}
     names.update(metrics)
     names.update(anchors)
     names["t"] = t
@@ -302,7 +323,20 @@ def evaluate(df: pd.DataFrame, criteria: list[str], expect: dict[str, dict], anc
             return np.zeros(len(df), dtype=bool)
         return df[col].fillna("[]").map(lambda s: any(a.get("code") == code for a in json.loads(s))).to_numpy(bool)
 
+    def _state_is(col: str, name: str) -> np.ndarray:
+        return (df[col].astype(str) == name).to_numpy() if col in df.columns else np.zeros(len(df), dtype=bool)
+
+    def mode_is(name: str) -> np.ndarray:
+        col = T.T_LIVING_MODE                          # JSON {"mode", "path", ...}
+        if col not in df.columns:
+            return np.zeros(len(df), dtype=bool)
+        return df[col].ffill().fillna("{}").map(lambda s: json.loads(s).get("mode") == name).to_numpy(bool)
+
+    def feasibility_is(name: str) -> np.ndarray:
+        return _state_is(T.T_CONTROL_FEASIBILITY, name)
+
     funcs = {"event_entered": lambda name: _active_event_mask(df, name), "value_at": value_at,
+             "mode_is": mode_is, "feasibility_is": feasibility_is,
              "basis_is": basis_is, "alert_raised": alert_raised,
              "ended_for": ended_for,
              "entries": entries, "ac_fan_is": ac_fan_is,

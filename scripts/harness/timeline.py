@@ -12,7 +12,7 @@ from env_model import SourceRates
 
 # 주입 종류 → 지원 여부. 아직 처리하지 못하는 것은 해당 주차를 적어 둔다.
 UNSUPPORTED_KINDS = {
-    "fault": "W10 고장 주입 (ir_miss 등 — door_sensor_stuck 만 지원)",
+    "fault": "W10 고장 주입 (지원: door_sensor_stuck · ir_miss · lux_invalid · mmwave_lost)",
 }
 # 재실 감지 주입 (sensing.py) — radar: silent(레이더 시야 밖) · wifi: doze(절전 끊김) · neighbor(벽 너머 정지 신호)
 #   · curtain(빈집 움직임 신호) · fault: door_sensor_stuck(문 센서 값 고정) · appliance: pc(사람이 켜는 기기 전력)
@@ -129,6 +129,12 @@ def build_timeline(scenario: dict[str, Any]) -> Timeline:
             tl.intervals.append(Interval(inj.get("label", kind), kind, at, at + dur, inj))
         elif inj.get("fault") == "door_sensor_stuck":
             tl.intervals.append(Interval(inj.get("label", "door_stuck"), "door_sensor_stuck", at, at, inj))
+        elif inj.get("fault") in ("ir_miss", "lux_invalid", "mmwave_lost"):
+            kind = inj["fault"]
+            dur = float(inj.get("duration_s", duration - at))
+            tl.intervals.append(Interval(inj.get("label", kind), kind, at, at + dur, inj))
+        elif "manual" in inj:                        # 사용자 직접 조작 — {device, action}
+            tl.intervals.append(Interval(inj.get("label", "manual"), "manual", at, at, inj))
         elif inj.get("door") == "open_close":
             open_s = float(inj.get("open_s", 5.0))
             tl.intervals.append(Interval(inj.get("label", "door"), "door", at, at + open_s, inj))

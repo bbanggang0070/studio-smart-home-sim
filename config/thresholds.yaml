@@ -286,6 +286,8 @@ smart_home_controller:
       desk_lux_at_full: 520.0      # 스탠드 100% 시 책상면 조도 [lux]    (TBD W05)
       distance_falloff: 'inverse_square'
       ceiling_to_desk_k_geo: 0.72  # 천장 조도 → 책상면 기하 계수 (센서 없이 추정)
+      desk_lux_at_ceiling_sensor_full: 60.0   # [v3.4.3] draft — 스탠드 100 % 가 천장 센서에 주는 조도 (자기 조명 기여 빼기용)
+      daylight_factor: 0.02        # [v3.4.3] draft — 가상 조도: 외부 조도 → 실내 (주광률)
       outdoor_transmittance_open: 0.85   # 블라인드 개방 시 창 투과율
       outdoor_transmittance_shaded: 0.12 # 차광 시
       camera_validation_enabled: false   # W12 오프라인 대조 시에만 true
@@ -354,6 +356,11 @@ smart_home_controller:
       lux:
         role: 'failsafe'                 # BH1750 무효 시 태양 위치 · 날씨 · 블라인드로 계산해 계속 제어 (X3)
         crosscheck_deviation_ratio: 0.5  # 실측과 50 % 이상 차이 지속 → 센서 가림 · 오염 경고
+        #  [v3.4.3] 가상 외부 조도 — 맑은 날 정오 최대 · 일출 ~ 일몰 정현 · 비 오면 감쇠 (draft)
+        clear_sky_peak_lux: 80000.0
+        sunrise_h: 6.0
+        sunset_h: 19.0
+        rain_factor: 0.25
 
     # ---- 전력 상태 판정 — [신설 v3.1] (docs/08 §3) ------------------------------
     #  측정 수단(CT 클램프 / 계량 스마트 플러그)과 무관하게 '기기별 전력 신호'로 추상화한다.
@@ -363,7 +370,7 @@ smart_home_controller:
       off_hold_s: 10.0
       moving_avg_s: 10.0
       states_w:                          # 예시 — 실측 교정
-        ac: { off_lt: 10.0, fan_only: [20.0, 100.0], run_gt: 250.0 }
+        ac: { off_lt: 10.0, fan_only: [20.0, 100.0], run_gt: 100.0 }   # [v3.4.6] 250 → 100: 인버터 저부하(제습 ~150 W) 가 빈 구간에 빠져 꺼짐 오판
         dehumidifier: { off_lt: 3.0, standby: [3.0, 30.0], run_gt: 120.0 }
         humidifier: { off_lt: 2.0, run_gt: 15.0 }
         cooktop: { off_lt: 20.0, heat_gt: 300.0 }
@@ -523,7 +530,7 @@ smart_home_controller:
       outdoor_pm: { layer: 1, min_grade: 'bad' }            # E6
       arrival: { source: 'door_open', only_in_mode: 'AWAY' }                  # E7 [v3.2] 문 열림 (PIR 제거)
       departure: { source: 'door_gating' }                                    # E8 [v3.2] 문 닫힘 + 판정 창 (occupancy.door_gating) · 폴백은 departure_confirm_min
-      appliance_no_response: { max_resend: 2, layer: 1, power_confirm_s: 10.0 }  # E9 — v3.1 전력 1차 확인
+      appliance_no_response: { max_resend: 2, layer: 1, power_confirm_s: 10.0 }  # E9 — v3.1 전력 1차 확인 (판정은 + 전력 감시 이동평균 창)
       laundry_drying:                  # E10 [v3.1]
         trigger: ['washer_spin_end', 'user_declare']
         #  [v3.4.3] 두 번째 신호 확장 — 'RH 상승'은 이미 제습 중이면 나타나지 않으므로(C15: 75 %RH 에서 제습 중),
@@ -627,6 +634,7 @@ smart_home_controller:
       ir:
         shared_emitter: [ac, purifier] # IR 송신부 1개 공유
         sim_miss_probability: 0.02     # 시뮬레이션 주입 (X7에서 1.0)
+        state_refresh_s: 600.0         # [v3.4.6] draft — 같은 명령이라도 이 주기로 전체 상태 프레임 재송신 (모드는 전력으로 확인 불가)
 
     # ---- 상호작용 규칙 I1-I7 — [신설 v3.0] · docs/07 §4.2 -------------------------
     interaction_rules:
@@ -688,6 +696,8 @@ smart_home_controller:
       escalate_release_band_c: 0.5         # 승격 유지 — 실내 ≤ 목표 + 1.0 − 0.5 °C (= 냉방 진입 기준) 가 되거나 냉방이 끝나야 무료 냉방으로 돌아간다 (I2 창문 ↔ 에어컨 채터링 방지)
       ac_dry_within_setpoint_c: 0.5        # draft — 냉방 + 제습이 함께 필요할 때, 실내 ≤ 냉방 설정 + 0.5 면 제습 모드 (C1)
       ac_cool_resume_above_c: 1.5          # draft — 제습 모드 중 실내 > 냉방 설정 + 1.5 면 다시 냉방
+      ac_dry_setpoint_below_c: 1.5         # [v3.4.6] draft — 제습 운전 설정 = 냉방 목표 − 1.5 (설정 아래 써모오프로 제습이 멈추지 않게)
+      ac_dry_min_setpoint_c: 24.0          # [v3.4.6] user_modes editable_ranges.cooling_setpoint_c 하한과 같게
 
     # ---- 제어 가능성 판정 (Control Feasibility) ---------------------------
     #  [신설 v2.0] 시나리오 X2 — 모든 수단이 제약될 때 "불가"를 판정하고 보고한다.

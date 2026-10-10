@@ -101,6 +101,7 @@ class RoomState:
 
 class RoomModel:
     def __init__(self, cfg: EnvModelConfig, state: RoomState):
+        self.ac_state = "off"
         self.cfg = cfg
         self.state = state
         self._b = cfg.get("condensation.magnus_b")
@@ -116,16 +117,18 @@ class RoomModel:
         pm25_ugm3: float,
         co2_ppm: float,
         filter_hours: float = 0.0,
+        mass_temp_c: float | None = None,
+        envelope_temp_c: float | None = None,
     ) -> "RoomModel":
-        """초기 조건(시나리오 `initial`)에서 시작. 축열 질량 · 외벽은 실내 온도와 평형이라고 본다."""
+        """초기 조건(시나리오 `initial`)에서 시작. 축열 질량 · 외벽은 따로 주지 않으면 실내 온도와 평형이라고 본다."""
         b, c = cfg.get("condensation.magnus_b"), cfg.get("condensation.magnus_c")
         state = RoomState(
             temp_c=temp_c,
             abs_humidity_g_m3=psychro.rh_to_abs(temp_c, rh_pct, b, c),
             pm25_ugm3=pm25_ugm3,
             co2_ppm=co2_ppm,
-            mass_temp_c=temp_c,
-            envelope_temp_c=temp_c,
+            mass_temp_c=temp_c if mass_temp_c is None else mass_temp_c,
+            envelope_temp_c=temp_c if envelope_temp_c is None else envelope_temp_c,
             hood_temp_c=temp_c,
             filter_hours=filter_hours,
         )
@@ -164,10 +167,12 @@ class RoomModel:
 
     def _ac_effect(self, ac: AcCommand, temp_c: float, rh_pct: float) -> tuple[float, float, float]:
         """에어컨 → (현열 냉방 W, 제습 g/h, 전력 W). 인버터 비례 제어 + 써모오프."""
+        self.ac_state = "off"                          # 참값 상태 — 전력 기반 판정(B11)의 정답
         if not ac.power:
             return 0.0, 0.0, 0.0
         p = "appliances.ac."
         g = self.cfg.get
+        self.ac_state = "fan_only"
         if ac.mode == "fan":
             return 0.0, 0.0, g(p + "fan_only_power_w")
         latent_wh_g = g("physics.water_latent_heat_wh_per_g")
@@ -175,6 +180,8 @@ class RoomModel:
         f_rh = min(1.0, max(0.0, (rh_pct - floor) / (full - floor)))
         cap = g(p + "cooling_capacity_w")
         if ac.mode == "dry":
+            if temp_c - ac.setpoint_c < -g(p + "thermo_off_band_c"):
+                return 0.0, 0.0, g(p + "fan_only_power_w")   # 제습 운전도 설정 아래로 내려가면 압축기 정지 (송풍)
             removal = g(p + "dry_mode_removal_g_per_h") * f_rh
             sensible = g(p + "dry_mode_sensible_w")
             q_total = sensible + removal * latent_wh_g
@@ -187,6 +194,7 @@ class RoomModel:
             shr = g(p + "sensible_heat_ratio")
             sensible = shr * q_total
             removal = (1.0 - shr) * q_total * f_rh / latent_wh_g
+        self.ac_state = "run"
         plr = q_total / cap
         cop = float(np.interp(plr, g(p + "cop_plr_points"), g(p + "cop_values")))
         return sensible, removal, q_total / cop
@@ -400,6 +408,15 @@ class RoomModel:
         t_dew = psychro.dew_point_c(s.temp_c, rh, b, c)
         t_s = condensation.window_surface_temp_c(
             s.temp_c, ext.outdoor_temp_c, r_si, g("condensation.r_rest_m2k_w"))
+        # 조도 — 천장 센서 위치 참값 (블라인드 투과율은 일사와 같은 각도 보간)
+        th = "thermal."
+        frac = min(max(act.blind_angle_deg / g(th + "blind_shade_angle_deg"), 0.0), 1.0)
+        tau = g(th + "blind_transmittance_open") + frac * (g(th + "blind_transmittance_shaded") - g(th + "blind_transmittance_open"))
+        daylight = max(ext.outdoor_illuminance_lux, 0.0) * g("lighting.daylight_factor") * tau
+        lux = (daylight + g("lighting.ceiling_lux_at_full") * act.ceiling_light_pct / 100.0
+               + g("lighting.desk_lux_at_sensor_full") * act.desk_light_pct / 100.0)
+        desk_lux = daylight + g("lighting.desk_lux_at_desk_full") * act.desk_light_pct / 100.0 \
+            + g("lighting.ceiling_lux_at_full") * act.ceiling_light_pct / 100.0
         fan_lv = int(act.ceiling_fan)
         perceived = 0.0
         if fan_lv > 0:
@@ -416,7 +433,10 @@ class RoomModel:
             "co2_ppm": s.co2_ppm,
             "hood_temperature_c": s.hood_temp_c,
             "operative_temp_c": s.temp_c - perceived,
+            "illuminance_lux": lux,
+            "desk_illuminance_lux": desk_lux,
             "heating_w": h_heat,
+            "ac_state": self.ac_state,
             "mass_temp_c": s.mass_temp_c,
             "envelope_temp_c": s.envelope_temp_c,
             "q_intake_m3h": flows.intake,

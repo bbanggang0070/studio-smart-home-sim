@@ -52,6 +52,9 @@ class Observation:
     ac_mode: str
     dehumidifier_on: bool
     occupancy_basis: str
+    ceiling_pct: float
+    desk_pct: float
+    appliance_states: dict
 
     @property
     def tod_s(self) -> float:
@@ -67,7 +70,7 @@ def parse_inbox(now_s: float, inbox: dict[str, Any]) -> Observation:
         rh_pct=float(inbox[T.S_HUMIDITY]),
         pm25=float(inbox[T.S_PM25]),
         hood_temp_c=float(inbox.get(T.S_HOOD_TEMPERATURE, inbox[T.S_TEMPERATURE])),
-        illuminance_lux=float(inbox.get(T.S_ILLUMINANCE, 0.0)),
+        illuminance_lux=float(inbox.get(T.S_ILLUMINANCE, float("nan"))),
         occupied=bool(inbox.get(T.S_OCCUPANCY, False)),
         zone=str(inbox.get(T.S_OCCUPANT_ZONE, "none")),
         door_open=bool(inbox.get(T.S_DOOR_CONTACT, False)),
@@ -91,6 +94,9 @@ def parse_inbox(now_s: float, inbox: dict[str, Any]) -> Observation:
         ac_mode=str(ac.get("mode", "cool")),
         dehumidifier_on=bool(inbox.get(T.T_DEHUMIDIFIER, False)),
         occupancy_basis=str(inbox.get(T.T_OCCUPANCY_BASIS, "")),
+        ceiling_pct=float(inbox.get(T.T_CEILING_LIGHT, 0.0)),
+        desk_pct=float(inbox.get(T.T_DESK_LIGHT, 0.0)),
+        appliance_states=json.loads(inbox.get(T.T_APPLIANCE_STATES) or "{}"),
     )
 
 

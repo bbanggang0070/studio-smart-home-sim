@@ -73,6 +73,8 @@ class OccupancyJudge:
         self._fusion_quiet_since: float | None = None
         self._wifi_prev: bool | None = None
         self._wifi_dropped_in_window = False
+        self.mmwave_lost = False                       # X3 — 신호 두절이면 Wi-Fi + 전력만으로 판정 · 영역 'unknown'
+        self._mm_alerted = False
 
     # ---- 증거 ----
 
@@ -114,7 +116,14 @@ class OccupancyJudge:
     def update(self, now: float, door_open: bool, moving: list[float], static: list[float], wifi: bool,
                power_w: dict[str, float]) -> OccupancyOutput:
         alerts: list[str] = []
+        if self.mmwave_lost:
+            moving = static = [0.0] * len(moving)
+            if not self._mm_alerted:
+                alerts.append("mmWave 신호 두절 — Wi-Fi · 전력만으로 재실 판단 · 위치 구분 불가")
+                self._mm_alerted = True
         strong, weak, strong_move, edge = self._evidence(now, moving, static, power_w)
+        if self.mmwave_lost and self.state == JUDGING and wifi:
+            strong = True                              # 레이더가 없으면 Wi-Fi 를 판정 창 증거로 쓴다 (docs/03 X3)
         if wifi or edge:
             self._last_wifi_or_power = now
         wifi_dropped = self._wifi_prev is True and not wifi
@@ -171,7 +180,8 @@ class OccupancyJudge:
                 alerts.append("문 센서 이상 의심 — 빈방 고정 중 실내 사람 신호 + 기기 조작 · 24시간 융합으로 전환")
         # LATCHED_OCCUPIED 는 다음 문 열림까지 유지 — 시간 기준 없음
 
-        return OccupancyOutput(self.occupied, self._zone(moving, static), self.state, alerts, self.fault)
+        zone = "unknown" if (self.mmwave_lost and self.occupied) else self._zone(moving, static)
+        return OccupancyOutput(self.occupied, zone, self.state, alerts, self.fault)
 
     def _fusion(self, now: float, strong_move: bool, edge: bool, wifi: bool) -> None:
         """폴백 — 하나라도 확실하면 재실, 셋 다 없을 때만 부재 (15분)."""

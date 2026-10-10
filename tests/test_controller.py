@@ -273,7 +273,7 @@ def test_baseline_b_has_no_hysteresis(params):
 
 
 @pytest.mark.parametrize("sid", ["B8", "B9", "C1", "C5", "C6", "C8", "C10", "C11", "C12", "C13", "C14", "C17", "C18", "C19",
-                                 "X1", "X5", "X6", "X8"])
+                                 "X1", "X5", "X6", "X8", "B10", "B11", "X3", "X7"])
 def test_comfort_scenarios_pass(sid, tmp_path):
     # baseline_A.* 비교 판정이 있는 시나리오는 A 도 함께 돌린다 (없으면 PENDING)
     res = run_batch([sid], baselines=["A", "B", "proposed"], reps=1, out_dir=tmp_path, progress=lambda *_: None)

@@ -335,7 +335,7 @@ scenarios:
       outdoor_illuminance_lux: 10000.0
     pass_criteria:
       - "window_open_ratio == 0 for all t"                   # E5
-      - "ac_power within 10 after 0"                         # 강우 감지 후 10 s 이내 에어컨 기동
+      - "cmd_ac_power within 10 after 0"                     # 강우 감지 후 10 s 이내 에어컨 기동 명령 (IR 누락 재송신은 X7)
       - "humidity <= 72 within 3600 after 0"                 # 60분 내 RH ≤ 72 % (2026-10-10 완화)
       - "exhaust_fan_rpm == 0 for all t"                     # I10 — 바깥이 더 습하다
       - "energy_wh <= baseline_A.energy_wh"
@@ -1182,3 +1182,183 @@ scenarios:
       - "event_entered('DOOR_SENSOR_FAULT') within 61 after pc_start"       # ⑥ E14
       - "alert_raised('E14') within 61 after pc_start"                      # ⑥ 사용자 알림
     metrics: [energy_wh]
+
+  # ---- v3.4.6 고속 모드 마무리: 모드 전환 · 전력 상태 판정 · 페일세이프 · IR 무응답 -----------------
+
+  - id: B10
+    tier: 1
+    name: "사용자 모드 전환"
+    duration_s: 1500
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261013
+    run_mode: fast
+    appliance_profile: full
+    season: mid
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 23.0
+      humidity_pct: 50.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "22:30"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 0.0
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 18.0
+      outdoor_rh_pct: 55.0
+    events:
+      - { at_s: 120, set: { user_mode: STUDY } }
+      - { at_s: 300, set: { user_mode: SLEEP, occupant_zone: bed, motion: sleeping } }
+    pass_criteria:
+      - "mode_is('STUDY') within 2 after 120"                       # 명령 후 2 s 이내 반영
+      - "cmd_desk_cct == 5500 within 2 after 120"                    # 공부 — 색온도 5,500 K
+      - "cmd_desk_light > 0 within 2 after 120"                      # 공부 — 스탠드 점등 (책상 600 lux)
+      - "mode_is('SLEEP') within 2 after 300"
+      - "cmd_exhaust_rpm <= 600 when t >= 302"                       # SLEEP 진입 즉시 N0 상한
+      - "cmd_intake_rpm <= 700 when t >= 302"
+      - "cmd_desk_cct == 2700 within 2 after 300"                    # 수면 — 2,700 K
+      - "cmd_ceiling_light > 0 when t >= 302 and t < 1190"           # 수면 15분 동안은 무드 조명 (30 lux)
+      - "cmd_ceiling_light == 0 by 902 after 300"                    # 수면 15분 후 소등
+      - "cmd_desk_light == 0 by 902 after 300"
+
+  - id: B11
+    tier: 1
+    name: "전력 기반 기기 상태 판정"
+    duration_s: 3600
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261014
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 30.0
+      mass_temp_c: 25.0              # 외출 중 닫힌 방 — 공기만 데워졌다 (부하가 작아 설정 도달 후 써모오프)
+      envelope_temp_c: 26.0
+      humidity_pct: 45.0             # 제습 불필요 — 냉방만 (써모오프가 송풍으로 나타나게)
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 400.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "14:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 60000.0
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 32.0
+      outdoor_rh_pct: 45.0
+    injections:
+      - { at_s: 1500, manual: { device: ac, action: "off" }, label: manual_off }   # 사용자가 리모컨으로 직접 끔
+    pass_criteria:
+      - "pm_ac_run == 1 within 10 after 0"                           # IR 확인 ≤ 10 s (명령 → 가동 판정)
+      - "appliance_state_accuracy >= 0.95"                           # 상태 판정 정확도 (참값 대비)
+      - "pm_ac_fan_only == 1 within 1500 after 0"                    # 써모오프를 송풍으로 판정 (OFF 오판 없음)
+      - "ac_manual_detected == 0 when t < manual_off_start"          # 써모오프 · 재기동을 수동 조작으로 오판하지 않음
+      - "ac_manual_detected == 1 within 30 after manual_off_start"   # 직접 끔 = 수동 조작 (E12)
+      - "event_entered('MANUAL_OVERRIDE') within 30 after manual_off_start"
+      - "ac_sent == 0 when t >= manual_off_start + 30 and t < manual_off_start + 1790"   # 보류 30분 중 에어컨 명령 0회
+      - "ac_sent == 1 within 60 after 3300"                          # 보류(1,500 + 30분)가 끝나면 자동 제어 복귀
+
+  - id: X3
+    tier: 3
+    name: "센서 고장 — 페일세이프"
+    duration_s: 3600
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261015
+    run_mode: fast
+    appliance_profile: full
+    season: mid
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: AUTO
+      temperature_c: 23.0
+      humidity_pct: 50.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "14:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 60000.0
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 20.0
+      outdoor_rh_pct: 55.0
+    injections:
+      - { at_s: 600, fault: lux_invalid, label: lux_bad }
+      - { at_s: 1800, fault: mmwave_lost, label: radar_lost }
+      - { at_s: 2400, source: cooking, label: cook, stove: induction_plug, pm_mg_per_min: 0.8, moisture_g_per_h: 300, heat_w: 1500, duration_s: 600 }
+    pass_criteria:
+      - "mode_is('STUDY') within 60 after 0"                         # 정상 — 책상 → AUTO 가 공부 모드
+      - "alert_raised('S_LUX') within 30 after lux_bad_start"        # 유지 10 s 뒤 가상 조도로 전환 + 경고
+      - "cmd_desk_light > 0 when t >= lux_bad_start + 30 and t < radar_lost_start"   # 가상 조도로 조명 제어 계속
+      - "occupied == 1 during radar_lost"                            # Wi-Fi + 전력으로 재실 유지
+      - "alert_raised('S_MMWAVE') within 10 after radar_lost_start"
+      - "mode_is('NORMAL') during radar_lost settle 900"             # 영역 구분 불가 → AUTO 는 NORMAL (자동 전환 히스테리시스 허용)
+      - "range_hood_level > 0 within 120 after cook_start"           # 안전 기능(E1) 계속 동작
+      - "window_open_ratio <= 1 for all t"
+
+  - id: X7
+    tier: 3
+    name: "에어컨 IR 무응답 — 단방향 제어의 실패 처리"
+    duration_s: 3600
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261016
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 32.0
+      humidity_pct: 55.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 400.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "14:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 60000.0
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 34.0
+      outdoor_rh_pct: 50.0
+    injections:
+      - { at_s: 0, fault: ir_miss, probability: 1.0, label: ir_dead }
+    pass_criteria:
+      - "ir_tx_ac == 3"                                              # 첫 송신 + 재송신 정확히 2회 · 무한 재시도 없음
+      - "event_entered('APPLIANCE_FAULT') within 120 after 0"        # E9
+      - "alert_raised('E9') within 120 after 0"
+      - "ac_sent == 0 when event_entered('APPLIANCE_FAULT')"         # 이후 에어컨 명령 0회
+      - "feasibility_is('DEGRADED') when event_entered('APPLIANCE_FAULT')"
+      - "ceiling_fan > 0 within 180 after 0"                         # 다른 수단으로 최선 노력
+      - "blind_angle >= 70 within 180 after 0"

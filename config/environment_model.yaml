@@ -101,10 +101,15 @@ environment_model:
     pm:
       deposition_rate_per_h: 0.2       # k_dep
 
-    # ---- 조명 발열 (W08 T8.1b · 시나리오 C4) — draft -----------------------------
+    # ---- 조명 발열 (W08 T8.1b · 시나리오 C4) · 조도 (W08 T8.3) — draft ------------------
     lighting:
       ceiling_light_w: 40.0            # draft — LED 천장등 (약 100 lm/W 기준)
       desk_lamp_w: 8.0                 # draft
+      #  조도 참값 (천장 BH1750 위치) = 외부 조도 × 주광률 × 블라인드 투과율 + 천장등 · 스탠드 기여 (W05 캘리브레이션으로 확정)
+      daylight_factor: 0.02            # draft — 주광률 2 % (원룸 측창)
+      ceiling_lux_at_full: 380.0       # thresholds lighting_model 과 같은 초기값 (참값 사본)
+      desk_lux_at_sensor_full: 60.0    # draft — 스탠드 100 % 가 천장 센서에 주는 조도
+      desk_lux_at_desk_full: 520.0     # 스탠드 100 % 책상면 조도 (참값 — 책상 조도 추정 오차 평가용)
 
     # ---- 후드 아래 온도 (가정 A21) ----------------------------------------------
     hood_sensor:
@@ -129,7 +134,7 @@ environment_model:
         sensible_heat_ratio: 0.85      # draft — 정격에서 잠열 약 345 W ≈ 0.5 L/h (제원과 일치)
         min_plr: 0.15                  # draft — 인버터 최저 부하율 (이하 단속 운전)
         modulation_w_per_k: 1500.0     # draft — 설정온도 편차 1 K 당 냉방 출력
-        thermo_off_band_c: 0.5         # draft — 설정 −0.5 °C 아래면 써모오프(송풍)
+        thermo_off_band_c: 0.5         # draft — 설정 −0.5 °C 아래면 써모오프(송풍) · 냉방 · 제습 모두 [v1.9]
         fan_only_power_w: 30.0         # docs/08 §6.3 송풍 20–100 W
         dry_mode_removal_g_per_h: 500.0
         dry_mode_sensible_w: 500.0     # draft

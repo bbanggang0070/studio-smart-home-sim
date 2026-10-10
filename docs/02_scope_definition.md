@@ -685,3 +685,4 @@ v2.0까지는 제어기 노드가 모든 판단을 했다. 그 구조에서는 *
 | 2026-10-10 | v3.4.5 | **토픽 53 → 55개** — 명령 `/studio/cmd/cooktop_power`(E15 플러그형 인덕션 차단) · 상태 `/studio/state/alerts`(사용자 알림 전용 — `safety_state` 는 창문 안전 상태로 한정) |
 | 2026-10-10 | v3.4.6 | 토픽 변경 없음 · thresholds 추가 — 에어컨 가동 구간 > 100 W · IR 상태 재송신 주기(`appliances.ir.state_refresh_s`) · 에어컨 제습 운전 설정 하향(`comfort_ladders.ac_dry_setpoint_below_c` · `ac_dry_min_setpoint_c`) · ROS 2 는 공식 `ros:jazzy` Docker 컨테이너로 실행 (SETUP §5) |
 | 2026-10-11 | v3.4.7 | 토픽 변경 없음 · thresholds `energy.arrival_model` 'empirical'(v1) · `energy.learned_model_file` · `energy.planner.*` 추가 · harness `personas` · `energy_training` 추가 · 학습 산출물 `models/` |
+| 2026-10-11 | v3.4.8 | **Scene v0.1** — 배치 `config/scene_layout.yaml` · 조인트 제한 `config/actuator_limits.yaml`(W04 T4.6) · 생성 `tools/isaac/build_scene.py` → `worlds/lowcost_studio_room.usd` · mmWave 구간 배치 확인(주방 1 · 책상 3 · 침대 6 · 방 4) · 토픽 변경 없음 |

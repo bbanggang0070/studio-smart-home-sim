@@ -68,11 +68,15 @@ git config core.quotepath false   # 한글 파일명(docs/weekly)이 깨져 보�
 
 ```bash
 tools/isaac/run.sh python tools/isaac/check_effort_sensor.py   # 헤드리스 스크립트 (Effort Sensor 검증)
+tools/isaac/run.sh python tools/isaac/build_scene.py           # 원룸 Scene 생성 → worlds/lowcost_studio_room.usd
+tools/isaac/run.sh python tools/isaac/check_scene.py           # Scene DoD 자동 검증 → results/scene_check.json
+tools/isaac/run.sh python tools/isaac/render_views.py          # 카메라 3종 · 색온도 비교 스크린샷 → results/screenshots/
 tools/isaac/run.sh gui                                         # GUI (X11)
 tools/isaac/run.sh shell                                       # 컨테이너 셸
 ```
 
 - 이미지 entrypoint(다른 프로젝트 패키지 설치)를 우회하고 `/isaac-sim/python.sh` 를 직접 쓴다
+- 컨테이너는 root 로 돈다 — `python` 모드는 끝난 뒤 저장소 안에 생긴 파일을 호스트 사용자 소유로 되돌린다 (2026-10-11)
 - 캐시 · 로그: `~/docker/studio-isaac/` · 저장소는 컨테이너의 `/workspace/studio` 에 마운트
 - **Isaac Sim 쪽 Python은 3.11**(이미지 내장)이다. 시뮬레이터 스크립트(`tools/isaac/`, 이후 Scene · 브릿지)는 3.11에서 돌고,
   제어기 · 환경 모델 · 하네스는 호스트 uv `.venv`(3.12)에서 돈다 — 둘 사이는 ROS 2 토픽으로만 연결한다

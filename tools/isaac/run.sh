@@ -31,8 +31,10 @@ if [[ "$MODE" == "gui" ]]; then
   X11_ARGS=(-e DISPLAY="${DISPLAY:-:0}" -v /tmp/.X11-unix:/tmp/.X11-unix:rw)
 fi
 
+# 컨테이너는 root 로 돈다 — 저장소에 만든 파일을 호스트 사용자 소유로 돌려준다 (호스트에서 고치고 지울 수 있게)
+HOST_IDS="$(id -u):$(id -g)"
 case "$MODE" in
-  python) CMD=("$ISAAC/python.sh" "$@") ;;
+  python) CMD=(bash -c '"$0" "$@"; rc=$?; find /workspace/studio -xdev -user 0 -not -path "*/.venv/*" -exec chown '"$HOST_IDS"' {} + 2>/dev/null; exit $rc' "$ISAAC/python.sh" "$@") ;;
   gui)    CMD=("$ISAAC/isaac-sim.sh" "$@") ;;
   shell)  CMD=(bash) ;;
   *) echo "사용법: $0 {python <script> [args] | gui | shell}" >&2; exit 2 ;;

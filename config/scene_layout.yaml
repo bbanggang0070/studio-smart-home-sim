@@ -1,0 +1,110 @@
+# ============================================================================
+#  원룸 Scene 배치 — tools/isaac/build_scene.py 입력 (W03 T3.1–T3.9 · W04)
+#  좌표: 원점 = 현관 쪽 왼쪽 바닥 모서리 · X = 폭(3.5 m) · Y = 깊이(5.0 m, 현관 → 안쪽) · Z = 위 · 단위 m
+#  배치 근거: mmWave(LD2410)를 현관 벽 위에 달아 안쪽을 본다 — 0.75 m 구간
+#             주방 0–1.5 m (0–1번) · 책상 1.5–3.0 m (2–3번) · 침대 3.75–5.25 m (5–6번)  (thresholds occupancy.zone_gates)
+#  [v0.1 · 2026-10-12] 치수는 가정 A1 · A2 · 국내 원룸 가구 표준 크기 — draft 표시 값은 W05 캘리브레이션에서 확정
+# ============================================================================
+version: 1
+usd_path: worlds/lowcost_studio_room.usd
+
+room:
+  width_m: 3.5
+  depth_m: 5.0
+  height_m: 2.4
+  wall_thickness_m: 0.15
+
+# ---- 현관문 (Y = 0 벽) — 문 열림 센서는 개방 각도로 판정 (W05 T5.d1) ----
+entrance_door:
+  x_range_m: [0.20, 1.10]           # 폭 0.9 m
+  height_m: 2.05
+  thickness_m: 0.04
+  mass_kg: 25.0                     # draft
+  hinge_side: min_x                 # 경첩 = x_range 왼쪽 · 안쪽으로 열림
+  open_max_deg: 100.0
+  contact_open_angle_deg: 5.0       # thresholds door_contact 판정과 같게 (W05)
+
+# ---- 창문 (Y = depth 벽) — 랙-피니언 미닫이 (docs/04) ----
+window:
+  opening_x_range_m: [0.10, 1.60]   # 창 폭 1.5 m (가정 A2-1)
+  sill_height_m: 0.90
+  opening_height_m: 1.20
+  panel_width_m: 0.78               # 미닫이 내창 — 닫힘 시 왼쪽 문설주(씰)에 닿는다
+  panel_thickness_m: 0.03
+  panel_mass_kg: 9.0                # draft — 복층유리 0.78 × 1.18 m
+  panel_track_y_offset_m: 0.04      # 벽 안쪽 면(y = depth)에서 바깥쪽으로 — 내창 레일 위치 (벽 개구부 안)
+  panel_clearance_m: 0.004          # 레일 위아래 틈 (마찰 접촉 회피)
+  travel_m: 0.70                    # docs/04 travel_length_m — +X 방향이 열림
+  seal_thickness_m: 0.012           # 폐쇄 종단 씰 (Zone D)
+  seal_compress_m: 0.006            # 조인트 하한을 0 보다 이만큼 아래로 — 씰을 눌러 압착 반력이 생기게
+  seal_compliance: { stiffness: 30000.0, damping: 300.0 }   # draft — 완만한 압착 램프 (W10 튜닝)
+  seal_friction: { static: 0.9, dynamic: 0.8 }
+  rack_tooth_pitch_m: 0.02          # 시각용
+  windowsill_depth_m: 0.22
+
+# ---- 끼임 시험 물체 3종 (T3.4c) — 레일 경로(창 개구부 안)에 놓는다 ----
+obstacles:
+  park_x_m: 2.6                     # 시험하지 않을 때 놓아 두는 곳 (창턱 오른쪽 밖) — 시험 스크립트가 옮긴다
+  rigid_pot:    { size_m: [0.10, 0.10, 0.18], mass_kg: 1.5, friction: 0.6 }
+  soft_cushion: { size_m: [0.12, 0.10, 0.15], mass_kg: 0.3, friction: 0.8, compliance: { stiffness: 2000.0, damping: 50.0 } }
+  elastic_sponge: { size_m: [0.10, 0.10, 0.12], mass_kg: 0.05, friction: 0.9, compliance: { stiffness: 800.0, damping: 5.0 }, restitution: 0.3 }
+
+# ---- 블라인드 (창 안쪽) — 슬랫 회전 0–90° (W04 T4.2) ----
+blind:
+  slat_count: 16
+  slat_depth_m: 0.05
+  slat_thickness_m: 0.004
+  y_offset_m: -0.14                 # 내창보다 안쪽
+  max_deg: 90.0
+
+# ---- 가구 (저폴리 프록시 — 충돌만) [x0, y0, z0] 아래 모서리 · [sx, sy, sz] ----
+furniture:
+  bed:           { min: [1.50, 4.00, 0.0], size: [2.00, 1.00, 0.45] }
+  desk:          { min: [0.00, 2.00, 0.0], size: [0.60, 1.20, 0.74] }
+  chair:         { min: [0.70, 2.35, 0.0], size: [0.45, 0.45, 0.45] }
+  kitchen_counter: { min: [2.90, 0.20, 0.0], size: [0.60, 1.20, 0.85] }
+  cooktop:       { min: [2.95, 0.45, 0.85], size: [0.50, 0.45, 0.02] }
+
+# ---- 액추에이터 · 센서 위치 ----
+range_hood:      { min: [2.95, 0.40, 1.65], size: [0.55, 0.50, 0.35] }
+hood_temperature_sensor: { pos: [3.20, 0.65, 1.62] }        # 후드 아래 (v3.3)
+exhaust_fan:     { pos: [3.45, 1.80, 2.10], diameter_m: 0.25, axis: X }   # 주방 쪽 벽 · 배기
+intake_fan:      { pos: [2.50, 4.95, 2.10], diameter_m: 0.20, axis: Y }   # 창 쪽 벽 · 급기 (필터)
+ceiling_fan:     { pos: [1.75, 2.75, 2.15], blade_span_m: 1.0 }
+air_conditioner: { min: [3.25, 2.60, 1.95], size: [0.25, 0.85, 0.28] }
+dehumidifier:    { min: [0.75, 4.40, 0.0], size: [0.30, 0.25, 0.55] }
+purifier:        { min: [2.60, 2.10, 0.0], size: [0.30, 0.30, 0.60] }
+ceiling_light:   { pos: [1.75, 2.40, 2.38], size_m: 0.60, intensity: 30000.0 }   # draft — W05 lux 매핑 (ceiling_lux_at_full)
+desk_lamp:       { pos: [0.20, 2.95, 1.15], radius_m: 0.04, intensity: 30000.0, cct_k: 4000.0, cone_deg: 60.0 }   # 갓 — 아래로 원뿔 배광   # draft — 책상면 520 lux @100 %
+mmwave_sensor:   { pos: [1.75, 0.05, 2.30], facing: +Y }
+temp_humidity_sensor: { pos: [1.75, 2.40, 2.35] }
+illuminance_sensor:   { pos: [1.75, 2.80, 2.38] }           # 천장 BH1750 (lighting_model 기준점)
+pm25_sensor:     { pos: [0.05, 3.40, 1.20] }
+
+# ---- 재실 영역 (트리거 볼륨 — mmWave 구간과 같은 거리) ----
+zones:
+  kitchen: { min: [2.30, 0.15, 0.0], size: [1.15, 1.30, 2.0] }
+  desk:    { min: [0.00, 1.80, 0.0], size: [1.30, 1.60, 2.0] }
+  bed:     { min: [1.40, 3.80, 0.0], size: [2.10, 1.20, 2.0] }
+
+person_proxy:
+  start: room                       # 시작 자리 — 카메라 시야를 가리지 않게
+  radius_m: 0.20
+  height_m: 1.70
+  positions:                        # 사람 프록시가 갈 수 있는 자리 (중심 x, y)
+    entrance: [0.65, 0.60]
+    kitchen:  [2.60, 0.80]
+    desk:     [0.95, 2.55]
+    bed:      [2.50, 4.50]
+    room:     [1.75, 3.30]
+
+cameras:
+  overview: { pos: [2.55, 0.20, 2.25], target: [1.2, 3.8, 0.5] }   # 현관 위 (실내 · 후드 왼쪽)
+  window:   { pos: [1.3, 3.3, 1.5],  target: [0.85, 5.0, 1.3] }
+  desk:     { pos: [1.9, 1.5, 1.7],  target: [0.3, 2.7, 0.8] }
+
+physics:
+  steps_per_second: 120              # 접촉 반력 해상도 — 끼임 판정 50 Hz 보다 충분히 빠르게
+  gravity_mps2: 9.81
+  solver_position_iterations: 32     # 접촉 반력이 튀지 않게 (W03 리스크)
+  solver_velocity_iterations: 4

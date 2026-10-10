@@ -252,8 +252,8 @@ smart_home_controller:
       zone_gates:
         desk: [2, 3]               # 1.5 ~ 3.0 m
         bed: [5, 6]                # 3.75 ~ 5.25 m
-        kitchen: [0, 1]            # [v3.4.3] draft — 현관 · 주방 쪽 (센서 배치 미확정, W03 Scene 에서 확정)
-        room: [4]                  # [v3.4.3] draft — 방 가운데
+        kitchen: [0, 1]            # 현관 · 주방 쪽 — Scene v0.1 에서 확인 (config/scene_layout.yaml · 2026-10-11)
+        room: [4]                  # 방 가운데 — Scene v0.1 에서 확인
       gate_size_m: 0.75            # LD2410 게이트 단위 (0-8번, 최대 약 6 m)
       #  [신설 v3.2.1] mmWave 자동 보정 — 사용자는 숫자를 넣지 않는다 (docs/08 §1.0)
       mmwave_calibration:

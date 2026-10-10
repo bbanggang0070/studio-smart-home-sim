@@ -60,7 +60,7 @@ appliance_profiles:
          ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood, cooktop_plug]
 
 # ---- mmWave(LD2410) 시뮬레이션 — 참값 → 구간 0–8 의 움직임 · 정지 에너지 (고속 모드 재실 노드 입력) ----
-#  구간 = 0.75 m. 사람 위치(zone) → 구간은 thresholds occupancy.zone_gates 와 같은 배치를 쓴다 (센서 배치는 W03 Scene 에서 확정).
+#  구간 = 0.75 m. 사람 위치(zone) → 구간은 thresholds occupancy.zone_gates 와 같은 배치를 쓴다 (센서 배치 = config/scene_layout.yaml · Scene v0.1 에서 확인).
 mmwave:
   gates: 9
   noise_max: 8.0                  # draft — 모든 구간에 0–8 균등 잡음

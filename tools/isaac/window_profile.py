@@ -109,7 +109,7 @@ def main() -> None:
     prof = REPO / "models" / "window_reference_profile.csv"
     with open(prof, "w", newline="", encoding="utf-8") as fh:
         fh.write("# 자동 생성 — tools/isaac/window_profile.py (W05 T5.8) · 무부하 기준 반력 · 20 mm 구간 · 5회 왕복 평균\n")
-        w = csv.DictWriter(fh, fieldnames=list(rows[0]))
+        w = csv.DictWriter(fh, fieldnames=list(rows[0]), lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
 

@@ -1473,10 +1473,10 @@ scenarios:
       co2_ppm: 450.0
       pm25_ugm3: 10.0
       illuminance_lux: 300.0
-      occupancy: false
-      occupant_zone: none
+      occupancy: true
+      occupant_zone: room
       time_of_day: "14:00"
-      window_open_ratio: 0.4                       # 창문 40 % 열린 채 절전 진입
+      window_open_ratio: 0.4                       # 창문 40 % 열어 둔 채 외출
       blind_angle_deg: 30.0
       appliances: { purifier_level: 0 }
     external:
@@ -1485,12 +1485,16 @@ scenarios:
       outdoor_pm25_ugm3: 10.0
       outdoor_temp_c: 25.0
       outdoor_rh_pct: 60.0
+    injections:
+      - { at_s: 300, door: open_close, label: leave, open_s: 8 }
     events:
-      - { at_s: 300, set: { weather: rain, outdoor_rh_pct: 95.0 } }
+      - { at_s: 304, set: { occupancy: false, occupant_zone: none } }
+      - { at_s: 495, set: { weather: rain, outdoor_rh_pct: 95.0 } }   # 판정 창(문 닫힘 + 3분 ≈ 488 s) 직후 — 절전 진입 직후 비
     pass_criteria:
-      - "cmd_window == 0 within 5 after 300"                         # 강우 감지 후 5 s 이내 폐쇄 명령 (L1 > L3)
-      - "window_open_ratio <= 0.01 by 600 after 300"                 # 폐쇄 완료
-      - "exhaust_fan_rpm == 0 when t >= 300"                         # 다른 액추에이터는 정지 유지
-      - "intake_fan_rpm == 0 when t >= 300"
-      - "ac_power == 0 for all t"
-      - "purifier_level == 0 for all t"
+      - "occupied == 0 within 200 after leave_end"                   # 빈방 고정 → 절전 진입
+      - "cmd_window == 0 within 5 after 495"                         # 강우 감지 후 5 s 이내 폐쇄 명령 (L1 > L3)
+      - "window_open_ratio <= 0.01 by 600 after 495"                 # 폐쇄 완료
+      - "exhaust_fan_rpm <= 1 when t >= 600"                         # 다른 액추에이터는 정지 유지 (1차 지연 잔여값 허용)
+      - "intake_fan_rpm <= 1 when t >= 600"
+      - "ac_power == 0 when t >= 600"
+      - "purifier_level == 0 when t >= 600"

@@ -31,6 +31,7 @@ class ComfortLadders:
         self._escalated = False
         self._ac_on = False
         self._outdoor_cooler = False
+        self._sunny = False
 
     def _dry_sp(self, sp: float) -> float:
         """에어컨 제습 운전 설정 — 냉방 목표보다 낮춰 둔다. 제습 운전도 실내가 설정 아래로 내려가면 압축기가 멈춰
@@ -125,12 +126,22 @@ class ComfortLadders:
                 self._escalated = True
             elif self._escalated and o.temp_c <= over_at - self._band("escalate_release_band_c"):
                 self._escalated = False
+        shading = False
+        # 일사 판단 — 블라인드 개방 환산 작업면 주광 + 히스테리시스 (차광 ↔ 해제 채터링 방지 · B3 물리 모드)
+        sun_lux = self.rules.lighting.daylight_open_equiv(o)
+        if sun_lux >= g("comfort_ladders.shade_requires_lux"):
+            self._sunny = True
+        elif sun_lux < (g("comfort_ladders.shade_release_lux") if self.hyst else g("comfort_ladders.shade_requires_lux")):
+            self._sunny = False
+        sunny = self._sunny
         if self.cooling:
-            if self.rules.lighting.daylight_workplane(o) >= g("comfort_ladders.shade_requires_lux"):   # 작업면 주광 (W05 T5.7 이후 센서 눈금과 다르다)
+            if sunny:
                 add("blind", "need", g("setpoints.blind_shade_angle_deg"), L5, "냉방 ① 블라인드 차광")
+                # 열원 먼저 — 블라인드가 차광각에 닿을 때까지 창문 · 배기(②)를 미룬다 (docs/03 C3 · B3 순서)
+                shading = o.blind_deg < g("setpoints.blind_shade_angle_deg") - g("means_ladder.blind_first_tolerance_deg")
             elif m.get("blind_policy") == "night_cooling" and outdoor_cooler:   # 복사냉각은 공기를 들이지 않는다 — I10 무관
                 add("blind", "need", g("setpoints.blind_night_cooling_deg"), L5, "냉방 — 야간 복사냉각 블라인드 개방 (수면)")
-            if free_cool and not blocked and not self._escalated:
+            if free_cool and not blocked and not self._escalated and not shading:
                 add("window", "need", g("setpoints.window_vent_ratio_pct") / 100.0, L5, "냉방 ② 창문 (외기가 더 시원)")
                 add("exhaust", "need", g("setpoints.fan_low_rpm"), L5, "냉방 ② 배기 저속 (창문 병행)")
             hi_at = sp + g("comfort_ladders.ceiling_fan_high_above_setpoint_c")
@@ -187,7 +198,6 @@ class ComfortLadders:
                 add("dehumidifier", "need", 1, L5, f"제습 ③ 제습기 (I6 {season})")
         info["dehumidifying"] = self.dehumidifying
         # 목표별 '쓸모 있는 수단' — 제어 가능성 판정(feasibility)이 소진 여부를 볼 때 쓴다 (외기가 더 더우면 환기는 냉방 수단이 아니다)
-        sunny = self.rules.lighting.daylight_workplane(o) >= g("comfort_ladders.shade_requires_lux")
         info["useful_means"] = {
             "cooling": {"ac": ac_allowed, "window": free_cool, "exhaust": free_cool, "intake": free_cool,
                         "ceiling_fan": True, "blind": sunny},

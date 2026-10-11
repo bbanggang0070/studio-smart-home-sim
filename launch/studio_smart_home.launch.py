@@ -1,4 +1,4 @@
-"""물리 모드 런치 (W06 T6.4 · W07) — ROS 컨테이너 쪽 노드 전부.
+"""물리 모드 런치 (W06 T6.4 · W07 · W10) — ROS 컨테이너 쪽 노드 전부.
 
     (Isaac 컨테이너)  tools/isaac/run.sh python scripts/sim/isaac_actuator_bridge.py
     (ROS 컨테이너)    tools/ros/run.sh ros2 launch launch/studio_smart_home.launch.py scenario:=B12
@@ -49,5 +49,8 @@ def generate_launch_description():
               condition=IfCondition(PythonExpression(["'", fast, "' == 'true' and ", world_on]))),
         _node("occupancy_sensor_node.py",
               condition=IfCondition(PythonExpression(["'", fast, "' != 'true' and ", world_on]))),
+          # 창문 상위 안전 계층 (W10) — Isaac 의 모터 전류 · 리플 위치를 쓰므로 물리 모드에서만
+        _node("window_safety_node.py", condition=IfCondition(PythonExpression(
+            ["'", fast, "' != 'true' and '", LaunchConfiguration("baseline"), "' != 'A'"]))),   # Baseline A — 안전 계층 없음
         _node("sensor_stub_node.py", "--mode", "STUDY", "--temp", "29", condition=IfCondition(stub)),
     ])

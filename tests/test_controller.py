@@ -305,3 +305,29 @@ def test_user_mode_ranges_are_clamped():
     changed = clamp_user_modes(modes)
     assert modes["modes"]["NORMAL"]["cooling_setpoint_c"] == 24.0 and modes["modes"]["NORMAL"]["lighting"]["cct_k"] == 6500.0
     assert modes["modes"]["AWAY"]["humidity_range_pct"] == [None, 70.0] and len(changed) == 2
+
+
+def test_manual_control_state_issues_no_actuator_commands():
+    c = SmartHomeController()
+    c.reset({"baseline": "proposed", "scenario": {}})
+    out = c.step(50000.0, inbox(**{T.C_MODE: "MANUAL", T.S_TEMPERATURE: 30.0}))
+    assert not any(tp in T.COMMAND_TOPICS for tp in out)
+    assert json.loads(out[T.T_LIVING_MODE])["state"] == "MANUAL"
+    # 수동 조작 중 끼임 → 거부 사유 알림 (X4) · 반복 끼임 잠금
+    out = c.step(50001.0, inbox(**{T.C_MODE: "MANUAL", T.T_SAFETY_STATE: "PINCH_REVERSE"}))
+    assert [a["code"] for a in json.loads(out[T.T_ALERTS])] == ["W_PINCH"]
+    out = c.step(50002.0, inbox(**{T.C_MODE: "MANUAL", T.T_SAFETY_STATE: "LOCKED_CLOSING|SAFETY_HOLD"}))
+    assert [a["code"] for a in json.loads(out[T.T_ALERTS])] == ["W_PINCH", "W_LOCK"]
+
+
+def test_window_waits_for_blind_and_safety_hold_redistributes_to_fans():
+    c = SmartHomeController()
+    c.reset({"baseline": "proposed", "scenario": {}})
+    hot = dict(**{T.S_TEMPERATURE: 29.0, T.S_ILLUMINANCE: 400.0,
+                  T.S_WEATHER: json.dumps({"raining": False, "outdoor_temp_c": 24.0, "outdoor_rh_pct": 50.0})})
+    out = c.step(50000.0, inbox(**hot, **{T.T_BLIND_ANGLE: 0.0}))
+    assert out[T.C_BLIND_ANGLE] >= 70 and out[T.C_WINDOW_OPEN_RATIO] < 0.35           # 블라인드 먼저 (0.1 은 기본 환기 틈)
+    out = c.step(50001.0, inbox(**hot, **{T.T_BLIND_ANGLE: 75.0}))
+    assert out[T.C_WINDOW_OPEN_RATIO] > 0.3                                           # 차광 뒤 창문
+    out = c.step(50002.0, inbox(**hot, **{T.T_BLIND_ANGLE: 75.0, T.T_SAFETY_STATE: "SAFETY_HOLD"}))
+    assert any("창문 불가 safety" in r for r in c.reasons())                         # 창문 불가 → 배기 + 흡기로

@@ -162,6 +162,47 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
         occ = df["truth.occupied"].astype(bool) if "truth.occupied" in df.columns else pd.Series(True, index=df.index)
         ok = (df["truth.desk_illuminance_lux"] >= lt["desk_lux_min"]) & (df["truth.temperature_c"] <= lt["temp_max_c"])
         out["lux_temp_ok_ratio"] = float(ok[occ].mean()) if occ.any() else math.nan
+    # #1 환경 목표 유지율 — 재실 중 온도 ≤ 냉방 목표 + 0.5 · 습도가 모드 범위 안 (ctx 모드)
+    occ_mask = df["truth.occupied"].astype(bool) if "truth.occupied" in df.columns else pd.Series(True, index=df.index)
+    sp_c = (ctx or {}).get("cooling_setpoint_c")
+    hr = (ctx or {}).get("humidity_range_pct") or [None, None]
+    ok = pd.Series(True, index=df.index)
+    if sp_c is not None:
+        ok &= df["truth.temperature_c"] <= sp_c + cfg_metrics["overheat_margin_c"]
+    if hr[0] is not None:
+        ok &= df["truth.humidity_pct"] >= hr[0]
+    if hr[1] is not None:
+        ok &= df["truth.humidity_pct"] <= hr[1]
+    out["comfort_ratio"] = float(ok[occ_mask].mean()) if occ_mask.any() else math.nan
+    # 물리 모드 전용 (#3 추종 오차 · #4 끼임 · #5 접촉 반력 · #6 리플 위치 오차) — 열이 없으면 NaN
+    for name, cmd_col, act_col, scale in (("window_track_err_pct", T.C_WINDOW_OPEN_RATIO, "act.window_open_ratio", 100.0),
+                                          ("blind_track_err_deg", T.C_BLIND_ANGLE, "act.blind_angle_deg", 1.0)):
+        if cmd_col in df.columns and act_col in df.columns:
+            c = df[cmd_col].ffill()
+            n = max(1, int(round(cfg_metrics["tracking_steady_s"] / dt_s)))
+            steady = c.eq(c.shift(n)) & c.notna()                       # 지령이 tracking_steady_s 이상 그대로인 시각만 (이동 중 제외)
+            out[name] = float((c[steady] - df[act_col][steady]).abs().quantile(0.95) * scale) if steady.any() else math.nan
+    if T.T_PINCH_DETECTED in df.columns:
+        p = df[T.T_PINCH_DETECTED].fillna(False).astype(bool)
+        out["pinch_events"] = float((p & ~p.shift(1, fill_value=False)).sum())
+    if "sim.contact_peak_n" in df.columns:
+        out["max_contact_force_n"] = float(pd.to_numeric(df["sim.contact_peak_n"], errors="coerce").max())
+    for col, name in (("sim.pinch_detect_ms", "pinch_detect_ms"), ("sim.pinch_stop_ms", "pinch_stop_ms")):
+        if col in df.columns:
+            out[name] = float(pd.to_numeric(df[col], errors="coerce").max())
+    if T.T_WINDOW_POSITION_EST in df.columns and "act.window_open_ratio" in df.columns:
+        travel = (ctx or {})["window_travel_m"]
+        out["ripple_pos_err_mm"] = float((df[T.T_WINDOW_POSITION_EST] - df["act.window_open_ratio"] * travel).abs().max() * 1000)
+    # C3 동작 순서 — 블라인드 차광 도달 시각이 창문 개방 시각보다 몇 초 앞섰나 (창문을 안 열었으면 +inf → 준수)
+    oc = cfg_metrics["order_check"]
+    if "act.blind_angle_deg" in df.columns and "act.window_open_ratio" in df.columns:
+        tb = _first_time(t, df["act.blind_angle_deg"].to_numpy(dtype=float) >= oc["blind_shaded_deg"])
+        tw = _first_time(t, df["act.window_open_ratio"].to_numpy(dtype=float) > oc["window_opened_ratio"])
+        out["blind_lead_s"] = (math.inf if math.isnan(tw) else tw - tb) if not math.isnan(tb) else -math.inf
+    # #15 귀가 시 쾌적 — 귀가 앵커 시각에 실내 ≤ 냉방 목표 + 1
+    if "arrive_start" in anchors and sp_c is not None:
+        tt = float(np.interp(anchors["arrive_start"], df["time_s"], df["truth.temperature_c"]))
+        out["arrival_comfort"] = float(tt <= sp_c + 1.0)
     out["ir_tx_ac"] = float(df["bridge.ir_tx_ac"].iloc[-1]) if "bridge.ir_tx_ac" in df.columns else math.nan
     out["rule_violation_count"] = (float(df["ctrl.rule_violations"].iloc[-1])
                                    if "ctrl.rule_violations" in df.columns else math.nan)

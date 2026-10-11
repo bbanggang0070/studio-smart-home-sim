@@ -70,6 +70,6 @@ class LocalCutoff:
         over_f = push > ls["local_cutoff_force_n"] and (zone != "D_SEAL" or q > ls["seal_closed_tolerance_m"])
         if over_i or over_f:
             self.tripped, self.blocked_dir = True, direction
-            self.reason = f"{'전류' if over_i else '반력'} {cur:.2f} A / {push:.1f} N @ {zone}"
+            self.reason = f"{'전류' if over_i else '반력'} {cur:.2f} A / {push:.1f} N @ {zone} · {'닫힘' if direction < 0 else '열림'} 방향"
             return True
         return False

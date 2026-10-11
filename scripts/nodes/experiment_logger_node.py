@@ -21,14 +21,10 @@ from std_msgs.msg import String
 
 from interfaces import ros_io
 from interfaces import topics as T
+from interfaces.log_columns import AC_COLUMNS, ACT
 
 REPO = Path(__file__).resolve().parents[2]
 ENV_TRUTH = f"{T.P}/internal/env_truth"
-ACT = {T.T_WINDOW_OPEN_RATIO: "window_open_ratio", T.T_BLIND_ANGLE: "blind_angle_deg", T.T_FAN_RPM: "exhaust_fan_rpm",
-       T.T_INTAKE_FAN_RPM: "intake_fan_rpm", T.T_RANGE_HOOD_LEVEL: "range_hood_level",
-       T.T_PURIFIER_LEVEL: "purifier_level", T.T_DEHUMIDIFIER: "dehumidifier", T.T_HUMIDIFIER: "humidifier",
-       T.T_CEILING_FAN: "ceiling_fan", T.T_CEILING_LIGHT: "ceiling_light_pct", T.T_DESK_LIGHT: "desk_light_pct"}
-
 
 def flatten(prefix: str, d: dict, row: dict) -> None:
     for k, v in d.items():
@@ -97,11 +93,17 @@ def main() -> None:
         for k, v in tr["ext"].items():
             row[f"ext.{k}"] = v
         row["injections"] = tr["injections"]
+        wl = last.get("_window_local") or {}
+        row["sim.contact_peak_n"] = wl.get("contact_peak_n")              # 브릿지 접촉 센서 (지표 #5)
+        row["sim.local_tripped"] = wl.get("tripped")
+        row["sim.pinch_detect_ms"] = wl.get("detect_ms")                  # 접촉 시작 → 감지 (브릿지 물리 콜백 계측)
+        row["sim.pinch_stop_ms"] = wl.get("stop_ms")                      # 감지 → 정지 (C2 ≤ 200 ms)
         for tp in T.ALL_TOPICS:
             if tp in last:
                 row[tp] = last[tp]
-        if st["writer"] is None:                                  # 열 = 첫 행 + 계약 55개 토픽 (늦게 오는 토픽도 자리를 둔다)
-            fields = list(row) + [tp for tp in T.ALL_TOPICS if tp not in row]
+        if st["writer"] is None:                                  # 열 = 첫 행 + 액추에이터 · 에어컨 열 + 계약 55개 토픽 (늦게 오는 값도 자리를 둔다)
+            late = [f"act.{n}" for n in ACT.values()] + list(AC_COLUMNS) + list(T.ALL_TOPICS)
+            fields = list(row) + [c for c in late if c not in row]
             st["fh"] = open(out, "w", newline="", encoding="utf-8")
             st["writer"] = csv.DictWriter(st["fh"], fieldnames=fields, extrasaction="ignore", lineterminator="\n")
             st["writer"].writeheader()
@@ -112,6 +114,8 @@ def main() -> None:
             st["fh"].flush()
 
     node.create_subscription(String, ENV_TRUTH, on_truth, ros_io.qos(T.C_MODE))
+    node.create_subscription(String, T.I_WINDOW_LOCAL, lambda m: last.__setitem__("_window_local", json.loads(m.data)),
+                             ros_io.qos(T.C_MODE))
 
     def watchdog():
         if st["writer"] is not None and time.monotonic() - st["t_last"] > 15.0:

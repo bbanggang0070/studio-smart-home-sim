@@ -123,6 +123,8 @@ class RuleEngine:
             why.append("ac_cooling")
         if mode == "AWAY":
             why.append("away")
+        if o.safety_state not in ("NORMAL", "LOCAL_CUTOFF"):
+            why.append("safety")                        # 끼임 SAFETY_HOLD · 방향 잠금 — 창문 불가 → 팬으로 재분배 (docs/04 §3.7 ⑥)
         if "window" not in self.devices:
             why.append("no_window")
         return why

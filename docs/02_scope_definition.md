@@ -477,7 +477,7 @@ v2.0까지는 제어기 노드가 모든 판단을 했다. 그 구조에서는 *
 | `/studio/state/window_zone` | `std_msgs/String` | `A_START`/`B_RUN`/`C_ENDZONE`/`D_SEAL` |
 | `/studio/state/pinch_detected` | `std_msgs/Bool` | |
 | `/studio/state/living_mode` | `std_msgs/String` | **v3.0 개명** (구 `lighting_mode`) — 현재 모드 + 결정 경로(`manual`/`schedule`/`auto`) |
-| `/studio/state/safety_state` | `std_msgs/String` | 창문 안전 계층 상태 (끼임 · `SAFETY_HOLD` 등) — 사용자 알림은 `alerts` 로 분리 |
+| `/studio/state/safety_state` | `std_msgs/String` | 창문 안전 계층 상태 — `NORMAL` · `LOCAL_CUTOFF`(로컬만 정지) · `PINCH_REVERSE` · `SAFETY_HOLD` · 잠금이면 `LOCKED_CLOSING`/`LOCKED_OPENING`(+`|<상태>`). 발행 = `window_safety_node` (W10) — 사용자 알림은 `alerts` 로 분리 |
 | `/studio/state/control_feasibility` | `std_msgs/String` | `FEASIBLE`/`DEGRADED`/`INFEASIBLE` |
 | `/studio/state/ac` | `std_msgs/String` | **v3.0** — **추정 상태 + 신뢰도** (`CONFIRMED`/`UNKNOWN`/`UNVERIFIABLE`) |
 | `/studio/state/dehumidifier` | `std_msgs/Bool` | **v3.0** |
@@ -691,3 +691,4 @@ v2.0까지는 제어기 노드가 모든 판단을 했다. 그 구조에서는 *
 | 2026-10-11 | v3.4.11 | **W07 물리 모드 센서 노드** — 계약 55개 전부 실제 노드로 연결 (통합 시험 55/55) · 내부 토픽(계약 밖) `/studio/internal/env_truth`(월드 → 센서 노드) · `/internal/door_open` · `/internal/person`(월드 → Isaac) · `/clock`(시뮬레이션 시각) · 센서 특성 `config/sensor_models.yaml` |
 | 2026-10-11 | v3.4.12 | W08 T8.6 · T8.7 — 실험 로거 · 물리 모드 채점(고속 모드와 같은 판정기) · `tools/run_physics.sh` · `harness.runner.finish_run` · `judge_group` 분리 · 토픽 변경 없음 |
 | 2026-10-12 | v3.4.15 | 내부 토픽 `/studio/internal/sim_init`(시나리오 초기 액추에이터 상태 → Isaac, 시험 전용) · thresholds — 눈부심 부분 차광 · 천장등 데드밴드 · 제어 가능성 세부 키 · 자연 냉방 해제 폭 · 청정기 해제 폭 · PM 이동평균 · 물리 모드 제어기 노드가 시나리오 설치 설정(가전 프로파일 등)을 읽는다 · 토픽 계약 변경 없음 |
+| 2026-10-12 | v3.4.17 | **W10 2계층 창문 안전** — `safety_state` · `pinch_detected` 발행 노드를 브릿지에서 `window_safety_node` 로 · 값 목록 명시 · 내부 토픽(계약 밖) `/studio/internal/window_local`(브릿지 로컬 차단 · 접촉력 · 감지/정지 지연) · `/studio/internal/window_override`(상위 반전 · 유지 · 잠금 → 브릿지) · 알림 코드 `W_PINCH` · `W_LOCK` · thresholds `layered_safety.safety_hold_s` · `pinch_detection.contact_onset_n` · `stopped_speed_mps` · `comfort_ladders.shade_release_lux` · 토픽 계약 55개 변경 없음 |

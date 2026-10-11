@@ -245,8 +245,10 @@ def finish_run(run: Run, df: pd.DataFrame, tl, hcfg: dict[str, Any], env_cfg, lo
         um = yaml.safe_load(f)
     mode0 = sc["initial"].get("user_mode", "NORMAL")
     ctx = {"user_mode": mode0,
+           "humidity_range_pct": (um["modes"].get(mode0) or {}).get("humidity_range_pct"),
            "base_vent_m3h": (um["modes"].get(mode0) or {}).get("base_vent_m3h") or 0.0,
            "cooling_setpoint_c": (um["modes"].get(mode0) or {}).get("cooling_setpoint_c"),
+           "window_travel_m": load_params().get("window_sensorless.travel_length_m"),
            "q_inf0_m3h": env_cfg.get("air_balance.base_infiltration_ach") * env_cfg.get("room.volume_m3")}
     metrics = C.compute_metrics(df, tl.anchors(), sources, hcfg["metrics"], log_every, ctx)
     res = RunResult(run=run, status="", controller=controller_name, df=df, metrics=metrics, notes=notes)

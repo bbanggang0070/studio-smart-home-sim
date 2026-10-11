@@ -21,6 +21,7 @@ from pathlib import Path
 ap = argparse.ArgumentParser()
 ap.add_argument("--gui", action="store_true")
 ap.add_argument("--duration", type=float, default=0.0, help="초 (0 = 끝없이)")
+ap.add_argument("--no-local-cutoff", action="store_true", help="Baseline A — 로컬 컷오프 없음 (C2 대비군 · 단독 규칙 제어기)")
 args, _ = ap.parse_known_args()
 
 from isaacsim import SimulationApp  # noqa: E402
@@ -68,6 +69,9 @@ def main() -> None:
     hz = B["physics_hz"]
     dt = 1.0 / hz
     world = World(stage_units_in_meters=1.0, physics_dt=dt, rendering_dt=dt * B["render_every_n_steps"])
+    from isaacsim.sensors.physics import ContactSensor
+    contact = world.scene.add(ContactSensor(prim_path="/World/window/window_panel/contact_sensor", name="panel_contact",
+                                            min_threshold=0.0, max_threshold=1.0e7, radius=-1))
     world.reset()
     win = SingleArticulation("/World/window", name="window")
     fans = {n: SingleArticulation(f"/World/{n}", name=n) for n in ("exhaust_fan", "intake_fan", "ceiling_fan")}
@@ -94,6 +98,8 @@ def main() -> None:
     travel = L["window"]["travel_m"]
     wdrive = UsdPhysics.DriveAPI(stage.GetPrimAtPath("/World/window/window_prismatic_joint"), "linear")
     max_force = A["window_prismatic_joint"]["max_force_n"]
+    if args.no_local_cutoff:                                  # Baseline A — 안전 계층 없이 계속 민다 (docs/03 C2 대비)
+        ws = {**ws, "layered_safety": {**ws["layered_safety"], "local_cutoff_enabled": False}}
     cut = LocalCutoff(ws, travel)
     lv = {"ceiling": 0.0, "desk": 0.0, "cct": L["desk_lamp"]["cct_k"]}
     levels = A["ceiling_fan_joint"]["levels_rpm"]
@@ -111,14 +117,34 @@ def main() -> None:
             log.warn(f"{name} {v} → 범위 [{lo}, {hi}] 로 자름")
         return min(max(v, lo), hi)
 
+    ovr = {"mode": "normal", "locked": []}
+
+    def on_override(m):
+        """상위 안전 계층의 우선 지령 — 반전 · 유지 · 방향 잠금 (W10 T10.7). 제어기 지령보다 먼저 적용한다."""
+        d = _json.loads(m.data)
+        ovr.update(mode=d.get("mode", "normal"), locked=list(d.get("locked", [])))
+        if ovr["mode"] == "reverse":
+            lat.setdefault("detect", st["t"])                # 상위만 감지한 경우 — 감지 시각 = 반전 지령 수신
+            goal = float(d["to_ratio"]) * travel
+            cut.on_command(1 if goal > st["q"] else -1)       # 반대 방향 — 로컬 컷오프도 풀린다
+            act.window_ramp.set_goal(goal)
+        elif ovr["mode"] == "hold":
+            act.window_ramp.set_goal(act.window_ramp.value)
+        log.info(f"상위 안전 지령: {d}")
+
     def on_cmd(topic, value):
         if topic == T.C_WINDOW_OPEN_RATIO:
             goal = clamp("window_open_ratio", float(value), 0.0, 1.0) * travel
             direction = 0 if abs(goal - st["q"]) < 1e-4 else (1 if goal > st["q"] else -1)
+            if ovr["mode"] != "normal" or direction in ovr["locked"]:
+                return                                        # 상위 SAFETY_HOLD · 반전 중 · 잠긴 방향 — 제어기 지령 무시
             if not cut.on_command(direction):
                 log.warn(f"로컬 컷오프 — 같은 방향 지령 거부 ({cut.reason})")
                 return
             act.window_ramp.set_goal(goal if goal > 0 else -L["window"]["seal_compress_m"])   # 닫힘은 씰을 눌러 닫는다
+            if direction != 0:
+                lat.clear()                                   # 새 주행 — 접촉 · 감지 · 정지 시각을 다시 잰다
+                peak["contact"] = 0.0                         # 접촉력 최댓값도 (안전 반전 · 유지로는 지우지 않는다 — 끼임 피크 보존)
         elif topic == T.C_BLIND_ANGLE:
             act.set_blind_deg(clamp("blind_angle", float(value), *A["blind_joint"]["range_deg"]))
         elif topic == T.C_FAN_RPM:
@@ -147,6 +173,14 @@ def main() -> None:
                              lambda m: on_cmd(T.I_WINDOW_TORQUE_PCT, m.data), ros_io.qos(T.C_WINDOW_OPEN_RATIO))
     node.create_subscription(ros_io.MSG[T.STR], T.I_SIM_OBSTACLE, lambda m: pending_obstacle.append(m.data),
                              ros_io.qos(T.C_WINDOW_OPEN_RATIO))
+    node.create_subscription(ros_io.MSG[T.STR], T.I_WINDOW_OVERRIDE, on_override, ros_io.qos(T.C_WINDOW_OPEN_RATIO))
+    pub_local = node.create_publisher(ros_io.MSG[T.STR], T.I_WINDOW_LOCAL, ros_io.qos(T.C_WINDOW_OPEN_RATIO))
+    peak = {"contact": 0.0}
+    lat: dict = {}                                            # 접촉 시작 · 감지 · 정지 (물리 콜백 시각)
+    pdet = ws["pinch_detection"]
+
+    def _ms(a, b):
+        return None if a is None or b is None else round((a - b) * 1000.0, 1)
     pending_init: list[dict] = []
     node.create_subscription(ros_io.MSG[T.STR], T.I_SIM_INIT, lambda m: pending_init.append(_json.loads(m.data)),
                              ros_io.qos(T.C_WINDOW_OPEN_RATIO))
@@ -168,16 +202,21 @@ def main() -> None:
         log.info(f"초기 상태: 창문 {d.get('window_open_ratio', 0.0)} · 블라인드 {b}°")
 
     def place_obstacle(name):
-        """시험 전용 — 끼임 물체를 창 개구부(문설주에서 0.2 m)에 놓거나 모두 치운다."""
+        """시험 전용 — 끼임 물체를 창 개구부에 놓거나('park') 모두 치운다. 'rigid_pot@0.15' = 문설주에서 0.15 m (기본 0.2).
+        'rigid_pot@1.03:30' = 질량 30 kg 로 바꿔 놓는다 (여는 방향 끼임 — 가벼운 물체는 뒤에 막는 것이 없어 밀려 간다)."""
         wd = L["window"]
+        name, _, mass = name.partition(":")
+        name, _, at = name.partition("@")
+        gap_x = float(at) if at else 0.20
         for n, o in obstacles.items():
             if n == name:
                 sz = L["obstacles"][n]["size_m"]
-                pos = np.array([wd["opening_x_range_m"][0] + wd["seal_thickness_m"] + 0.20,
+                pos = np.array([wd["opening_x_range_m"][0] + wd["seal_thickness_m"] + gap_x,
                                 L["room"]["depth_m"] + wd["panel_track_y_offset_m"], wd["sill_height_m"] + sz[2] / 2 + 0.002])
             else:
                 pos = park[n]
             o.set_world_pose(position=pos)
+            o.set_mass(float(mass) if (n == name and mass) else L["obstacles"][n]["mass_kg"])
             o.set_linear_velocity(np.zeros(3))
             o.set_angular_velocity(np.zeros(3))
         log.info(f"시험 물체: {name}")
@@ -208,7 +247,7 @@ def main() -> None:
         return math.degrees(float(door.get_joint_positions()[0])) > L["entrance_door"]["contact_open_angle_deg"]
 
     out = [T.T_CEILING_LIGHT, T.T_DESK_LIGHT, T.T_FAN_RPM, T.T_INTAKE_FAN_RPM, T.T_CEILING_FAN, T.T_BLIND_ANGLE,
-           T.T_WINDOW_OPEN_RATIO, T.T_WINDOW_ZONE, T.T_SAFETY_STATE, T.T_PINCH_DETECTED, T.S_WINDOW_MOTOR_CURRENT,
+           T.T_WINDOW_OPEN_RATIO, T.T_WINDOW_ZONE, T.S_WINDOW_MOTOR_CURRENT,
            T.S_DOOR_CONTACT, T.T_WINDOW_POSITION_EST]
     pubs = {tp: ros_io.publisher(node, tp) for tp in out}
 
@@ -218,6 +257,13 @@ def main() -> None:
         st["q"] = float(win.get_joint_positions()[wdof])
         st["v"] = float(win.get_joint_velocities()[wdof])
         st["force"] = float(np.asarray(win.get_measured_joint_efforts())[wdof])
+        f_contact = float(contact.get_current_frame().get("force", 0.0))
+        peak["contact"] = max(peak["contact"], f_contact)
+        # 지연 계측 (C2 · 지표 #4) — 접촉 시작 → 감지(로컬 차단 · 상위 반전) → 정지
+        if lat.get("onset") is None and st["dir"] != 0 and f_contact > pdet["contact_onset_n"]:
+            lat["onset"] = st["t"]
+        if lat.get("detect") is not None and lat.get("stop_ms") is None and abs(st["v"]) < pdet["stopped_speed_mps"]:
+            lat["stop_ms"] = (st["t"] - lat["detect"]) * 1000.0
         # 이동 방향 = 지령 램프의 속도 (실제 위치 오차로 정하면 마찰로 남은 정지 오차 때문에 '새 출발'을 놓친다 → 기동 피크 오작동)
         rv = act.window_ramp.velocity
         st["dir"] = 0 if abs(rv) < 1e-6 else (1 if rv > 0 else -1)
@@ -225,7 +271,8 @@ def main() -> None:
             act.window_ramp.value = act.window_ramp.goal = st["q"]          # 즉시 정지 — 지금 위치에 고정
             wdrive.GetTargetPositionAttr().Set(st["q"])
             wdrive.GetTargetVelocityAttr().Set(0.0)
-            st["new_trip"] = True
+            st["new_trip"] = st.get("new_trip", 0) + 1                     # 로그 전에 여러 번 끊겨도 센다
+            lat.setdefault("detect", st["t"])
 
     world.add_physics_callback("window_local_cutoff", physics_step)
 
@@ -244,8 +291,12 @@ def main() -> None:
         p(T.T_BLIND_ANGLE, float(np.degrees(blind.get_joint_positions()[0])))
         p(T.T_WINDOW_OPEN_RATIO, window_q_to_ratio(st["q"], travel))
         p(T.T_WINDOW_ZONE, window_zone(st["q"], travel, st["dir"], cut._start_q, ws))
-        p(T.T_SAFETY_STATE, "LOCAL_CUTOFF" if cut.tripped else "NORMAL")
-        p(T.T_PINCH_DETECTED, cut.tripped)
+        # 로컬 상태는 내부 토픽으로 — 계약 토픽 safety_state · pinch_detected 는 상위(window_safety_node)가 낸다
+        pub_local.publish(ros_io.MSG[T.STR](data=_json.dumps({"tripped": cut.tripped, "reason": cut.reason,
+                                                                 "contact_peak_n": round(peak["contact"], 1),
+                                                                 "detect_ms": _ms(lat.get("detect"), lat.get("onset")),
+                                                                 "stop_ms": None if lat.get("stop_ms") is None
+                                                                 else round(lat["stop_ms"], 1)})))
         p(T.S_DOOR_CONTACT, door_contact())
 
     log.info(f"브릿지 시작 — 물리 {hz:.0f} Hz · 상태 {B['state_hz']:.0f} Hz · 전류 {B['current_hz']:.0f} Hz")
@@ -274,8 +325,8 @@ def main() -> None:
         world.step(render=args.gui and k % B["render_every_n_steps"] == 0)
         k += 1
         if st["new_trip"]:
-            st["new_trip"] = False
-            log.warn(f"로컬 컷오프 — {cut.reason}")
+            n, st["new_trip"] = st["new_trip"], 0
+            log.warn(f"로컬 컷오프 — {cut.reason}" + (f" (직전 로그 뒤 {n}회)" if n > 1 else ""))
             publish_state()
         est = ripple.update(st["q"], moving=st["dir"] != 0 or abs(st["v"]) > 1e-4)   # 리플 카운팅 (매 물리 스텝)
         if due("cur"):

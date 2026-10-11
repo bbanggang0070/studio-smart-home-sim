@@ -122,3 +122,8 @@ I_WINDOW_TORQUE_PCT = f"{P}/internal/window_torque_pct"
 I_SIM_OBSTACLE = f"{P}/internal/sim_obstacle"
 #  시험 전용 — 시나리오 초기 액추에이터 상태를 Isaac 에 적용 (월드 노드 → 브릿지). String JSON {window_open_ratio, blind_angle_deg}
 I_SIM_INIT = f"{P}/internal/sim_init"
+#  창문 2계층 안전 (W10) — 상위(window_safety_node) ↔ 하위(Isaac 브릿지 로컬 컷오프)
+#  브릿지 → 상위: 로컬 상태 String JSON {tripped, reason, contact_peak_n}
+#  상위 → 브릿지: 우선 지령 String JSON {mode: normal|reverse|hold, to_ratio, locked: [−1/+1]} — 제어기 지령보다 먼저
+I_WINDOW_LOCAL = f"{P}/internal/window_local"
+I_WINDOW_OVERRIDE = f"{P}/internal/window_override"

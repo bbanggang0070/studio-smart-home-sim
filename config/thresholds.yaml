@@ -153,6 +153,9 @@ smart_home_controller:
         max_contact_force_n: 100.0         # 목표 상한 (FMVSS 118 참조 기준)
         reverse_distance_m: 0.050          # 끼임 후 반전 거리
         repeat_lock_count: 2               # 동일 위치 2회 끼임 → 방향 잠금
+        reverse_timeout_s: 3.0             # [v3.4.17] draft — 반전이 이 시간 안에 끝나지 않으면(막힘 · 지령 유실) 그 자리에서 SAFETY_HOLD
+        contact_onset_n: 5.0               # [v3.4.17] 지표 계측용 — 패널 접촉력이 이 이상이면 '접촉 시작' (감지 지연 #4)
+        stopped_speed_mps: 0.002           # [v3.4.17] 지표 계측용 — 감지 뒤 패널 속도가 이 아래면 '정지' (C2 정지 ≤ 200 ms)
 
       # -- 엔드존 램프 검출 -------------------------------------------------
       #  끼임(급격한 계단) vs 씰 압착(완만한 램프) 구분
@@ -203,6 +206,7 @@ smart_home_controller:
         local_acts_in_physics_step: true # 물리 콜백 내부에서 실행 (통신 없음)
         report_only_upstream: true       # 로컬은 정지만, 정책 판단은 상위가 담당
         upstream_timeout_ms: 500         # 상위 응답 없으면 로컬이 정지 유지
+        safety_hold_s: 30.0              # [v3.4.16] draft — 끼임 반전 뒤 창문 고정 시간 (이후 정상 · 같은 자리 반복이면 방향 잠금, 해제는 사용자 WINDOW_UNLOCK)
 
       # -- 페일세이프 -------------------------------------------------------
       fail_safe:
@@ -698,6 +702,7 @@ smart_home_controller:
       pm_remove:  [dilution_if_cleaner_outside, purifier, range_hood]
       anti_condensation: [ceiling_fan_reverse, blind_open, dehumidifier, pulse_vent_if_drier_outside]
       window_cooling_requires_outdoor_below_c: 1.0   # 외기 < 실내 - 1 °C
+      blind_first_tolerance_deg: 5.0       # [v3.4.16] draft — 냉방 차광 중이면 블라인드가 차광각 − 5° 에 닿은 뒤 창문 · 배기 (열원 먼저 차단 · C3 · B3)
       window_cooling_release_band_c: 0.5   # [v3.4.15] draft — 한번 들어가면 차이가 1.0 − 0.5 °C 로 줄 때까지 유지 (경계 근처 센서 잡음 채터링 — 물리 모드 X2)
       base_vent_window_outdoor_temp_range_c: [15.0, 28.0]  # 이 범위 밖이면 기본 환기에 창문을 쓰지 않음
 
@@ -709,7 +714,8 @@ smart_home_controller:
       cooling_off_band_c: 1.0              # 해제: 실내 < 목표 − 1.0
       ceiling_fan_high_above_setpoint_c: 2.0   # 목표 + 2 °C 초과면 실링팬 강 (소음 등급 허용 시)
       ceiling_fan_speed_band_c: 0.5        # 강 → 약 복귀는 목표 + 2 − 0.5 °C 아래 (I5 로 에어컨이 목표 + 1 근처에 머물 때 강/약 채터링 방지)
-      shade_requires_lux: 250.0            # 작업면 주광이 이 이상(낮 · 일사)일 때만 냉방 차광 [v3.4.12 — 센서 원값 → 작업면 추정]
+      shade_requires_lux: 250.0            # 작업면 주광이 이 이상(낮 · 일사)일 때만 냉방 차광 [v3.4.12 — 센서 원값 → 작업면 추정 · v3.4.17 블라인드 개방 환산]
+      shade_release_lux: 200.0             # [v3.4.17] draft — 개방 환산 주광이 이 아래로 내려가야 냉방 차광 해제 (히스테리시스)
       dehumidify_off_band_pct: 5.0         # 제습: 상한 초과 진입 → 상한 − 5 %p 아래에서 해제
       humidify_restart_band_pct: 3.0       # 가습: 하한 미만 진입 → 유효 상한 도달 정지 · 상한 − 3 %p 아래로 내려오면 재개 허용
       cap_extension_by_ceiling_fan: true   # I4 — 결로 상한이 모드 상한보다 낮으면 실링팬 역회전으로 상한 확장 (C10)

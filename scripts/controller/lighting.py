@@ -77,6 +77,14 @@ class Lighting:
             lux = self._virtual_lux(o)                 # measured() 와 같은 규칙 — 페일세이프 상태는 바꾸지 않는다 (알림은 apply 가 낸다)
         return max(0.0, lux - self._own_light(o)) / g("lighting_model.daylight_sensor_ratio")
 
+    def daylight_open_equiv(self, o: Observation) -> float:
+        """블라인드를 열었을 때의 작업면 주광 — 차광하면 측정 주광이 줄어 차광 판단이 스스로 풀리는 채터링을 막는다."""
+        g = self.p.get
+        lm = "lighting_model."
+        frac = min(max(o.blind_deg / g("setpoints.blind_shade_angle_deg"), 0.0), 1.0)
+        t_open, t_sh = g(lm + "outdoor_transmittance_open"), g(lm + "outdoor_transmittance_shaded")
+        return self.daylight_workplane(o) * t_open / (t_open + frac * (t_sh - t_open))
+
     def apply(self, o: Observation, mode: str, saving: bool, cooling: bool, add) -> dict:
         g = self.p.get
         lm = "lighting_model."

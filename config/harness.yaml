@@ -35,6 +35,8 @@ metrics:
                       act.dehumidifier, act.humidifier]
   actuation_continuous: { act.window_open_ratio: 0.05, act.exhaust_fan_rpm: 100.0, act.intake_fan_rpm: 100.0 }
   lux_temp_ok: { desk_lux_min: 600.0, temp_max_c: 28.0 }   # C4 — 책상 조도 · 실내 온도 동시 유지율 (재실 시간 중)
+  tracking_steady_s: 15.0         # 지표 #3 — 지령이 이만큼 그대로인 시각만 추종 오차로 본다 (이동 중 제외) · 95 백분위
+  order_check: { blind_shaded_deg: 70.0, window_opened_ratio: 0.15 }   # C3 — 블라인드 차광 도달이 창문 개방(기본 환기 틈 위)보다 먼저 (blind_lead_s)
   user_modes: config/user_modes.yaml   # 지표 #9 — 모드별 기본 환기 목표 (시나리오 initial.user_mode 기준)
 
 # ---- 외기 PM 등급 (에어코리아 API 대체) — 환경부 PM2.5 예보 등급 -----------------

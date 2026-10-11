@@ -22,7 +22,9 @@ echo "물리 모드 실행: $SC · $BASE · 반복 $REP · ${DUR} s (실시간)"
 docker rm -f studio-isaac >/dev/null 2>&1; tools/ros/run.sh stop
 # 이전 실행의 로그 · CSV 를 지운다 — 남아 있으면 '기록 종료' 대기가 옛 로그를 보고 바로 끝나고 채점도 옛 CSV 로 된다
 rm -f "$LOGS/${SC}_bridge.log" "$LOGS/${SC}_launch.log" "$REPO/results/physics/raw/${SC}_${BASE}_${REP}.csv"
-timeout $((DUR + 400)) tools/isaac/run.sh python scripts/sim/isaac_actuator_bridge.py --duration $((DUR + 120)) \
+# Baseline A 는 창문 안전 계층(로컬 컷오프 · 상위 판정)이 없다 — 장치별 독립 규칙 (docs/03 C2 '계속 밀어 반력 초과')
+EXTRA=""; [ "$BASE" = "A" ] && EXTRA="--no-local-cutoff"
+timeout $((DUR + 400)) tools/isaac/run.sh python scripts/sim/isaac_actuator_bridge.py --duration $((DUR + 120)) $EXTRA \
   > "$LOGS/${SC}_bridge.log" 2>&1 &
 for i in $(seq 1 60); do grep -q "브릿지 시작\|Traceback" "$LOGS/${SC}_bridge.log" && break; sleep 5; done
 grep -q "브릿지 시작" "$LOGS/${SC}_bridge.log" || { echo "브릿지 기동 실패 — $LOGS/${SC}_bridge.log"; exit 1; }

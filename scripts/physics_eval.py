@@ -19,6 +19,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 
 from env_model.config import load_config  # noqa: E402
 from harness import criteria as C  # noqa: E402
+from interfaces.log_columns import fill_act_from_topics
 from harness.runner import RunResult, finish_run, judge_group, load_harness_config, write_summary  # noqa: E402
 from harness.scenario import expand_runs, load_scenarios  # noqa: E402
 from harness.timeline import build_timeline  # noqa: E402
@@ -42,7 +43,7 @@ def main() -> None:
         if not path.exists():
             r = RunResult(run, C.PENDING, "physics", notes=[f"로그 없음: {path.relative_to(REPO)}"])
         else:
-            df = pd.read_csv(path)
+            df = fill_act_from_topics(pd.read_csv(path))
             r = finish_run(run, df, build_timeline(run.scenario), hcfg, env_cfg, 1.0, "physics",
                            [f"물리 모드 로그 {len(df)}행"])
         results.append(r)

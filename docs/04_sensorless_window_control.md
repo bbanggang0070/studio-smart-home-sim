@@ -323,14 +323,20 @@ W06에서 측정하는 명령→반응 지연(목표 100 ms 이하)이 그대로
 │        → 즉시 모터 정지 (PWM 0)                                         │
 │   반응 시간 = 물리 스텝 1회                                              │
 └────────────────────────┬───────────────────────────────────────────────┘
-                         │ pinch_detected 발행 (보고만 — 판단하지 않음)
+                         │ /studio/internal/window_local 발행 (보고만 — 판단하지 않음)
                          ▼
-┌─ 상위 계층 ── smart_home_controller (ROS 2) ───────────────────────────┐
+┌─ 상위 계층 ── window_safety_node (ROS 2 · 50 Hz) ─────────────────────┐
 │   1. 정밀 판정 (4조건 AND · 적응형 임계값 · Zone 확인)                    │
-│   2. 50 mm 반전 시퀀스                                                  │
-│   3. SAFETY_HOLD 진입 / 해제                                            │
-│   4. 역할 재분배 (창문 불가 → 팬으로 이전)                                │
-│   5. 동일 위치 2회 반복 → 방향 잠금                                       │
+│      로컬이 먼저 끊었으면 그 사건도 끼임으로 받는다                        │
+│   2. 50 mm 반전 시퀀스        ─┐  /studio/internal/window_override      │
+│   3. SAFETY_HOLD 진입 / 해제   ├→ (브릿지가 제어기 지령보다 먼저 적용)    │
+│   5. 동일 위치 2회 반복 → 방향 잠금 ─┘                                   │
+│   → state/safety_state · state/pinch_detected (계약 토픽)               │
+└────────────────────────┬───────────────────────────────────────────────┘
+                         ▼
+┌─ smart_home_controller ───────────────────────────────────────────────┐
+│   4. 역할 재분배 (safety_state ≠ NORMAL → 창문 불가 → 팬으로 이전)        │
+│      사용자 알림 W_PINCH · W_LOCK (state/alerts — 명령 거부 사유)         │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -362,6 +368,16 @@ W06에서 측정하는 명령→반응 지연(목표 100 ms 이하)이 그대로
 
 > ⚠️ **상위 계층이 500 ms 내에 응답하지 않으면 로컬은 정지 상태를 유지한다**(`upstream_timeout_ms`).
 > 제어기가 죽어도 창문이 계속 밀지 않는다.
+
+> **W10 구현 메모 (v1.4 · 2026-10-12)**
+> - 상위 계층은 제어기와 분리된 노드 `scripts/nodes/window_safety_node.py` (코어 `controller/window_safety.py`, 순수 Python). 제어기가 죽어도 상위 안전은 돈다.
+> - 로컬 차단 뒤 상위가 반전을 내기 전까지(무응답 포함) 로컬은 **같은 방향 재지령을 거부**하고 정지를 유지한다 — 시간 제한 없이 유지하므로 `upstream_timeout_ms` 를 넘겨도 정지.
+> - 반전이 `pinch_detection.reverse_timeout_s`(3 s) 안에 끝나지 않으면(막힘 · 지령 유실) 그 자리에서 `SAFETY_HOLD` — `PINCH_REVERSE` 에 갇히지 않는다.
+> - `SAFETY_HOLD` = `layered_safety.safety_hold_s` (30 s, draft). 그동안 제어기 창문 지령은 브릿지가 무시하고, 제어기는 `safety_state` 를 보고 창문을 사다리에서 뺀다.
+> - **방향 잠금 해제** = 사용자 활동 `WINDOW_UNLOCK` (`cmd/activity`). 잠금 중에도 반대 방향은 허용.
+> - 반복 계수: 같은 방향 · ±`reverse_distance_m` 안의 끼임 기록. **같은 방향 정상 주행이 그 위치를 무사히 지나가면 기록을 지운다** (물체를 치움 — 다른 날 · 다른 물체를 반복으로 세지 않음).
+> - 계측(브릿지 물리 콜백 120 Hz): 접촉 시작(`contact_onset_n` 5 N) → 감지(로컬 차단 또는 상위 반전 수신) → 정지(`stopped_speed_mps`) 지연을 `window_local` 의 `detect_ms` · `stop_ms` 로 낸다 (C2 '감지 후 200 ms 이내 정지').
+> - Baseline A 는 안전 계층이 없다 (`--no-local-cutoff` · 상위 노드 미기동) — C2 대비군.
 
 ---
 
@@ -613,3 +629,4 @@ window_sensorless:
 | 2026-10-09 | v1.1 | Effort Sensor 실측 경로 정정(`isaacsim.sensors.physics`, Isaac Sim 5.1) · Prismatic 반력 읽기 실증 결과 기록 |
 | 2026-10-11 | v1.2 | §6-1 시뮬레이션의 Zone A–D 반력 근거 — 스프링식 레일 씰 패드 + 엔드존 경사로 + 압착 씰 · 기준 프로파일 `models/window_reference_profile.csv` (W05 T5.8) |
 | 2026-10-11 | v1.3 | §3.7 로컬 계층 구현 메모 — 운동 방향으로 미는 힘만 판정(제동 · 감속 힘 제외) · 기동 150 ms 블랭킹 · Zone D 는 전류 기준 끔 + 덜 닫혔을 때(> 3 mm) 반력 백업 · 이동 방향은 지령 램프 속도로 (정지 오차 때문에 '새 출발'을 놓쳐 기동 피크 오작동하던 문제) · `scripts/sim/window_local.py` |
+| 2026-10-12 | v1.4 | §3.7 W10 구현 — 상위 계층을 `window_safety_node` 로 분리(제어기는 역할 재분배 · 알림만) · 내부 토픽 `window_local` · `window_override` · 로컬 차단도 상위가 끼임으로 받아 반전 · `SAFETY_HOLD` 30 s · 잠금 해제 `WINDOW_UNLOCK` · 정상 주행이 지나가면 반복 기록 삭제 · 반전 시간 초과(3 s) → SAFETY_HOLD · 감지/정지 지연 계측 · Baseline A 안전 계층 없음 |

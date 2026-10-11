@@ -1509,7 +1509,7 @@ scenarios:
     tier: 1
     name: "저조도 자동 점등"
     duration_s: 120
-    repeat: 1
+    repeat: 3
     baselines: [proposed]
     seed: 20261021
     run_mode: physics
@@ -1545,7 +1545,7 @@ scenarios:
     tier: 1
     name: "과조도 차광"
     duration_s: 120
-    repeat: 1
+    repeat: 3
     baselines: [proposed]
     seed: 20261022
     run_mode: physics
@@ -1583,7 +1583,7 @@ scenarios:
     tier: 1
     name: "고온 기본 환기 (사다리 하위 칸)"
     duration_s: 900
-    repeat: 1
+    repeat: 3
     baselines: [proposed]
     seed: 20261023
     run_mode: physics
@@ -1623,7 +1623,7 @@ scenarios:
     tier: 3
     name: "모든 환기 경로 차단 — 실패 보고"
     duration_s: 900
-    repeat: 1
+    repeat: 3
     baselines: [proposed]
     seed: 20261024
     run_mode: physics
@@ -1656,11 +1656,128 @@ scenarios:
       - "feasibility_is('INFEASIBLE') within 900 after 0"         # 제어 목표 달성 불가를 판정 · 보고
       - "actuation_count <= 10"                                   # 무의미한 반복 구동 없음 (지표 #8)
 
+  - id: C2
+    tier: 2
+    name: "고온 + 창문 경로 끼임 (여는 방향)"
+    duration_s: 600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261026
+    run_mode: physics
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 29.0
+      humidity_pct: 55.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 150.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "19:00"             # 해 질 녘 — 차광이 필요 없어 창문이 바로 사다리 ②로 (끼임에 집중)
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 2000.0
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 24.0
+      outdoor_rh_pct: 50.0
+    injections:
+      # 창이 열리는 쪽 레일에 큰 화분 — 패널 뒤쪽 끝이 열림 약 0.15 m 에서 닿는다 (문설주에서 1.03 m)
+      # 여는 방향은 뒤에 막는 문틀이 없어 가벼운 화분(1.5 kg)은 밀려 간다 → 30 kg (미끄럼 저항 ≈ 177 N > 구동 최대 120 N)
+      - { at_s: 0, obstacle: "rigid_pot@1.03:30", label: pot }
+    pass_criteria:
+      - "pinch_events >= 1"                                       # 끼임 감지 성공 (docs/03 C2)
+      - "max_contact_force_n <= 100"                              # 최대 접촉 반력 ≤ 100 N (지표 #5)
+      - "pinch_stop_ms <= 200"                                    # 감지 후 200 ms 이내 정지
+      - "exhaust_fan_rpm >= 500 within 300 after 0"               # 사다리 다음 칸 (팬) 으로 보상
+
+  - id: C3
+    tier: 2
+    name: "고온 + 강한 일사 — 열원 차단 우선"
+    duration_s: 600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261027
+    run_mode: physics
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 29.0
+      humidity_pct: 55.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 400.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "14:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 25000.0   # 직사광 (docs/03 C3)
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 25.0
+      outdoor_rh_pct: 50.0
+    pass_criteria:
+      - "blind_lead_s > 0"                                        # 블라인드 차광이 창문 개방보다 선행 (동작 순서)
+      - "blind_angle >= 70 within 120 after 0"                    # ① 열원 차단
+      - "temperature < value_at('temperature', 0) by 600 after 0" # 실내 온도 상승 억제 → 하강
+      - "energy_wh <= baseline_A.energy_wh"                       # A 는 에어컨이 자체 판단으로 바로 기동
+
+  - id: X4
+    tier: 3
+    name: "수동 명령 + 안전 위반 거부"
+    duration_s: 300
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261028
+    run_mode: physics
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: MANUAL                # 제어 상태 MANUAL — 제어기는 액추에이터 명령을 내지 않는다
+      temperature_c: 27.0
+      humidity_pct: 55.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "19:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 2000.0
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 24.0
+      outdoor_rh_pct: 50.0
+    injections:
+      - { at_s: 0, obstacle: "rigid_pot@1.03:30", label: pot }   # C2 와 같은 큰 화분
+      - { at_s: 20, manual: { device: window, action: 0.5 }, label: user_open }   # 사용자 앱 — 창문 50 % 열기
+    pass_criteria:
+      - "pinch_events >= 1"                                       # 수동 명령도 끼임 감지 (W10 T10.21)
+      - "max_contact_force_n <= 100"
+      - "alert_raised('W_PINCH') within 60 after user_open_start" # 거부 사유가 토픽(state/alerts)으로 발행
+
   - id: B5
     tier: 1
     name: "히스테리시스 채터링 억제"
     duration_s: 600
-    repeat: 1
+    repeat: 3
     baselines: [B, proposed]
     seed: 20261025
     run_mode: physics

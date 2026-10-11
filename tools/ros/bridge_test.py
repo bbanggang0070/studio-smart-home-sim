@@ -41,9 +41,13 @@ def main() -> None:
             peak["current"] = max(peak["current"], float(v))
 
     for tp in (T.T_CEILING_LIGHT, T.T_DESK_LIGHT, T.T_FAN_RPM, T.T_INTAKE_FAN_RPM, T.T_CEILING_FAN, T.T_BLIND_ANGLE,
-               T.T_WINDOW_OPEN_RATIO, T.T_WINDOW_ZONE, T.T_SAFETY_STATE, T.T_PINCH_DETECTED, T.S_WINDOW_MOTOR_CURRENT,
+               T.T_WINDOW_OPEN_RATIO, T.T_WINDOW_ZONE, T.S_WINDOW_MOTOR_CURRENT,
                T.T_WINDOW_POSITION_EST, T.S_DOOR_CONTACT):
         ros_io.subscribe(node, tp, on_state)
+    # 로컬 계층 상태 — W10 부터 safety_state · pinch_detected 는 상위 안전 노드가 내고, 브릿지는 내부 토픽만 낸다
+    local = {"tripped": False, "reason": "", "contact_peak_n": 0.0}
+    node.create_subscription(String, T.I_WINDOW_LOCAL, lambda m: local.update(json.loads(m.data)),
+                             ros_io.qos(T.C_WINDOW_OPEN_RATIO))
     pubs = {tp: ros_io.publisher(node, tp) for tp in T.COMMAND_TOPICS}
     torque = node.create_publisher(Float32, T.I_WINDOW_TORQUE_PCT, ros_io.qos(T.C_WINDOW_OPEN_RATIO))
     obstacle = node.create_publisher(String, T.I_SIM_OBSTACLE, ros_io.qos(T.C_WINDOW_OPEN_RATIO))
@@ -96,7 +100,7 @@ def main() -> None:
     record("범위 밖 명령 클램핑 (창문 150 % · 블라인드 200°)",
            val(T.T_WINDOW_OPEN_RATIO, 9) <= 1.0001 and val(T.T_BLIND_ANGLE, 999) <= 90.5,
            f"창문 → {val(T.T_WINDOW_OPEN_RATIO):.3f} · 블라인드 → {val(T.T_BLIND_ANGLE):.1f}°")
-    record("정상 주행에서 로컬 컷오프 미작동", val(T.T_SAFETY_STATE) == "NORMAL", f"safety_state = {val(T.T_SAFETY_STATE)}")
+    record("정상 주행에서 로컬 컷오프 미작동", not local["tripped"], f"로컬 차단 = {local['tripped']}")
 
     # 3. 지연 (T6.6) — 명령 발행 → 상태 변화 첫 관측 (상태 20 Hz)
     lat = []
@@ -163,17 +167,17 @@ def main() -> None:
     peak["current"] = 0.0
     cmd(T.C_WINDOW_OPEN_RATIO, 0.0)
     spin(10.0)
-    tripped = val(T.T_SAFETY_STATE) == "LOCAL_CUTOFF" and val(T.T_PINCH_DETECTED) is True
+    tripped = bool(local["tripped"])
     q_stop = val(T.T_WINDOW_OPEN_RATIO)
     record("⭐ 로컬 컷오프 — 제어기 없이 장애물에서 정지", tripped and q_stop > 0.1,
-           f"safety_state {val(T.T_SAFETY_STATE)} · 정지 위치 {q_stop * 700:.0f} mm · 최대 전류 {peak['current']:.2f} A")
+           f"로컬 차단 {local['tripped']} ({local['reason']}) · 접촉 {local['contact_peak_n']:.0f} N · 정지 위치 {q_stop * 700:.0f} mm · 최대 전류 {peak['current']:.2f} A")
     cmd(T.C_WINDOW_OPEN_RATIO, 0.0)                       # 같은 방향 재지령 → 거부되어야 한다
     spin(3.0)
     held = abs(val(T.T_WINDOW_OPEN_RATIO) - q_stop) < 0.005
     cmd(T.C_WINDOW_OPEN_RATIO, 0.5)                       # 반대 방향 → 해제
     spin(8.0)
-    record("컷오프 뒤 같은 방향 거부 · 반대 방향 해제", held and val(T.T_SAFETY_STATE) == "NORMAL",
-           f"재지령 뒤 위치 유지 {held} · 열기 뒤 {val(T.T_SAFETY_STATE)}")
+    record("컷오프 뒤 같은 방향 거부 · 반대 방향 해제", held and not local["tripped"],
+           f"재지령 뒤 위치 유지 {held} · 열기 뒤 로컬 차단 {local['tripped']}")
     obstacle.publish(String(data="park"))
     spin(1.0)
 

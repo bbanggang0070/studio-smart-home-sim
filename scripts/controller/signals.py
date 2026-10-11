@@ -55,6 +55,7 @@ class Observation:
     ceiling_pct: float
     desk_pct: float
     appliance_states: dict
+    safety_state: str = "NORMAL"           # 창문 안전 계층 (W10) — SAFETY_HOLD · LOCKED_* 이면 창문을 못 쓴다
 
     @property
     def tod_s(self) -> float:
@@ -97,6 +98,7 @@ def parse_inbox(now_s: float, inbox: dict[str, Any]) -> Observation:
         ceiling_pct=float(inbox.get(T.T_CEILING_LIGHT, 0.0)),
         desk_pct=float(inbox.get(T.T_DESK_LIGHT, 0.0)),
         appliance_states=json.loads(inbox.get(T.T_APPLIANCE_STATES) or "{}"),
+        safety_state=str(inbox.get(T.T_SAFETY_STATE, "NORMAL") or "NORMAL"),
     )
 
 

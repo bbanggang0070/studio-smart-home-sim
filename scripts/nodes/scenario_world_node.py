@@ -106,6 +106,7 @@ def main() -> None:
     pub_clock = node.create_publisher(Clock, "/clock", 10)
     pub_init = node.create_publisher(String, T.I_SIM_INIT, rel)
     pub_obstacle = node.create_publisher(String, T.I_SIM_OBSTACLE, rel)
+    pub_user_window = ros_io.publisher(node, T.C_WINDOW_OPEN_RATIO)     # 사용자 앱의 수동 창문 명령 (X4 — MANUAL)
     ini_act = initial_actuators(sc)
     pubs = {tp: ros_io.publisher(node, tp) for tp in (T.T_AIR_BALANCE, T.C_MODE, T.C_ACTIVITY)}
     fast_pubs = {tp: ros_io.publisher(node, tp) for tp in list(FIELD_TO_STATE.values()) + [T.T_AC]} if args.fast_actuators else {}
@@ -131,6 +132,11 @@ def main() -> None:
             for iv in tl.instants_between(now - dt if now else -1.0, now + 1e-9, "obstacle"):
                 pub_obstacle.publish(String(data=str(iv.spec["obstacle"])))
                 log.info(f"시험 물체 배치: {iv.spec['obstacle']}")
+            for iv in tl.instants_between(now - dt if now else -1.0, now + 1e-9, "manual"):
+                man = iv.spec["manual"]
+                if man["device"] == "window":                # 창문 수동 명령 — 제어기와 같은 명령 토픽 (MANUAL 이면 제어기는 침묵)
+                    ros_io.publish(pub_user_window, T.C_WINDOW_OPEN_RATIO, float(man["action"]))
+                    log.info(f"사용자 수동 창문 명령: {man['action']}")
         for iv in tl.active_kind(now, "temp_wave"):          # 참값 강제 — 실내 공기 온도를 사인파로 (B5 히스테리시스)
             w = iv.spec["temp_wave"]
             model.state.temp_c = w["center_c"] + w["amplitude_c"] * math.sin(2 * math.pi * (now - iv.start_s) / w["period_s"])

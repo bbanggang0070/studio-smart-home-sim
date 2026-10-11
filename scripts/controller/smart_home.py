@@ -86,6 +86,8 @@ class SmartHomeController:
         self.feas = Feasibility(self.p)
         self._last_t: float | None = None
         self._reasons: list[str] = []
+        self._safety_prev = "NORMAL"
+        self.safety_alerts: list[dict] = []
 
     def reasons(self) -> list[str]:
         return self._reasons
@@ -95,6 +97,9 @@ class SmartHomeController:
         if self._last_t is not None and o.intake_rpm > 0:
             self.rules.filter_hours += (now_s - self._last_t) / 3600.0
         self._last_t = now_s
+        self._safety_alert(o)
+        if o.user_mode == "MANUAL":                    # 제어 상태 MANUAL — 사용자가 직접 조작, 제어기는 액추에이터 명령을 내지 않는다
+            return self._manual_step(o)                # (창문 안전은 상위 · 로컬 계층이 그대로 지킨다 — W10 T10.21 · X4)
         mode, path = self.modes.update(o)
         self.rules.home_mode = self.modes._before_away if mode == "AWAY" else mode
         ev = self.events.update(o)
@@ -134,7 +139,7 @@ class SmartHomeController:
                                                         (info.get("ac_override") or info.get("ac") or {}).get("mode"))
         if self.feas.reason:
             self._reasons.append(f"control_feasibility={self.feas.state} ← {self.feas.reason}")
-        alerts = sorted(self.rules.alerts + self.events.alerts + self.guard.alerts, key=lambda a: a["t"])
+        alerts = sorted(self.rules.alerts + self.events.alerts + self.guard.alerts + self.safety_alerts, key=lambda a: a["t"])
         if alerts:                                     # 사용자 알림 (v3.4.5 전용 토픽)
             out[T.T_ALERTS] = json.dumps(alerts, ensure_ascii=False)
         return out
@@ -151,6 +156,28 @@ class SmartHomeController:
                 a["fan"] = info["ac_fan_force"]
             info["ac"] = a
         return ac_json(info, on, self.guard.seq)       # seq — 재송신하면 값이 바뀌어 브릿지가 다시 쏜다 (E9)
+
+    def _manual_step(self, o) -> dict[str, Any]:
+        ev = self.events.update(o)
+        self._reasons = ["MANUAL — 사용자 직접 조작 (액추에이터 명령 없음)"]
+        return {T.T_LIVING_MODE: json.dumps({"mode": "MANUAL", "path": "manual", "noise_grade": "-", "state": "MANUAL"}),
+                T.T_ACTIVE_EVENTS: json.dumps(sorted(ev)), T.T_CONTROL_FEASIBILITY: "FEASIBLE",
+                T.T_DEW_MARGIN: self.psy.dew_margin(o),
+                **({T.T_ALERTS: json.dumps(self.safety_alerts, ensure_ascii=False)} if self.safety_alerts else {})}
+
+    def _safety_alert(self, o) -> None:
+        """창문 안전 상태가 바뀌면 거부 사유를 사용자 알림으로 (X4 — 수동 명령도 끼임이면 거부 · W10 T10.21)."""
+        cur, prev = o.safety_state, self._safety_prev
+        self._safety_prev = cur
+        if cur == prev:
+            return
+        if cur.startswith("LOCKED") and not prev.startswith("LOCKED"):
+            d = "닫힘" if "CLOSING" in cur else "열림"
+            self.safety_alerts.append({"code": "W_LOCK", "level": "critical", "t": o.now_s,
+                                       "msg": f"같은 자리 반복 끼임 — 창문 {d} 방향 잠금 · 명령 거부 (WINDOW_UNLOCK 으로 해제)"})
+        elif ("PINCH_REVERSE" in cur or cur == "LOCAL_CUTOFF") and "PINCH_REVERSE" not in prev and prev != "LOCAL_CUTOFF":
+            self.safety_alerts.append({"code": "W_PINCH", "level": "warning", "t": o.now_s,
+                                       "msg": "창문 끼임 감지 — 정지 · 반전 · 안전 대기 중 창문 명령 거부"})
 
     def _caps(self, cands, decided: dict[str, Decision]) -> dict[str, float]:
         """장치별 지금 낼 수 있는 최댓값 — cap · force 후보의 최솟값, 없으면 장치 최댓값 (I7 후처리로 줄었으면 그 값)."""

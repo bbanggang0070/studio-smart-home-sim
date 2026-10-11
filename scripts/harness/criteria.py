@@ -22,6 +22,7 @@
     basis_is('FALLBACK')             재실 판정 근거(occupancy_basis)가 그 값인 시각
     alert_raised('E15')              /studio/state/alerts 에 그 코드의 알림이 나온 뒤의 시각
     ac_fan_is('low')                 에어컨이 꺼져 있거나 그 풍량인 시각
+    abs(<식>)                         절댓값
     mode_is('SLEEP')                 제어기가 낸 유효 생활 모드(living_mode)가 그 값인 시각
     feasibility_is('DEGRADED')       control_feasibility 가 그 값인 시각
     cmd_* 별칭은 제어기가 낸 명령값 — 내지 않은 주기는 직전 값을 이어 쓴다
@@ -86,6 +87,7 @@ ALIASES = {
     "desk_illuminance": "truth.desk_illuminance_lux",   # 책상면 조도 참값 (센서 없음 — C4 판정용)
     "floor_illuminance": "truth.floor_illuminance_lux", # 방 작업면(바닥 중앙) 조도 참값 — 모드 조도 목표의 기준면 (B1 · B2)
     "cmd_window": T.C_WINDOW_OPEN_RATIO,
+    "cmd_blind": T.C_BLIND_ANGLE,
     "cmd_ceiling_light": T.C_CEILING_LIGHT,
     "cmd_desk_light": T.C_DESK_LIGHT,
     "cmd_desk_cct": T.C_DESK_LIGHT_CCT,
@@ -344,7 +346,7 @@ def evaluate(df: pd.DataFrame, criteria: list[str], expect: dict[str, dict], anc
         return _state_is(T.T_CONTROL_FEASIBILITY, name)
 
     funcs = {"event_entered": lambda name: _active_event_mask(df, name), "value_at": value_at,
-             "mode_is": mode_is, "feasibility_is": feasibility_is,
+             "mode_is": mode_is, "feasibility_is": feasibility_is, "abs": np.abs,
              "basis_is": basis_is, "alert_raised": alert_raised,
              "ended_for": ended_for,
              "entries": entries, "ac_fan_is": ac_fan_is,

@@ -120,3 +120,5 @@ def qos_kind(topic: str) -> str:
 I_WINDOW_TORQUE_PCT = f"{P}/internal/window_torque_pct"
 #  시험 전용 (물리 모드 검증 스크립트) — 끼임 물체를 창 레일 경로에 놓기 / 치우기. String: 'rigid_pot' | 'soft_cushion' | 'elastic_sponge' | 'park'
 I_SIM_OBSTACLE = f"{P}/internal/sim_obstacle"
+#  시험 전용 — 시나리오 초기 액추에이터 상태를 Isaac 에 적용 (월드 노드 → 브릿지). String JSON {window_open_ratio, blind_angle_deg}
+I_SIM_INIT = f"{P}/internal/sim_init"

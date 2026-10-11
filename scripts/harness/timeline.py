@@ -133,6 +133,11 @@ def build_timeline(scenario: dict[str, Any]) -> Timeline:
             kind = inj["fault"]
             dur = float(inj.get("duration_s", duration - at))
             tl.intervals.append(Interval(inj.get("label", kind), kind, at, at + dur, inj))
+        elif "obstacle" in inj:                      # 물리 모드 — 끼임 물체를 창 레일 경로에 (X2) · 고속 모드는 기록만
+            tl.intervals.append(Interval(inj.get("label", "obstacle"), "obstacle", at, at, inj))
+        elif "temp_wave" in inj:                     # 물리 모드 — 실내 공기 온도 강제 진동 {center_c, amplitude_c, period_s} (B5)
+            dur = float(inj.get("duration_s", duration - at))
+            tl.intervals.append(Interval(inj.get("label", "temp_wave"), "temp_wave", at, at + dur, inj))
         elif "manual" in inj:                        # 사용자 직접 조작 — {device, action}
             tl.intervals.append(Interval(inj.get("label", "manual"), "manual", at, at, inj))
         elif inj.get("door") == "open_close":

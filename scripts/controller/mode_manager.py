@@ -4,7 +4,8 @@
 - AUTO: user_modes.yaml 의 rules 를 위에서부터 평가. 자동 전환에만 히스테리시스(auto_hysteresis_min)
 - 외출(E8): 재실이 false 이고 away_auto_enabled 이면 AWAY — 재실 판정(문 이벤트 · 판정 창)은 재실 노드의 몫이다
 - 귀가(E7): AWAY 중 재실 true → 직전 모드로 복귀
-스케줄 경로는 W09 후반 (schedule.enabled 가 기본 false).
+- 스케줄(schedule.enabled): 우선순위 수동 > 스케줄 > AUTO. 수동 선택은 다음 스케줄 경계까지 유지된다
+  (switching.manual_hold_until). 요일(days)은 시뮬레이션 시각에 없어 v1 은 무시한다
 """
 
 from __future__ import annotations
@@ -37,6 +38,10 @@ class ModeManager:
         self._candidate_since = 0.0
         self._before_away = "NORMAL"
         self._initialized = False
+        sch = p.modes.get("schedule") or {}
+        self.schedule = sorted(((_hhmm(e["at"]), e["mode"]) for e in sch.get("entries") or []), key=lambda x: x[0]) \
+            if sch.get("enabled") else []
+        self._manual = None                     # (모드, 설정 시각)
 
     def _auto_select(self, o: Observation) -> str:
         for rule in self.p.mode("AUTO")["rules"]:
@@ -58,6 +63,21 @@ class ModeManager:
             return rule["select"]
         return "NORMAL"
 
+    def _scheduled(self, tod: float) -> str:
+        """지금 시각 직전의 스케줄 항목 모드 (자정을 넘으면 전날 마지막 항목)."""
+        past = [m for t, m in self.schedule if t <= tod]
+        return past[-1] if past else self.schedule[-1][1]
+
+    def _boundary_since(self, t0: float, t1: float) -> bool:
+        """t0 (초과) ~ t1 (이하) 사이에 스케줄 경계가 있었나 (하루 안 · 자정 넘김 처리)."""
+        if t1 - t0 >= SECONDS_PER_DAY:
+            return True
+        a, b = t0 % SECONDS_PER_DAY, t1 % SECONDS_PER_DAY
+        for t, _ in self.schedule:
+            if (a < t <= b) if a <= b else (t > a or t <= b):
+                return True
+        return False
+
     def update(self, o: Observation) -> tuple[str, str]:
         """→ (유효 모드, 결정 경로 manual | auto | away)."""
         if self.away_auto and not o.occupied:
@@ -69,7 +89,15 @@ class ModeManager:
             self.mode, self.path = self._before_away, "arrival"
 
         if o.user_mode != "AUTO":
-            self.mode, self.path = o.user_mode, "manual"
+            if self._manual is None or self._manual[0] != o.user_mode:
+                self._manual = (o.user_mode, o.now_s)
+            if not (self.schedule and self._boundary_since(self._manual[1], o.now_s)):
+                self.mode, self.path = o.user_mode, "manual"
+                return self.mode, self.path
+        else:
+            self._manual = None
+        if self.schedule:                                     # 수동이 없거나 다음 경계가 지났다 → 스케줄
+            self.mode, self.path = self._scheduled(o.tod_s), "schedule"
             return self.mode, self.path
 
         want = self._auto_select(o)

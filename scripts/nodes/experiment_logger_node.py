@@ -59,6 +59,9 @@ def main() -> None:
     def on_truth(m):
         tr = json.loads(m.data)
         st["t_last"] = time.monotonic()
+        if st.get("last_t") is not None and tr["t"] <= st["last_t"]:
+            return                                                # 월드 노드 준비 대기 중 반복되는 t = 0 — 한 번만 쓴다
+        st["last_t"] = tr["t"]
         row: dict = {"time_s": tr["t"]}
         obs = dict(tr["obs"])
         energy = obs.pop("energy_wh", {})

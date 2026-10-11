@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import time
+from pathlib import Path
 
 import rclpy
 
@@ -29,11 +30,17 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--baseline", default="proposed")
     ap.add_argument("--clock0", default="", help="HH:MM — 하루 중 시작 시각 (기본: 현지 시각)")
+    ap.add_argument("--scenario", default="", help="시나리오 id — 설치 설정(가전 프로파일 · 사용자 설정 · 필터 누적)을 고속 모드와 같게 읽는다")
     args, _ = ap.parse_known_args()
 
     p = load_params()
     ctrl = SmartHomeController()
-    ctrl.reset({"baseline": args.baseline, "scenario": {}})
+    sc = {}
+    if args.scenario:                                   # 고속 모드와 같은 reset — 프로파일이 다르면 쓸 수 있는 가전이 다르다 (X2 P-core)
+        from harness.scenario import load_scenarios
+        sc = next(s for s in load_scenarios(Path(__file__).resolve().parents[2] / "config" / "scenario_profiles.yaml")
+                  if s["id"] == args.scenario)
+    ctrl.reset({"baseline": args.baseline, "scenario": sc})
     rclpy.init()
     node = rclpy.create_node("smart_home_controller")
     log = node.get_logger()

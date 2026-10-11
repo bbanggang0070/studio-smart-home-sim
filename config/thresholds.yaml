@@ -50,6 +50,10 @@ smart_home_controller:
       light_off_lux: 320.0       # 이상 → 조명 소등 (데드밴드 70 lux)
       over_bright_lux: 700.0     # 이상 → 블라인드 차광 시작
       shade_release_lux: 620.0   # 이하 → 차광 해제 (데드밴드 80 lux)
+      glare_partial_shade: true  # [v3.4.13] 눈부심 차광은 부분 차광 — 방 조도 목표에 맞는 각도 (전부 가리고 조명을 켜지 않게 · B2)
+      ceiling_deadband_lux: 30.0 # [v3.4.13] draft — 작업면 부족분이 이보다 작으면 천장등을 켜지 않는다 (주광이 목표 근처일 때 깜빡임 방지)
+      glare_angle_step_deg: 5.0
+      glare_settle_s: 5.0        # [v3.4.13] draft — 블라인드가 지령 각도에 도착한 뒤 이만큼 지나서야 조도로 다시 판단 (움직이는 중 · 센서 지연에 과보정 진동 방지)  # 부분 차광 각도 단위 · 이만큼 넘게 달라질 때만 바꾼다 (센서 잡음에 블라인드가 떨지 않게)
       comfort_min_lux: 250.0     # 평가 지표용 목표 범위 하한
       comfort_max_lux: 700.0     # 평가 지표용 목표 범위 상한
 
@@ -451,6 +455,8 @@ smart_home_controller:
       target_ugm3: 15.0
       bad_ugm3: 35.0
       purifier_level_above_target: 1   # [v3.4.3] 평상시 청정기 — 목표 초과 1단 · 나쁨 초과 2단
+      purifier_off_band_ugm3: 3.0      # [v3.4.15] draft — 목표 − 3 µg/m³ 아래로 내려가야 끈다 (PM 센서 잡음 채터링 — 물리 모드 B5)
+      control_filter_s: 30.0           # [v3.4.15] draft — 청정기 판단용 PM 이동평균 시정수 (센서 잡음 σ ≈ 2.5 µg/m³ · 이벤트 감지는 원값)
       purifier_level_above_bad: 3      # 2026-10-09: 2 → 3 (docs/09 '청정기 PM 높으면 가동' · 요리 후 회복 지연 개선)
       recovery_target_ugm3: 35.0       # 지표 #10 회복 기준
 
@@ -692,6 +698,7 @@ smart_home_controller:
       pm_remove:  [dilution_if_cleaner_outside, purifier, range_hood]
       anti_condensation: [ceiling_fan_reverse, blind_open, dehumidifier, pulse_vent_if_drier_outside]
       window_cooling_requires_outdoor_below_c: 1.0   # 외기 < 실내 - 1 °C
+      window_cooling_release_band_c: 0.5   # [v3.4.15] draft — 한번 들어가면 차이가 1.0 − 0.5 °C 로 줄 때까지 유지 (경계 근처 센서 잡음 채터링 — 물리 모드 X2)
       base_vent_window_outdoor_temp_range_c: [15.0, 28.0]  # 이 범위 밖이면 기본 환기에 창문을 쓰지 않음
 
     # ---- 쾌적 사다리 구현값 — [v3.4.3] 제어기 v1 (docs/06 §4 · docs/07 §4.2–4.3) --------------
@@ -722,7 +729,16 @@ smart_home_controller:
       enabled: true
       degraded_after_s: 120.0    # 목표 미달 지속 → DEGRADED
       infeasible_after_s: 300.0  # 가용 수단 소진 + 목표 미달 → INFEASIBLE
-      suppress_futile_actuation: true  # 불가 판정 시 헛구동 중단
+      suppress_futile_actuation: true  # 불가 판정 시 헛구동 중단 — [v3.4.14] 아직 미구현 (X2 구동 횟수 판정으로 결과만 확인)
+      #  [v3.4.14] W09 T9.7 구현 (controller/feasibility.py) — 목표별 '벗어남 ∧ 쓸모 있는 수단 소진 ∧ 나아지지 않음' (draft)
+      improve_window_s: 600.0          # 이 창 동안
+      improve_min_c: 0.1               #   이만큼이라도 좋아지면 '나아지는 중' (느려도 나아지면 불가가 아니다)
+      improve_min_pct: 0.5
+      improve_min_ugm3: 2.0
+      cooling_margin_c: 1.0            # 냉방 목표 + 1 °C 를 넘으면 '벗어남'
+      humidity_margin_pct: 5.0         # 습도 상한 + 5 %p
+      #  발생원이 있는 동안의 PM · 습도 상승은 '불가'가 아니라 외란이다 — 이 이벤트가 켜져 있으면 해당 목표를 판정에서 뺀다
+      disturbance_events: { pm: [COOKING, HOOD_POST_RUN], dehum: [COOKING, HOOD_POST_RUN, SHOWER, LAUNDRY_DRYING] }
 
     # ---- 센서 페일세이프 (시나리오 X3) --------------------------------------
     sensor_failsafe:

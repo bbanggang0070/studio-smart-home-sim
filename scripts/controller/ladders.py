@@ -30,6 +30,7 @@ class ComfortLadders:
         self._fan_high = False
         self._escalated = False
         self._ac_on = False
+        self._outdoor_cooler = False
 
     def _dry_sp(self, sp: float) -> float:
         """에어컨 제습 운전 설정 — 냉방 목표보다 낮춰 둔다. 제습 운전도 실내가 설정 아래로 내려가면 압축기가 멈춰
@@ -37,6 +38,9 @@ class ComfortLadders:
         g = self.p.get
         cl = "comfort_ladders."
         return max(g(cl + "ac_dry_min_setpoint_c"), sp - g(cl + "ac_dry_setpoint_below_c"))
+
+    def _band_ml(self, key: str) -> float:
+        return self.p.get(f"means_ladder.{key}") if self.hyst else 0.0
 
     def _band(self, key: str) -> float:
         return self.p.get(f"comfort_ladders.{key}") if self.hyst else 0.0
@@ -68,8 +72,12 @@ class ComfortLadders:
             m["humidity_range_pct"] = [None, g("events.saving_state.mold_guard_rh_pct")]
         season = self.season(o)
         info: dict = {"season": season}
-        outdoor_cooler = (not math.isnan(o.outdoor_temp_c)
-                          and o.outdoor_temp_c <= o.temp_c - g("means_ladder.window_cooling_requires_outdoor_below_c"))
+        # 외기가 더 시원한가 — 히스테리시스 (경계에서 실내 온도 잡음만으로 매 주기 뒤집히지 않게, X2 물리 모드)
+        need_dt = g("means_ladder.window_cooling_requires_outdoor_below_c")
+        if self._outdoor_cooler:
+            need_dt -= self._band_ml("window_cooling_release_band_c")
+        self._outdoor_cooler = (not math.isnan(o.outdoor_temp_c) and o.outdoor_temp_c <= o.temp_c - need_dt)
+        outdoor_cooler = self._outdoor_cooler
         free_cool = outdoor_cooler                      # 환기로 하는 냉방 — 아래에서 I10 이 막을 수 있다
         # 창문을 못 쓰면 배기 + 흡기만 남는다 — 소음 등급 · 외기 등급 상한 뒤 배기 여력이 작으면 무료 냉방이 없는 것과 같다
         if free_cool and blocked:
@@ -159,6 +167,9 @@ class ComfortLadders:
                 why = "냉방 ⑤ 에어컨" + (" (승격 — 무료 냉방 부족)" if escalate else "") + (f" (I5 +{relax:g} °C)" if relax else "")
                 ac_cmd = ("dry", self._dry_sp(sp_ac), why + " → 제습 모드 (냉방 + 제습)") if self._ac_dry else ("cool", sp_ac, why)
         info["cooling"] = self.cooling
+        if sp is not None:                              # 실제 냉방 목표 (I5 완화 포함) — 제어 가능성 판정이 쓴다
+            info["cooling_target_c"] = sp + (g("interaction_rules.I5_ceiling_fan_setpoint_relax_c")
+                                             if "ceiling_fan" in self.rules.devices else 0.0)
 
         # ---- 제습 수단 ----
 
@@ -175,6 +186,13 @@ class ComfortLadders:
             else:
                 add("dehumidifier", "need", 1, L5, f"제습 ③ 제습기 (I6 {season})")
         info["dehumidifying"] = self.dehumidifying
+        # 목표별 '쓸모 있는 수단' — 제어 가능성 판정(feasibility)이 소진 여부를 볼 때 쓴다 (외기가 더 더우면 환기는 냉방 수단이 아니다)
+        sunny = self.rules.lighting.daylight_workplane(o) >= g("comfort_ladders.shade_requires_lux")
+        info["useful_means"] = {
+            "cooling": {"ac": ac_allowed, "window": free_cool, "exhaust": free_cool, "intake": free_cool,
+                        "ceiling_fan": True, "blind": sunny},
+            "dehum": {"ac": ac_allowed and season == "summer", "dehumidifier": True, "window": i10, "exhaust": i10},
+        }
 
         # ---- 가습 (I4 상한) ----
         lo = (m.get("humidity_range_pct") or [None, None])[0]

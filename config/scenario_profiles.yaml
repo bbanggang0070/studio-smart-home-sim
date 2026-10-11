@@ -585,6 +585,9 @@ scenarios:
       - "pm25 <= 35 for all t"
       - "co2 <= 1000 for all t"
       - "purifier_level >= 2 when outdoor_pm25 > 75 and t >= 2405"    # 매우나쁨 — 청정기 2단 (반응 5 s 허용)
+      - "exhaust_fan_rpm <= 1400 when outdoor_pm25 > 15 and t >= 15"    # 보통 — 배기 상한 1,400 (W09 DoD: 등급별 단계적 감소)
+      - "exhaust_fan_rpm <= 600 when outdoor_pm25 > 35 and t >= 1215"   # 나쁨 — 600
+      - "exhaust_fan_rpm <= 1 when outdoor_pm25 > 75 and t >= 2415"     # 매우나쁨 — 팬 정지 (우천 C1 과 반대)
     metrics: [pm25_peak, co2_compliance, energy_wh, rule_violation_count]
 
   # ---- C11 · 냉방 중 + 기본 환기 (docs/03 §3) ------------------------------------------
@@ -1536,7 +1539,7 @@ scenarios:
     pass_criteria:
       - "floor_illuminance >= 250 within 1 after 0"            # docs/03 B1 — 1.0 s 이내 250 lux
       - "exhaust_fan_rpm <= 1 for all t"                         # 팬 정지 유지
-      - "window_open_ratio <= 0.01 for all t"
+      - "window_open_ratio <= 0.105 for all t"                   # 창문은 재실 기본 환기 틈(10 %)까지만 (v3.4 — 2026-10-11 결정 가)
 
   - id: B2
     tier: 1
@@ -1570,9 +1573,11 @@ scenarios:
       outdoor_temp_c: 23.0
       outdoor_rh_pct: 50.0
     pass_criteria:
-      - "blind_angle >= 72 within 30 after 0"                    # 차광 75° (목표각 오차 ≤ 3°)
-      - "floor_illuminance <= 0.5 * value_at('floor_illuminance', 0) by 60 after 0"   # 조도 하강 (W08 DoD)
-      - "ceiling_light <= 0.5 by 60 after 0"                     # docs/03 B2 — 조명 출력 0 %
+      - "blind_angle >= 20 within 30 after 0"                    # 부분 차광 (2026-10-11 결정 가 — 방 조도 목표에 맞는 각도)
+      - "abs(blind_angle - cmd_blind) <= 3 when t >= 30"         # 블라인드 목표각 오차 ≤ 3°
+      - "floor_illuminance <= 0.6 * value_at('floor_illuminance', 0) by 60 after 0"   # 조도 하강 (W08 DoD)
+      - "floor_illuminance >= 360 when t >= 60"                  # 일반 모드 400 lux 의 90 % 이상 유지 (조명 없이)
+      - "ceiling_light <= 0.5 by 60 after 0"                     # 조명 출력 0 %
 
   - id: B3
     tier: 1
@@ -1613,3 +1618,77 @@ scenarios:
       - "value_at('temperature', 300) < value_at('temperature', 0)"   # 온도 하강 추세 (docs/03 B3 · W08 T8.6)
       - "temperature < value_at('temperature', 300) by 900 after 0"
       - "humidity <= value_at('humidity', 0) by 900 after 0"     # 습도 하강 — 외기가 더 건조 (W08 T8.6)
+
+  - id: X2
+    tier: 3
+    name: "모든 환기 경로 차단 — 실패 보고"
+    duration_s: 900
+    repeat: 1
+    baselines: [proposed]
+    seed: 20261024
+    run_mode: physics
+    appliance_profile: core            # P-core — 에어컨 · 흡기팬 · 제습기 없음 (P-full 이면 에어컨이 해결해 실패가 성립하지 않는다)
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 32.0
+      humidity_pct: 80.0
+      co2_ppm: 700.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "15:00"
+      window_open_ratio: 0.5           # 열어 둔 창 경로에 장애물 — 비가 와 닫으려다 막힌다
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: rain
+      outdoor_illuminance_lux: 15000.0
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 31.0
+      outdoor_rh_pct: 95.0
+    injections:
+      - { at_s: 0, obstacle: rigid_pot, label: pot }
+    pass_criteria:
+      - "feasibility_is('INFEASIBLE') within 900 after 0"         # 제어 목표 달성 불가를 판정 · 보고
+      - "actuation_count <= 10"                                   # 무의미한 반복 구동 없음 (지표 #8)
+
+  - id: B5
+    tier: 1
+    name: "히스테리시스 채터링 억제"
+    duration_s: 600
+    repeat: 1
+    baselines: [B, proposed]
+    seed: 20261025
+    run_mode: physics
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 26.5
+      humidity_pct: 50.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "20:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 0.0
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 24.0
+      outdoor_rh_pct: 50.0
+    injections:
+      # v3.4 데드밴드 [목표 − 1.0, 목표 + 0.5] = [25.0, 26.5] 안팎 — 진입 경계(26.5)를 넘고 B 의 해제 경계(26.0)를 넘나든다
+      - { at_s: 0, temp_wave: { center_c: 26.4, amplitude_c: 0.5, period_s: 120.0 }, label: wave }   # 25.9 ↔ 26.9 °C · 10분 동안 5회
+    pass_criteria:
+      - "actuation_count <= 0.5 * baseline_B.actuation_count"    # 히스테리시스 없는 B 대비 구동 50 % 이상 감소

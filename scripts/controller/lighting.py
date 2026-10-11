@@ -25,6 +25,9 @@ class Lighting:
         self._last_valid: tuple[float, float] | None = None   # (시각, 값)
         self._sleep_since: float | None = None
         self._glare = False
+        self._glare_deg: float | None = None
+        self._settled_since: float | None = None
+        self._hold_c_pct: float | None = None
         self.virtual = False
         self.alerted = False
 
@@ -95,7 +98,16 @@ class Lighting:
         daylight = max(0.0, lux - self._own_light(o)) / g(lm + "daylight_sensor_ratio")   # 작업면 주광 추정
         info["daylight_workplane_lux"] = round(daylight, 1)
         ceil_target = m.get("ceiling_lux", m["lux"]) if m["target"] == "desk" else m["lux"]
-        c_pct = min(100.0, max(0.0, (ceil_target - daylight) / g(lm + "ceiling_lux_at_floor_full") * 100.0))
+        # 블라인드가 움직이는 중이거나 막 멈췄으면(센서 · 조명 지연) 조도로 다시 판단하지 않는다 — 과보정 진동 방지 (B2 물리 모드)
+        settled = self._blind_settled(o)
+        short = ceil_target - daylight
+        if short < g("illuminance.ceiling_deadband_lux"):
+            short = 0.0                                    # 목표 근처 — 센서 잡음에 천장등이 깜빡이지 않게
+        c_pct = min(100.0, max(0.0, short / g(lm + "ceiling_lux_at_floor_full") * 100.0))
+        if settled or self._hold_c_pct is None:
+            self._hold_c_pct = c_pct
+        else:
+            c_pct = self._hold_c_pct
         add("ceiling_light", "need", c_pct, L6, f"조명 — 천장 {ceil_target:g} lux 목표 ({mode})")
         if cooling:
             add("ceiling_light", "cap", g("setpoints.ceiling_light_thermal_cap_pct"), L5, "고온 — 조명 발열 상한 (C4)")
@@ -113,10 +125,46 @@ class Lighting:
         frac = min(max(o.blind_deg / g("setpoints.blind_shade_angle_deg"), 0.0), 1.0)
         t_open, t_sh = g(lm + "outdoor_transmittance_open"), g(lm + "outdoor_transmittance_shaded")
         open_equiv = daylight * t_open / (t_open + frac * (t_sh - t_open))
-        if open_equiv > g(il + "over_bright_lux"):
-            self._glare = True
-        elif open_equiv < g(il + "shade_release_lux"):
-            self._glare = False
+        if settled:
+            if open_equiv > g(il + "over_bright_lux"):
+                self._glare = True
+            elif open_equiv < g(il + "shade_release_lux"):
+                self._glare = False
         if self._glare:
-            add("blind", "need", g("setpoints.blind_shade_angle_deg"), L6, "눈부심 — 블라인드 차광")
+            if not g(il + "glare_partial_shade"):
+                deg = g("setpoints.blind_shade_angle_deg")
+            elif settled or self._glare_deg is None:
+                deg = self._partial_shade_deg(open_equiv, ceil_target, t_open, t_sh)
+            else:
+                deg = self._glare_deg                      # 움직이는 중 — 직전 지령 유지
+            add("blind", "need", deg, L6, f"눈부심 — 블라인드 차광 {deg:g}°")
+            info["glare_shade_deg"] = deg
+        else:
+            self._glare_deg = None
         return info
+
+    def _partial_shade_deg(self, open_equiv: float, target: float, t_open: float, t_sh: float) -> float:
+        """방 조도 목표에 맞는 차광 각도 — 블라인드를 연 상태의 작업면 주광(open_equiv)에서 필요한 투과율을 거꾸로 푼다.
+        목표가 눈부심 해제 조도보다 높으면 해제 조도에 맞춘다. 각도 단위 · 데드밴드로 떨림을 막는다."""
+        g = self.p.get
+        il = "illuminance."
+        goal = min(target, g(il + "shade_release_lux"))
+        tau = t_open * goal / max(open_equiv, 1e-6)
+        frac = min(max((tau - t_open) / (t_sh - t_open), 0.0), 1.0)
+        step = g(il + "glare_angle_step_deg")
+        # 내림 — 덜 가리는 쪽으로 (주광이 목표보다 약간 밝게 남아 조명이 켜지지 않게)
+        deg = min(g("setpoints.blind_shade_angle_deg"), math.floor(frac * g("setpoints.blind_shade_angle_deg") / step) * step)
+        if self._glare_deg is None or abs(deg - self._glare_deg) > step:
+            self._glare_deg = deg
+        return self._glare_deg
+
+    def _blind_settled(self, o: Observation) -> bool:
+        """블라인드가 직전 차광 지령 각도에 도착해 glare_settle_s 이상 지났나 (지령이 없으면 늘 정착)."""
+        if self._glare_deg is None:
+            self._settled_since = None
+            return True
+        if abs(o.blind_deg - self._glare_deg) > 2.0:
+            self._settled_since = None
+            return False
+        self._settled_since = self._settled_since if self._settled_since is not None else o.now_s
+        return o.now_s - self._settled_since >= self.p.get("illuminance.glare_settle_s")

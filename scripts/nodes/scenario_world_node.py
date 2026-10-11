@@ -9,12 +9,15 @@
              /studio/internal/door_open (Bool — 사람이 문을 연다 → Isaac 문 조인트) · /studio/internal/person (String JSON → Isaac 사람 프록시)
              /studio/state/air_balance (Float32 — Q_net) · /studio/cmd/mode · activity (사용자 = 시나리오) · /clock (시뮬레이션 시각)
   시각       /clock = 하루 중 초 (시나리오 time_of_day + 경과). 제어기 노드가 이 시각을 쓴다
+  준비       제어기가 첫 판단을 낼 때(state/living_mode)까지 t = 0 참값을 반복해 내며 기다린다 (최대 30 s) —
+             고속 모드처럼 제어기가 t = 0 상태를 보고 판단한 뒤에 시나리오 시계가 흐른다 (노드 기동 순서에 결과가 흔들리지 않게)
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 import rclpy
@@ -101,10 +104,14 @@ def main() -> None:
     pub_door = node.create_publisher(Bool, DOOR_OPEN, rel)
     pub_person = node.create_publisher(String, PERSON, rel)
     pub_clock = node.create_publisher(Clock, "/clock", 10)
+    pub_init = node.create_publisher(String, T.I_SIM_INIT, rel)
+    pub_obstacle = node.create_publisher(String, T.I_SIM_OBSTACLE, rel)
+    ini_act = initial_actuators(sc)
     pubs = {tp: ros_io.publisher(node, tp) for tp in (T.T_AIR_BALANCE, T.C_MODE, T.C_ACTIVITY)}
     fast_pubs = {tp: ros_io.publisher(node, tp) for tp in list(FIELD_TO_STATE.values()) + [T.T_AC]} if args.fast_actuators else {}
 
-    state = {"t": 0.0, "was_present": world.occupancy, "arrived_at": None}
+    state = {"t": 0.0, "was_present": world.occupancy, "arrived_at": None, "ready": False, "wait": 0}
+    ros_io.subscribe(node, T.T_LIVING_MODE, lambda _t, _v: state.update(ready=True))
     dt = 1.0
     unsupported_seen: set[str] = set(tl.unsupported)
     for u in unsupported_seen:
@@ -115,15 +122,28 @@ def main() -> None:
         if now > duration:
             log.info(f"시나리오 {args.scenario} 끝 ({duration:.0f} s)")
             raise SystemExit
-        for change in tl.events_between(now - dt if now else -1.0, now + 1e-9 if now == 0 else now):
-            world.apply(change)
-        if args.fast_actuators:
+        fresh = now > 0 or not state.get("t0_done")          # 준비 대기로 t = 0 을 반복할 때 t = 0 이벤트는 한 번만
+        if now == 0 and state["wait"] % 5 == 0:              # 초기 액추에이터 상태 → Isaac (대기 중 몇 번 되풀이 — 브릿지가 늦게 떠도)
+            pub_init.publish(String(data=json.dumps({"window_open_ratio": ini_act.window_open_ratio,
+                                                     "blind_angle_deg": ini_act.blind_angle_deg})))
+        state["t0_done"] = True
+        if fresh:
+            for iv in tl.instants_between(now - dt if now else -1.0, now + 1e-9, "obstacle"):
+                pub_obstacle.publish(String(data=str(iv.spec["obstacle"])))
+                log.info(f"시험 물체 배치: {iv.spec['obstacle']}")
+        for iv in tl.active_kind(now, "temp_wave"):          # 참값 강제 — 실내 공기 온도를 사인파로 (B5 히스테리시스)
+            w = iv.spec["temp_wave"]
+            model.state.temp_c = w["center_c"] + w["amplitude_c"] * math.sin(2 * math.pi * (now - iv.start_s) / w["period_s"])
+        if fresh:
+            for change in tl.events_between(now - dt if now else -1.0, now + 1e-9 if now == 0 else now):
+                world.apply(change)
+        if args.fast_actuators and now > 0:
             acts.update(dt)
         src, extra_power = tl.sources_at(now, cooktop["relay"])
-        hung = tl.laundry_hung_between(now - dt if now else -1.0, now)
+        hung = tl.laundry_hung_between(now - dt if now else -1.0, now) if fresh else 0.0
         if hung > 0:
             model.hang_laundry(model.state.laundry_moisture_g + hung)
-        obs = model.step(dt if now else 0.0, actual, world.ext, src, world.occupancy_model())
+        obs = model.step(dt if now else 0.0, actual, world.ext, src, world.occupancy_model())   # t = 0 (대기 중)은 적분 없음
         if world.occupancy and not state["was_present"]:
             state["arrived_at"] = now
         state["was_present"] = world.occupancy
@@ -160,6 +180,11 @@ def main() -> None:
             for tp, v in acts.state_topics().items():
                 if tp in fast_pubs:
                     ros_io.publish(fast_pubs[tp], tp, v)
+        if not state["ready"] and state["wait"] < 30:            # 제어기 준비 전 — t = 0 을 반복해 낸다
+            state["wait"] += 1
+            if state["wait"] == 1:
+                log.info("제어기 준비 대기 (t = 0 유지)")
+            return
         state["t"] = now + dt
 
     node.create_timer(dt / args.speed, tick)

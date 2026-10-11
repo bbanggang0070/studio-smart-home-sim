@@ -48,6 +48,10 @@ class RuleEngine:
         self.alerts: list[str] = []
         self.info: dict = {}
         self.ladders = ComfortLadders(p, psy, self, hysteresis)
+        self.hysteresis = hysteresis
+        self._pm_level = 0                          # 실내 PM 청정기 단 (히스테리시스 상태)
+        self._pm_avg: float | None = None           # 청정기 판단용 PM 이동평균
+        self._pm_last_t: float | None = None
         self.lighting = Lighting(p)
         self._mm_alerted = False
         self.energy: EnergyPlanner | None = None    # 외출 전략 · 프리쿨링 (smart_home 이 사용자 설정으로 만든다)
@@ -237,10 +241,24 @@ class RuleEngine:
         elif self.energy is not None:
             self.energy.end_away()
         pm = "indoor_pm."
-        if o.pm25 > g(pm + "bad_ugm3"):
+        # 히스테리시스 — 켜는 기준(목표 · 나쁨)을 넘어 켰으면 기준 − off_band 아래로 내려가야 한 단 내린다 (센서 잡음 채터링, B5)
+        band = g(pm + "purifier_off_band_ugm3") if self.hysteresis else 0.0
+        bad_at = g(pm + "bad_ugm3") - (band if self._pm_level >= 2 else 0.0)
+        tgt_at = g(pm + "target_ugm3") - (band if self._pm_level >= 1 else 0.0)
+        # 청정기 판단은 이동평균으로 (센서 잡음에 단이 오르내리지 않게) — 요리 감지 등 이벤트는 원값을 쓴다
+        dt = 1.0 if self._pm_last_t is None else max(o.now_s - self._pm_last_t, 0.0)
+        self._pm_last_t = o.now_s
+        a = 1.0 - math.exp(-dt / g(pm + "control_filter_s")) if self._pm_avg is not None else 1.0
+        self._pm_avg = o.pm25 if self._pm_avg is None else self._pm_avg + a * (o.pm25 - self._pm_avg)
+        pm_ctl = self._pm_avg
+        if pm_ctl > bad_at:
+            self._pm_level = 2
             add("purifier", "need", g(pm + "purifier_level_above_bad"), L5, "실내 PM 나쁨")
-        elif o.pm25 > g(pm + "target_ugm3"):
+        elif pm_ctl > tgt_at:
+            self._pm_level = 1
             add("purifier", "need", g(pm + "purifier_level_above_target"), L5, "실내 PM 목표 초과")
+        else:
+            self._pm_level = 0
         if cond and cond.info.get("level") == "warn":
             add("ceiling_fan", "need", -1, L5, "E2 결로 경고 실링팬 역회전")
             add("humidifier", "cap", 0, L5, "E2 결로 경고 가습 중단")

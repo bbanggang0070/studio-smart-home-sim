@@ -32,7 +32,7 @@ def generate_launch_description():
         DeclareLaunchArgument("baseline", default_value="proposed"),
         DeclareLaunchArgument("rep", default_value="1", description="반복 번호 (로그 파일 이름)"),
         DeclareLaunchArgument("stub", default_value="false", description="W06 시험용 고정 센서 스텁 (월드 · 센서 노드 대신)"),
-        _node("smart_home_node.py", "--baseline", LaunchConfiguration("baseline")),
+        _node("smart_home_node.py", "--baseline", LaunchConfiguration("baseline"), "--scenario", scenario),
         _node("appliance_bridge_node.py"),
         # 시나리오 월드 + 센서 노드 (W07)
         ExecuteProcess(cmd=["python3", "scripts/nodes/scenario_world_node.py", "--scenario", scenario, "--speed", speed,

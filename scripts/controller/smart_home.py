@@ -15,6 +15,7 @@ from controller.appliance_guard import ApplianceGuard
 from controller.energy import EnergyPlanner
 from controller.arbiter import Decision, merge
 from controller.event_detector import ActiveEvent
+from controller.feasibility import Feasibility
 from controller.event_detector import GRADE_ORDER, EventDetector
 from controller.ladders import ac_json
 from controller.mode_manager import ModeManager
@@ -82,6 +83,7 @@ class SmartHomeController:
                                           strategy if strategy in ("auto", "setback", "off", "precool") else "auto")
         self.devices = self.rules.devices
         self.guard = ApplianceGuard(self.p)
+        self.feas = Feasibility(self.p)
         self._last_t: float | None = None
         self._reasons: list[str] = []
 
@@ -126,7 +128,12 @@ class SmartHomeController:
                                            "i10_dew_diff_c": info.get("i10_dew_diff_c")})
         if "energy_forecast" in info:
             out[T.T_ENERGY_FORECAST] = json.dumps(info["energy_forecast"])
-        out[T.T_CONTROL_FEASIBILITY] = "DEGRADED" if "APPLIANCE_FAULT" in ev else "FEASIBLE"   # 전체 판정은 W09 T9.7
+        out[T.T_CONTROL_FEASIBILITY] = self.feas.update(o, self.p.mode(mode), decided, set(decided),
+                                                        self._caps(cands, decided), ev, info.get("useful_means"),
+                                                        info.get("cooling_target_c"),
+                                                        (info.get("ac_override") or info.get("ac") or {}).get("mode"))
+        if self.feas.reason:
+            self._reasons.append(f"control_feasibility={self.feas.state} ← {self.feas.reason}")
         alerts = sorted(self.rules.alerts + self.events.alerts + self.guard.alerts, key=lambda a: a["t"])
         if alerts:                                     # 사용자 알림 (v3.4.5 전용 토픽)
             out[T.T_ALERTS] = json.dumps(alerts, ensure_ascii=False)
@@ -144,6 +151,21 @@ class SmartHomeController:
                 a["fan"] = info["ac_fan_force"]
             info["ac"] = a
         return ac_json(info, on, self.guard.seq)       # seq — 재송신하면 값이 바뀌어 브릿지가 다시 쏜다 (E9)
+
+    def _caps(self, cands, decided: dict[str, Decision]) -> dict[str, float]:
+        """장치별 지금 낼 수 있는 최댓값 — cap · force 후보의 최솟값, 없으면 장치 최댓값 (I7 후처리로 줄었으면 그 값)."""
+        g = self.p.get
+        top = {"window": 1.0, "exhaust": g("appliances.exhaust_fan.max_rpm"), "intake": g("appliances.intake_fan.max_rpm"),
+               "ceiling_fan": 2.0, "blind": g("setpoints.blind_shade_angle_deg"), "ac": 1.0, "dehumidifier": 1.0,
+               "humidifier": 1.0, "purifier": 3.0, "range_hood": 2.0}
+        caps = {}
+        for dev in decided:
+            lim = [c.value for c in cands if c.device == dev and c.kind in ("cap", "force")]
+            caps[dev] = min(lim + [top.get(dev, float("inf"))])
+        ex = decided.get("exhaust")
+        if ex is not None and any(r.startswith("I7") for r in ex.reasons):
+            caps["exhaust"] = min(caps.get("exhaust", ex.value), ex.value)
+        return caps
 
     def _ac_guard(self, o, decided: dict[str, Decision], ev: dict) -> str:
         """E9 · E12 — 전력 감시로 에어컨 명령 결과를 확인한다 (appliance_guard)."""

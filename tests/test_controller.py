@@ -279,3 +279,29 @@ def test_comfort_scenarios_pass(sid, tmp_path):
     res = run_batch([sid], baselines=["A", "B", "proposed"], reps=1, out_dir=tmp_path, progress=lambda *_: None)
     p = next(r for r in res if r.run.baseline == "proposed")
     assert p.status == C.PASS, [(c.status, c.text, c.detail) for c in p.criteria]
+
+
+def test_schedule_path_and_manual_hold_until_boundary():
+    import copy
+
+    from controller.params import ControllerParams
+    p0 = load_params()
+    modes = copy.deepcopy(p0.modes)
+    modes["schedule"]["enabled"] = True                         # 23:30 SLEEP · 07:00 NORMAL
+    mm = ModeManager(ControllerParams(p0.th, modes))
+    o = parse_inbox(22 * 3600, inbox(**{T.C_MODE: "AUTO"}))
+    assert mm.update(o) == ("NORMAL", "schedule")
+    o = parse_inbox(23 * 3600, inbox(**{T.C_MODE: "STUDY"}))       # 수동 — 다음 경계(23:30)까지 유지
+    assert mm.update(o) == ("STUDY", "manual")
+    o = parse_inbox(23 * 3600 + 1800 + 10, inbox(**{T.C_MODE: "STUDY"}))
+    assert mm.update(o) == ("SLEEP", "schedule")
+
+
+def test_user_mode_ranges_are_clamped():
+    from controller.params import clamp_user_modes
+    modes = {"editable_ranges": {"cooling_setpoint_c": [24.0, 28.0], "cct_k": [2700.0, 6500.0]},
+             "modes": {"NORMAL": {"cooling_setpoint_c": 20.0, "lighting": {"cct_k": 9000.0}},
+                       "AWAY": {"cooling_setpoint_c": None, "humidity_range_pct": [None, 70.0]}}}
+    changed = clamp_user_modes(modes)
+    assert modes["modes"]["NORMAL"]["cooling_setpoint_c"] == 24.0 and modes["modes"]["NORMAL"]["lighting"]["cct_k"] == 6500.0
+    assert modes["modes"]["AWAY"]["humidity_range_pct"] == [None, 70.0] and len(changed) == 2

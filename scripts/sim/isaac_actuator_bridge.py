@@ -50,7 +50,7 @@ def main() -> None:
 
     from interfaces import ros_io
     from interfaces import topics as T
-    from sim.actuators import IsaacActuators, rad_s_to_rpm, window_q_to_ratio
+    from sim.actuators import IsaacActuators, rad_s_to_rpm, window_q_to_ratio, window_ratio_to_q
     from actuators.l0_protect import FanDirectionGuard
     from sensors.sensor_models import RippleCounter
     from sim.window_local import LocalCutoff, motor_current, window_zone
@@ -147,6 +147,25 @@ def main() -> None:
                              lambda m: on_cmd(T.I_WINDOW_TORQUE_PCT, m.data), ros_io.qos(T.C_WINDOW_OPEN_RATIO))
     node.create_subscription(ros_io.MSG[T.STR], T.I_SIM_OBSTACLE, lambda m: pending_obstacle.append(m.data),
                              ros_io.qos(T.C_WINDOW_OPEN_RATIO))
+    pending_init: list[dict] = []
+    node.create_subscription(ros_io.MSG[T.STR], T.I_SIM_INIT, lambda m: pending_init.append(_json.loads(m.data)),
+                             ros_io.qos(T.C_WINDOW_OPEN_RATIO))
+    init_done = {"v": False}
+
+    def apply_init(d):
+        """시나리오 초기 상태 — 창문 · 블라인드를 그 자리에 바로 둔다 (한 번만 · 제어 지령 전에)."""
+        if init_done["v"]:
+            return
+        init_done["v"] = True
+        q = window_ratio_to_q(float(d.get("window_open_ratio", 0.0)), travel)
+        pos = np.array(win.get_joint_positions())
+        pos[wdof] = q
+        win.set_joint_positions(pos)
+        act.window_ramp.value = act.window_ramp.goal = q
+        b = float(d.get("blind_angle_deg", 0.0))
+        blind.set_joint_positions(np.full(L["blind"]["slat_count"], math.radians(b)))
+        act.blind_ramp.value = act.blind_ramp.goal = b
+        log.info(f"초기 상태: 창문 {d.get('window_open_ratio', 0.0)} · 블라인드 {b}°")
 
     def place_obstacle(name):
         """시험 전용 — 끼임 물체를 창 개구부(문설주에서 0.2 m)에 놓거나 모두 치운다."""
@@ -244,6 +263,8 @@ def main() -> None:
     k = 0
     while app.is_running() and (args.duration <= 0 or k * dt < args.duration):
         rclpy.spin_once(node, timeout_sec=0.0)
+        while pending_init:
+            apply_init(pending_init.pop(0))
         while pending_obstacle:
             place_obstacle(pending_obstacle.pop(0))
         apply_world()

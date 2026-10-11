@@ -20,6 +20,8 @@ print(int(next(s for s in load_scenarios('config/scenario_profiles.yaml') if s['
 echo "물리 모드 실행: $SC · $BASE · 반복 $REP · ${DUR} s (실시간)"
 
 docker rm -f studio-isaac >/dev/null 2>&1; tools/ros/run.sh stop
+# 이전 실행의 로그 · CSV 를 지운다 — 남아 있으면 '기록 종료' 대기가 옛 로그를 보고 바로 끝나고 채점도 옛 CSV 로 된다
+rm -f "$LOGS/${SC}_bridge.log" "$LOGS/${SC}_launch.log" "$REPO/results/physics/raw/${SC}_${BASE}_${REP}.csv"
 timeout $((DUR + 400)) tools/isaac/run.sh python scripts/sim/isaac_actuator_bridge.py --duration $((DUR + 120)) \
   > "$LOGS/${SC}_bridge.log" 2>&1 &
 for i in $(seq 1 60); do grep -q "브릿지 시작\|Traceback" "$LOGS/${SC}_bridge.log" && break; sleep 5; done

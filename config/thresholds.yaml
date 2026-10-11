@@ -702,7 +702,7 @@ smart_home_controller:
       cooling_off_band_c: 1.0              # 해제: 실내 < 목표 − 1.0
       ceiling_fan_high_above_setpoint_c: 2.0   # 목표 + 2 °C 초과면 실링팬 강 (소음 등급 허용 시)
       ceiling_fan_speed_band_c: 0.5        # 강 → 약 복귀는 목표 + 2 − 0.5 °C 아래 (I5 로 에어컨이 목표 + 1 근처에 머물 때 강/약 채터링 방지)
-      shade_requires_lux: 250.0            # 실내 조도가 이 이상(낮 · 일사)일 때만 냉방 차광
+      shade_requires_lux: 250.0            # 작업면 주광이 이 이상(낮 · 일사)일 때만 냉방 차광 [v3.4.12 — 센서 원값 → 작업면 추정]
       dehumidify_off_band_pct: 5.0         # 제습: 상한 초과 진입 → 상한 − 5 %p 아래에서 해제
       humidify_restart_band_pct: 3.0       # 가습: 하한 미만 진입 → 유효 상한 도달 정지 · 상한 − 3 %p 아래로 내려오면 재개 허용
       cap_extension_by_ceiling_fan: true   # I4 — 결로 상한이 모드 상한보다 낮으면 실링팬 역회전으로 상한 확장 (C10)

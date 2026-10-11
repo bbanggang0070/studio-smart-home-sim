@@ -28,6 +28,7 @@ from harness.timeline import build_timeline
 from interfaces import ros_io
 from interfaces import topics as T
 from env_model.config import load_config
+from env_model.psychro import dew_point_c
 from env_model.room import AcCommand
 
 REPO = Path(__file__).resolve().parents[2]
@@ -129,9 +130,13 @@ def main() -> None:
         faults = sorted({k for k in ("lux_invalid", "mmwave_lost", "radar") if tl.active_kind(now, k)})
         truth = {
             "t": now, "tod_s": (clock0 + now) % 86400.0, "scenario": args.scenario,
-            "obs": {k: v for k, v in obs.items() if k not in ("energy_wh",)},
+            "obs": obs,                                       # energy_wh(누적) 포함 — 로거 · 지표
             "ext": {"outdoor_temp_c": world.ext.outdoor_temp_c, "outdoor_rh_pct": world.ext.outdoor_rh_pct,
-                    "outdoor_pm25_ugm3": world.ext.outdoor_pm25_ugm3, "raining": world.raining},
+                    "outdoor_pm25_ugm3": world.ext.outdoor_pm25_ugm3, "raining": world.raining,
+                    "outdoor_dew_c": dew_point_c(world.ext.outdoor_temp_c, world.ext.outdoor_rh_pct,
+                                               env_cfg.get("condensation.magnus_b"), env_cfg.get("condensation.magnus_c"))},
+            "injections": ",".join(tl.active_labels(now)),
+            "occupied_truth": world.occupancy,
             "extra_power_w": extra_power,
             "person": {"present": world.occupancy, "zone": world.occupant_zone, "motion": world.motion,
                        "phone": world.phone, "arrived_at": state["arrived_at"],

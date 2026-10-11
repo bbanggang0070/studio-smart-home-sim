@@ -61,6 +61,19 @@ class Lighting:
         self.virtual = True
         return self._virtual_lux(o), entered
 
+    def daylight_workplane(self, o: Observation) -> float:
+        """작업면 주광 추정 — 센서 값(자기 조명 기여 제외)을 작업면 기준으로 환산 (냉방 사다리 차광 판단도 이 값을 쓴다)."""
+        g = self.p.get
+        lo, hi = g("sensor_failsafe.illuminance_valid_range")
+        val = o.illuminance_lux
+        if val == val and lo <= val <= hi:
+            lux = val
+        elif self._last_valid and o.now_s - self._last_valid[0] <= g("sensor_failsafe.hold_last_valid_s"):
+            lux = self._last_valid[1]
+        else:
+            lux = self._virtual_lux(o)                 # measured() 와 같은 규칙 — 페일세이프 상태는 바꾸지 않는다 (알림은 apply 가 낸다)
+        return max(0.0, lux - self._own_light(o)) / g("lighting_model.daylight_sensor_ratio")
+
     def apply(self, o: Observation, mode: str, saving: bool, cooling: bool, add) -> dict:
         g = self.p.get
         lm = "lighting_model."

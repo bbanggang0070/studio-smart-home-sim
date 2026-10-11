@@ -118,7 +118,7 @@ class ComfortLadders:
             elif self._escalated and o.temp_c <= over_at - self._band("escalate_release_band_c"):
                 self._escalated = False
         if self.cooling:
-            if o.illuminance_lux >= g("comfort_ladders.shade_requires_lux"):
+            if self.rules.lighting.daylight_workplane(o) >= g("comfort_ladders.shade_requires_lux"):   # 작업면 주광 (W05 T5.7 이후 센서 눈금과 다르다)
                 add("blind", "need", g("setpoints.blind_shade_angle_deg"), L5, "냉방 ① 블라인드 차광")
             elif m.get("blind_policy") == "night_cooling" and outdoor_cooler:   # 복사냉각은 공기를 들이지 않는다 — I10 무관
                 add("blind", "need", g("setpoints.blind_night_cooling_deg"), L5, "냉방 — 야간 복사냉각 블라인드 개방 (수면)")

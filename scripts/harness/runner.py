@@ -233,6 +233,13 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
     notes = [f"미지원 주입: {u}" for u in tl.unsupported]
     if acts.rejected:
         notes.append(f"프로파일에 없는 장치 명령 무시: {acts.rejected}")
+    return finish_run(run, df, tl, hcfg, env_cfg, log_every, controller_name, notes)
+
+
+def finish_run(run: Run, df: pd.DataFrame, tl, hcfg: dict[str, Any], env_cfg, log_every: float,
+               controller_name: str, notes: list[str]) -> RunResult:
+    """로그(DataFrame) → 지표 · 앵커 · 구간이 붙은 RunResult. 고속 모드와 물리 모드(scripts/physics_eval.py)가 함께 쓴다."""
+    sc = run.scenario
     sources = {iv.label: iv.kind for iv in tl.intervals}
     with open(REPO / hcfg["metrics"]["user_modes"], encoding="utf-8") as f:
         um = yaml.safe_load(f)
@@ -290,18 +297,23 @@ def run_batch(ids: list[str] | None = None, baselines: list[str] | None = None, 
 
     # 판정 — baseline 간 비교(baseline_A.*)가 있으므로 같은 시나리오의 모든 실행이 끝난 뒤에 한다
     for rs in by_scenario.values():
-        for r in rs:
-            if r.df is None:
-                r.status = r.status or C.ERROR
-                continue
-            peers = {o.run.baseline: o.metrics for o in rs if o.run.rep == r.run.rep and o.df is not None}
-            sc = r.run.scenario
-            r.criteria = C.evaluate(r.df, sc.get("pass_criteria") or [], sc.get("expect") or {},
-                                    r.anchors, r.intervals, r.metrics, peers,   # type: ignore[attr-defined]
-                                    own_baseline=r.run.baseline)
-            r.status = _overall(r.criteria) if r.criteria else C.PASS
+        judge_group(rs)
     write_summary(results, out / "summary.csv")
     return results
+
+
+def judge_group(rs: list[RunResult]) -> None:
+    """같은 시나리오의 실행들(기준선 · 반복)을 판정한다 — 기준선 비교 판정 때문에 묶어서."""
+    for r in rs:
+        if r.df is None:
+            r.status = r.status or C.ERROR
+            continue
+        peers = {o.run.baseline: o.metrics for o in rs if o.run.rep == r.run.rep and o.df is not None}
+        sc = r.run.scenario
+        r.criteria = C.evaluate(r.df, sc.get("pass_criteria") or [], sc.get("expect") or {},
+                                r.anchors, r.intervals, r.metrics, peers,   # type: ignore[attr-defined]
+                                own_baseline=r.run.baseline)
+        r.status = _overall(r.criteria) if r.criteria else C.PASS
 
 
 def write_summary(results: list[RunResult], path: Path) -> None:

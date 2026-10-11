@@ -1498,3 +1498,118 @@ scenarios:
       - "intake_fan_rpm <= 1 when t >= 600"
       - "ac_power == 0 when t >= 600"
       - "purifier_level == 0 when t >= 600"
+
+  # ---- 물리 모드 (Isaac Sim + ROS 2 — W08 T8.6 폐루프 · scripts/physics_eval.py 로 채점) ----------------------
+  #  고속 실행기는 run_mode: physics 를 건너뛴다 (SKIPPED). 작업면 조도 = 주광률 × 블라인드 투과율 × 외부 조도 + 조명
+
+  - id: B1
+    tier: 1
+    name: "저조도 자동 점등"
+    duration_s: 120
+    repeat: 1
+    baselines: [proposed]
+    seed: 20261021
+    run_mode: physics
+    appliance_profile: full
+    season: mid
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 23.0
+      humidity_pct: 50.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 180.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "15:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 10600.0   # 작업면 주광 ≈ 10,600 × 0.02 × 0.85 = 180 lux
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 22.0
+      outdoor_rh_pct: 50.0
+    pass_criteria:
+      - "floor_illuminance >= 250 within 1 after 0"            # docs/03 B1 — 1.0 s 이내 250 lux
+      - "exhaust_fan_rpm <= 1 for all t"                         # 팬 정지 유지
+      - "window_open_ratio <= 0.01 for all t"
+
+  - id: B2
+    tier: 1
+    name: "과조도 차광"
+    duration_s: 120
+    repeat: 1
+    baselines: [proposed]
+    seed: 20261022
+    run_mode: physics
+    appliance_profile: full
+    season: mid
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 24.0
+      humidity_pct: 50.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 850.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "13:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, ceiling_light_pct: 0.0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 50000.0   # 작업면 주광 ≈ 50,000 × 0.02 × 0.85 = 850 lux
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 23.0
+      outdoor_rh_pct: 50.0
+    pass_criteria:
+      - "blind_angle >= 72 within 30 after 0"                    # 차광 75° (목표각 오차 ≤ 3°)
+      - "floor_illuminance <= 0.5 * value_at('floor_illuminance', 0) by 60 after 0"   # 조도 하강 (W08 DoD)
+      - "ceiling_light <= 0.5 by 60 after 0"                     # docs/03 B2 — 조명 출력 0 %
+
+  - id: B3
+    tier: 1
+    name: "고온 기본 환기 (사다리 하위 칸)"
+    duration_s: 900
+    repeat: 1
+    baselines: [proposed]
+    seed: 20261023
+    run_mode: physics
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 29.0
+      humidity_pct: 55.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 400.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "16:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 30000.0
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 24.0
+      outdoor_rh_pct: 50.0
+    pass_criteria:
+      - "ac_power == 0 for all t"                                # 에어컨은 기동하지 않는다
+      - "blind_angle >= 30 within 120 after 0"                   # ① 블라인드 (부분) 차광
+      - "window_open_ratio >= 0.35 within 120 after 0"           # ② 창문 40 %
+      - "exhaust_fan_rpm >= 500 within 300 after 0"              # ③ 팬 저속
+      - "value_at('temperature', 300) < value_at('temperature', 0)"   # 온도 하강 추세 (docs/03 B3 · W08 T8.6)
+      - "temperature < value_at('temperature', 300) by 900 after 0"
+      - "humidity <= value_at('humidity', 0) by 900 after 0"     # 습도 하강 — 외기가 더 건조 (W08 T8.6)

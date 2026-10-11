@@ -84,6 +84,7 @@ ALIASES = {
     "desk_light": "act.desk_light_pct",
     "desk_cct": "act.desk_cct",
     "desk_illuminance": "truth.desk_illuminance_lux",   # 책상면 조도 참값 (센서 없음 — C4 판정용)
+    "floor_illuminance": "truth.floor_illuminance_lux", # 방 작업면(바닥 중앙) 조도 참값 — 모드 조도 목표의 기준면 (B1 · B2)
     "cmd_window": T.C_WINDOW_OPEN_RATIO,
     "cmd_ceiling_light": T.C_CEILING_LIGHT,
     "cmd_desk_light": T.C_DESK_LIGHT,

@@ -1,4 +1,4 @@
-"""W06 DoD 자동 검증 — ROS 컨테이너에서 Isaac 액추에이터 브릿지를 토픽만으로 시험한다.
+"""W06 DoD (+ W07 리플 위치 추정) 자동 검증 — ROS 컨테이너에서 Isaac 액추에이터 브릿지를 토픽만으로 시험한다.
 
     (터미널 1) tools/isaac/run.sh python scripts/sim/isaac_actuator_bridge.py
     (터미널 2) tools/ros/run.sh node tools/ros/bridge_test.py
@@ -41,7 +41,8 @@ def main() -> None:
             peak["current"] = max(peak["current"], float(v))
 
     for tp in (T.T_CEILING_LIGHT, T.T_DESK_LIGHT, T.T_FAN_RPM, T.T_INTAKE_FAN_RPM, T.T_CEILING_FAN, T.T_BLIND_ANGLE,
-               T.T_WINDOW_OPEN_RATIO, T.T_WINDOW_ZONE, T.T_SAFETY_STATE, T.T_PINCH_DETECTED, T.S_WINDOW_MOTOR_CURRENT):
+               T.T_WINDOW_OPEN_RATIO, T.T_WINDOW_ZONE, T.T_SAFETY_STATE, T.T_PINCH_DETECTED, T.S_WINDOW_MOTOR_CURRENT,
+               T.T_WINDOW_POSITION_EST, T.S_DOOR_CONTACT):
         ros_io.subscribe(node, tp, on_state)
     pubs = {tp: ros_io.publisher(node, tp) for tp in T.COMMAND_TOPICS}
     torque = node.create_publisher(Float32, T.I_WINDOW_TORQUE_PCT, ros_io.qos(T.C_WINDOW_OPEN_RATIO))
@@ -124,6 +125,21 @@ def main() -> None:
     record("명령 → 반응 지연 ≤ 100 ms", lat and max(lat) <= 100 and (not wl or max(wl) <= 150),
            f"조명 상태 반영 중앙 {statistics.median(lat):.0f} · 최대 {max(lat):.0f} ms · "
            f"창문 조인트 이동 관측 {[round(x) for x in wl]} ms (상태 20 Hz · 램프 가속 포함)" if lat else "측정 실패")
+
+    # 3b. 리플 위치 추정 (W07 T7.4b) — 왕복 중 오차 · 하드 스톱 재동기화
+    travel = 0.70
+    errs = []
+    cmd(T.C_WINDOW_OPEN_RATIO, 0.0)                       # 하드 스톱에서 시작 (재동기화) → 1회 왕복 (docs/04 §7: 1회 왕복 누적 ≤ 5 mm)
+    spin(16.0)
+    for goal in (0.9, 0.1):
+        cmd(T.C_WINDOW_OPEN_RATIO, goal)
+        spin(14.0)
+        errs.append(abs(val(T.T_WINDOW_POSITION_EST, 0) - val(T.T_WINDOW_OPEN_RATIO, 0) * travel) * 1000)
+    cmd(T.C_WINDOW_OPEN_RATIO, 0.0)
+    spin(10.0)
+    resync = abs(val(T.T_WINDOW_POSITION_EST, 1)) * 1000
+    record("리플 위치 추정 ±5 mm · 하드 스톱 재동기화", max(errs) <= 5.0 and resync <= 1.0,
+           f"멈춘 위치별 오차 {[round(e, 2) for e in errs]} mm · 닫힘 뒤 {resync:.2f} mm")
 
     # 4. 토크 상한 (T6.3b) — 씰 압착 전류: 100 % vs 30 %
     def seal_current(pct):

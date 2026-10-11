@@ -9,6 +9,8 @@ Isaac 내장 Python 3.11 + 내장 Jazzy rclpy 에서 돈다:
   발행  state/{ceiling_light_intensity, desk_light_intensity, fan_rpm, intake_fan_rpm, ceiling_fan, blind_angle,
         window_open_ratio, window_zone, safety_state, pinch_detected} · sensor/window_motor_current (50 Hz)
   범위 밖 명령은 actuator_limits.yaml 범위로 자른다 (T6.5). 로컬 컷오프는 물리 콜백 안에서 (T6.7 · scripts/sim/window_local.py).
+  W07 — 센서: sensor/door_contact (문 조인트 각도 > contact_open_angle_deg · 10 Hz) · state/window_position_est (리플 카운팅 20 Hz)
+        · 모터 전류 측정 잡음 · 월드 노드의 /studio/internal/door_open → 문 구동 · /studio/internal/person → 사람 프록시 자리
 """
 
 import argparse
@@ -50,6 +52,7 @@ def main() -> None:
     from interfaces import topics as T
     from sim.actuators import IsaacActuators, rad_s_to_rpm, window_q_to_ratio
     from actuators.l0_protect import FanDirectionGuard
+    from sensors.sensor_models import RippleCounter
     from sim.window_local import LocalCutoff, motor_current, window_zone
 
     L = yaml.safe_load((REPO / "config" / "scene_layout.yaml").read_text(encoding="utf-8"))
@@ -72,6 +75,16 @@ def main() -> None:
     for a in (win, blind, *fans.values()):
         a.initialize()
     wdof = win.get_dof_index("window_prismatic_joint")
+    door = SingleArticulation("/World/entrance_door", name="door")
+    door.initialize()
+    person = SingleRigidPrim("/World/occupancy_object", name="person")
+    person.initialize()
+    sm = yaml.safe_load((REPO / "config" / "sensor_models.yaml").read_text(encoding="utf-8"))
+    rng = np.random.default_rng(sm["seed"] + 11)
+    ripple = RippleCounter(ws, L["window"]["travel_m"], sm["window_current"]["hard_stop_resync_m"], rng)
+    i_noise = ws["ripple_estimation"]["current_noise_sigma_a"]
+    ddrive = UsdPhysics.DriveAPI(stage.GetPrimAtPath("/World/entrance_door/entrance_door_joint"), "angular")
+    sim_in = {"door_open": False, "person": None}
     obstacles = {n: SingleRigidPrim(f"/World/obstacles/{n}", name=n) for n in L["obstacles"] if n != "park_x_m"}
     for o in obstacles.values():
         o.initialize()
@@ -150,8 +163,34 @@ def main() -> None:
             o.set_angular_velocity(np.zeros(3))
         log.info(f"시험 물체: {name}")
 
+    import json as _json
+    from std_msgs.msg import Bool as _Bool
+    node.create_subscription(_Bool, f"{T.P}/internal/door_open", lambda m: sim_in.update(door_open=bool(m.data)),
+                             ros_io.qos(T.C_WINDOW_OPEN_RATIO))
+    node.create_subscription(ros_io.MSG[T.STR], f"{T.P}/internal/person",
+                             lambda m: sim_in.update(person=_json.loads(m.data)), ros_io.qos(T.C_WINDOW_OPEN_RATIO))
+    pp = L["person_proxy"]
+    away_xy = (pp["positions"]["entrance"][0], -1.5)                       # 집 밖 (현관 바깥)
+
+    def apply_world():
+        """월드 노드 입력 → 문 조인트 목표 · 사람 프록시 자리 (사람이 문을 연다 · 방 안을 옮겨 다닌다)."""
+        ddrive.GetTargetPositionAttr().Set(L["entrance_door"]["open_max_deg"] * 0.6 if sim_in["door_open"] else 0.0)
+        p = sim_in["person"]
+        if p is None:
+            return
+        xy = pp["positions"].get(p["zone"], pp["positions"]["room"]) if p["present"] else away_xy
+        if sim_in["door_open"]:
+            xy = pp["positions"]["entrance"]
+        cur = person.get_world_pose()[0]
+        if abs(cur[0] - xy[0]) + abs(cur[1] - xy[1]) > 0.05:
+            person.set_world_pose(position=np.array([xy[0], xy[1], pp["height_m"] / 2]))
+
+    def door_contact() -> bool:
+        return math.degrees(float(door.get_joint_positions()[0])) > L["entrance_door"]["contact_open_angle_deg"]
+
     out = [T.T_CEILING_LIGHT, T.T_DESK_LIGHT, T.T_FAN_RPM, T.T_INTAKE_FAN_RPM, T.T_CEILING_FAN, T.T_BLIND_ANGLE,
-           T.T_WINDOW_OPEN_RATIO, T.T_WINDOW_ZONE, T.T_SAFETY_STATE, T.T_PINCH_DETECTED, T.S_WINDOW_MOTOR_CURRENT]
+           T.T_WINDOW_OPEN_RATIO, T.T_WINDOW_ZONE, T.T_SAFETY_STATE, T.T_PINCH_DETECTED, T.S_WINDOW_MOTOR_CURRENT,
+           T.S_DOOR_CONTACT, T.T_WINDOW_POSITION_EST]
     pubs = {tp: ros_io.publisher(node, tp) for tp in out}
 
     # ---- 로컬 컷오프 — 물리 콜백 안 (ROS 왕복 없음) ----
@@ -188,16 +227,26 @@ def main() -> None:
         p(T.T_WINDOW_ZONE, window_zone(st["q"], travel, st["dir"], cut._start_q, ws))
         p(T.T_SAFETY_STATE, "LOCAL_CUTOFF" if cut.tripped else "NORMAL")
         p(T.T_PINCH_DETECTED, cut.tripped)
+        p(T.S_DOOR_CONTACT, door_contact())
 
     log.info(f"브릿지 시작 — 물리 {hz:.0f} Hz · 상태 {B['state_hz']:.0f} Hz · 전류 {B['current_hz']:.0f} Hz")
-    k_state = max(1, int(round(hz / B["state_hz"])))
-    k_cur = max(1, int(round(hz / B["current_hz"])))
+    # 발행 주기 — 물리 주기의 정수배가 아니어도 맞게 (120 Hz 에서 50 Hz 를 '2 스텝마다'로 반올림하면 60 Hz 가 된다)
+    rates = {"state": B["state_hz"], "cur": B["current_hz"], "pos": sm["window_current"]["position_est_hz"]}
+    last_tick = {name: -1 for name in rates}
+
+    def due(name: str) -> bool:
+        n = int(k * dt * rates[name])
+        if n != last_tick[name]:
+            last_tick[name] = n
+            return True
+        return False
     t0 = time.perf_counter()
     k = 0
     while app.is_running() and (args.duration <= 0 or k * dt < args.duration):
         rclpy.spin_once(node, timeout_sec=0.0)
         while pending_obstacle:
             place_obstacle(pending_obstacle.pop(0))
+        apply_world()
         lvl = fan_guard.apply(fan_want["level"], k * dt)                     # L0 — 실링팬 방향 전환 대기
         act.set_fan_rpm("ceiling_fan", math.copysign(levels[abs(lvl)], lvl) if lvl else 0.0)
         act.step(dt)
@@ -207,9 +256,13 @@ def main() -> None:
             st["new_trip"] = False
             log.warn(f"로컬 컷오프 — {cut.reason}")
             publish_state()
-        if k % k_cur == 0:
-            ros_io.publish(pubs[T.S_WINDOW_MOTOR_CURRENT], T.S_WINDOW_MOTOR_CURRENT, motor_current(st["force"], ws))
-        if k % k_state == 0:
+        est = ripple.update(st["q"], moving=st["dir"] != 0 or abs(st["v"]) > 1e-4)   # 리플 카운팅 (매 물리 스텝)
+        if due("cur"):
+            ros_io.publish(pubs[T.S_WINDOW_MOTOR_CURRENT], T.S_WINDOW_MOTOR_CURRENT,
+                           motor_current(st["force"], ws) + float(rng.normal(0.0, i_noise)))
+        if due("pos"):
+            ros_io.publish(pubs[T.T_WINDOW_POSITION_EST], T.T_WINDOW_POSITION_EST, est)
+        if due("state"):
             publish_state()
         lag = t0 + k * dt - time.perf_counter()                              # 실시간 맞춤
         if lag > 0:

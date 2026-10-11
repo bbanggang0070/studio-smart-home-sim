@@ -41,3 +41,36 @@ def publish(pub, topic: str, value: Any) -> None:
 def subscribe(node, topic: str, cb: Callable[[str, Any], None]):
     """cb(topic, 파이썬 값)."""
     return node.create_subscription(msg_type(topic), topic, lambda m: cb(topic, m.data), qos(topic))
+
+
+class SimClock:
+    """시뮬레이션 시각 — 월드 노드의 /clock(하루 중 초)을 따르고, 없으면 벽시계(현지 시각).
+
+    now()  하루 중 초 (제어기 now_s) · elapsed()  시작 뒤 경과 초 (L0 보호 · 전력 감시 시간 판정)
+    """
+
+    def __init__(self, node):
+        import time
+
+        from rosgraph_msgs.msg import Clock
+
+        self._time = time
+        self.sim: float | None = None
+        self._first: float | None = None
+        self._t0 = time.monotonic()
+        node.create_subscription(Clock, "/clock", self._on_clock, 10)
+
+    def _on_clock(self, m) -> None:
+        self.sim = m.clock.sec + m.clock.nanosec * 1e-9
+        if self._first is None:
+            self._first = self.sim
+
+    def now(self) -> float:
+        if self.sim is not None:
+            return self.sim % 86400.0
+        return (self._time.time() - self._time.timezone) % 86400.0
+
+    def elapsed(self) -> float:
+        if self.sim is not None:
+            return self.sim - self._first
+        return self._time.monotonic() - self._t0

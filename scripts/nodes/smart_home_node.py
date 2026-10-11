@@ -4,7 +4,7 @@
 
   입력  센서 13 · 사용자 명령(mode · activity) · 액추에이터 상태(브릿지) → inbox (토픽 이름 그대로)
   출력  step() 의 outbox → 명령 · 상태 토픽 (policy_rate_hz 주기)
-  시각  now_s = 하루 중 초. --clock0 을 주면 그 시각에서 시작해 벽시계로 흐른다 (없으면 현지 시각)
+  시각  now_s = 하루 중 초 — 월드 노드의 /clock(시뮬레이션 시각)을 따른다. 없으면 --clock0 부터 벽시계 · 그것도 없으면 현지 시각
   필수 센서(온도 · 습도 · PM)가 아직 없으면 판단하지 않고 기다린다 — 센서 노드는 W07
 """
 
@@ -48,12 +48,13 @@ def main() -> None:
     for tp in T.SENSOR_TOPICS + T.USER_COMMAND_TOPICS + T.STATE_TOPICS:
         ros_io.subscribe(node, tp, on_msg)
 
+    clock = ros_io.SimClock(node)
     if args.clock0:
         h, m = args.clock0.split(":")
         base, t_start = int(h) * 3600 + int(m) * 60, time.time()
-        now_tod = lambda: (base + time.time() - t_start) % 86400.0   # noqa: E731
+        now_tod = lambda: clock.now() if clock.sim is not None else (base + time.time() - t_start) % 86400.0   # noqa: E731
     else:
-        now_tod = lambda: (time.time() - time.timezone) % 86400.0     # noqa: E731
+        now_tod = clock.now
 
     state = {"waiting": True}
 

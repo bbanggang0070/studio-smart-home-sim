@@ -12,7 +12,6 @@
 from __future__ import annotations
 
 import json
-import time
 
 import rclpy
 
@@ -53,10 +52,10 @@ def main() -> None:
         ros_io.subscribe(node, tp, on_cmd)
     out = (T.T_AC, T.T_DEHUMIDIFIER, T.T_HUMIDIFIER, T.T_PURIFIER_LEVEL, T.T_RANGE_HOOD_LEVEL)
     pubs = {tp: ros_io.publisher(node, tp) for tp in out}
-    t0 = time.monotonic()
+    clock = ros_io.SimClock(node)
 
     def tick():
-        now = time.monotonic() - t0
+        now = clock.elapsed()
         ac = dict(want["ac"])
         ac["power"] = ac_g.apply(bool(ac.get("power")), now)
         dehum, hum = dehum_hum_mutex(want["dehumidifier"], want["humidifier"])

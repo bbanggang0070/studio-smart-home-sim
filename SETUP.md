@@ -117,7 +117,9 @@ isaacsim                                        # 첫 실행은 셰이더 컴파
 ```bash
 tools/ros/run.sh build                                   # 처음 한 번 — studio-ros:jazzy (ros:jazzy-ros-base + numpy · yaml)
 tools/isaac/run.sh python scripts/sim/isaac_actuator_bridge.py          # (터미널 1) Isaac 액추에이터 브릿지 — 내장 Jazzy rclpy
-tools/ros/run.sh ros2 launch launch/studio_smart_home.launch.py stub:=true   # (터미널 2) 제어기 · 가전 브릿지 (+ W07 전 센서 스텁)
+tools/ros/run.sh ros2 launch launch/studio_smart_home.launch.py scenario:=B12  # (터미널 2) 월드 · 센서 · 재실 · 전력 감시 · 가전 브릿지 · 제어기
+tools/ros/run.sh ros2 launch launch/studio_smart_home.launch.py scenario:=B12 fast_actuators:=true speed:=5   # Isaac 없이 ROS 쪽만 빠르게
+tools/ros/run.sh node tools/ros/topic_rates.py          # 센서 발행 주기 점검 (ros2 topic hz 대신 — 계약 QoS 로 직접 센다)
 tools/ros/run.sh node tools/ros/check_topics.py         # 토픽 계약 55개 연결 점검
 tools/ros/run.sh node tools/ros/bridge_test.py          # W06 DoD 자동 검증 (브릿지만 띄운 상태에서)
 tools/ros/run.sh stop                                    # 남은 ROS 컨테이너 정리 (timeout 은 docker 클라이언트만 끝낸다)

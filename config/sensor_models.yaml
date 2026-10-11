@@ -1,0 +1,56 @@
+# ============================================================================
+#  가상 센서 특성 (W07 T7.5) — 물리 모드 센서 노드가 참값에 입힌다 (고속 모드는 참값 그대로)
+#  값은 데이터시트 기반 draft — 1차 지연(tau) → 가우시안 잡음(절대 sigma + 비례 rel_sigma) → 분해능 양자화 → 측정 범위 클램프
+#  ROS 파라미터 파일이 아니다 (시뮬레이션 설정) — 숫자 키 · null 제약은 thresholds 와 같게 지킨다
+# ============================================================================
+version: 1
+seed: 20261019
+sensors:
+  temperature:        # SHT31 — ±0.2 °C (typ)
+    rate_hz: 10.0
+    tau_s: 5.0
+    sigma: 0.1
+    rel_sigma: 0.0
+    resolution: 0.01
+    range: [-40.0, 125.0]
+  humidity:           # SHT31 — ±2 %RH (typ)
+    rate_hz: 10.0
+    tau_s: 8.0
+    sigma: 0.8
+    rel_sigma: 0.0
+    resolution: 0.01
+    range: [0.0, 100.0]
+  illuminance:        # BH1750 — 1 lx 분해능 · ±20 % 정확도 중 무작위 성분만 (교정 오차는 W05 캘리브레이션으로 흡수)
+    rate_hz: 10.0
+    tau_s: 0.2
+    sigma: 0.5
+    rel_sigma: 0.02
+    resolution: 1.0
+    range: [0.0, 65535.0]
+  pm25:               # PMS7003 — ±10 µg/m³ (0–100) · ±10 % (100–500)
+    rate_hz: 1.0
+    tau_s: 10.0
+    sigma: 2.0
+    rel_sigma: 0.05
+    resolution: 1.0
+    range: [0.0, 1000.0]
+  hood_temperature:   # DS18B20 — ±0.5 °C
+    rate_hz: 1.0
+    tau_s: 3.0
+    sigma: 0.2
+    rel_sigma: 0.0
+    resolution: 0.0625
+    range: [-55.0, 125.0]
+  appliance_power:    # 계량 플러그 — ±3 % (docs/08 §6.3)
+    rate_hz: 1.0
+    tau_s: 0.0
+    sigma: 0.3
+    rel_sigma: 0.03
+    resolution: 0.1
+    range: [0.0, 4000.0]
+api:
+  weather_period_s: 600.0          # 기상청 초단기실황 — 10분마다 (변경 시 즉시)
+  outdoor_pm_period_s: 3600.0      # 에어코리아 — 1시간마다 (변경 시 즉시)
+window_current:                    # 창문 전류 합성 (T7.4 · T7.4b) — 계수는 thresholds window_sensorless.ripple_estimation
+  position_est_hz: 20.0
+  hard_stop_resync_m: 0.002        # 이 안쪽에서 멈추면 하드 스톱으로 보고 리플 카운트를 0 / 끝 위치로 맞춘다

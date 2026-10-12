@@ -60,7 +60,9 @@ window:
 # ---- 끼임 시험 물체 3종 (T3.4c) — 레일 경로(창 개구부 안)에 놓는다 ----
 obstacles:
   park_x_m: 2.6                     # 시험하지 않을 때 놓아 두는 곳 (창턱 오른쪽 밖) — 시험 스크립트가 옮긴다
-  rigid_pot:    { size_m: [0.10, 0.10, 0.18], mass_kg: 1.5, friction: 0.6 }
+  # [2026-10-12] 강체도 '시험봉' 강성으로 — 강체끼리 충돌하면 접촉력이 1스텝 스파이크(패널 관성)로 나와 반력 지표가 측정 방식에 좌우된다
+  #   끼임 반력 시험 장치처럼 스프링 상수 65 N/mm(draft)의 컴플라이언스를 준다 (사용자 결정 1번 · docs/04 §3.7)
+  rigid_pot:    { size_m: [0.10, 0.10, 0.18], mass_kg: 1.5, friction: 0.6, compliance: { stiffness: 65000.0, damping: 300.0 } }
   soft_cushion: { size_m: [0.12, 0.10, 0.15], mass_kg: 0.3, friction: 0.8, compliance: { stiffness: 2000.0, damping: 50.0 } }
   elastic_sponge: { size_m: [0.10, 0.10, 0.12], mass_kg: 0.05, friction: 0.9, compliance: { stiffness: 800.0, damping: 5.0 }, restitution: 0.3 }
 

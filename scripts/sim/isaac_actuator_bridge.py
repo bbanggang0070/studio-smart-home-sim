@@ -124,7 +124,8 @@ def main() -> None:
         d = _json.loads(m.data)
         ovr.update(mode=d.get("mode", "normal"), locked=list(d.get("locked", [])))
         if ovr["mode"] == "reverse":
-            lat.setdefault("detect", st["t"])                # 상위만 감지한 경우 — 감지 시각 = 반전 지령 수신
+            if "detect" not in lat:                          # 상위만 감지한 경우 — 감지 시각 = 반전 지령 수신
+                lat["detect"], lat["dir"] = st["t"], st["dir"]
             goal = float(d["to_ratio"]) * travel
             cut.on_command(1 if goal > st["q"] else -1)       # 반대 방향 — 로컬 컷오프도 풀린다
             act.window_ramp.set_goal(goal)
@@ -258,11 +259,15 @@ def main() -> None:
         st["v"] = float(win.get_joint_velocities()[wdof])
         st["force"] = float(np.asarray(win.get_measured_joint_efforts())[wdof])
         f_contact = float(contact.get_current_frame().get("force", 0.0))
-        peak["contact"] = max(peak["contact"], f_contact)
+        # 씰 구간(Zone D)의 접촉은 씰 압착이지 끼임이 아니다 — 접촉 센서는 패널에 닿는 힘을 모두 합하므로 끼임 반력(지표 #5)에서 뺀다
+        if window_zone(st["q"], travel, -1, None, ws) != "D_SEAL":
+            peak["contact"] = max(peak["contact"], f_contact)
         # 지연 계측 (C2 · 지표 #4) — 접촉 시작 → 감지(로컬 차단 · 상위 반전) → 정지
         if lat.get("onset") is None and st["dir"] != 0 and f_contact > pdet["contact_onset_n"]:
             lat["onset"] = st["t"]
-        if lat.get("detect") is not None and lat.get("stop_ms") is None and abs(st["v"]) < pdet["stopped_speed_mps"]:
+        # 정지 = 감지 당시 진행 방향의 속도가 stopped_speed 아래 (곧바로 반전하면 0 근처를 샘플 사이에서 건너뛴다)
+        if (lat.get("detect") is not None and lat.get("stop_ms") is None
+                and st["v"] * lat.get("dir", 0) < pdet["stopped_speed_mps"]):
             lat["stop_ms"] = (st["t"] - lat["detect"]) * 1000.0
         # 이동 방향 = 지령 램프의 속도 (실제 위치 오차로 정하면 마찰로 남은 정지 오차 때문에 '새 출발'을 놓친다 → 기동 피크 오작동)
         rv = act.window_ramp.velocity
@@ -272,7 +277,8 @@ def main() -> None:
             wdrive.GetTargetPositionAttr().Set(st["q"])
             wdrive.GetTargetVelocityAttr().Set(0.0)
             st["new_trip"] = st.get("new_trip", 0) + 1                     # 로그 전에 여러 번 끊겨도 센다
-            lat.setdefault("detect", st["t"])
+            if "detect" not in lat:
+                lat["detect"], lat["dir"] = st["t"], st["dir"]
 
     world.add_physics_callback("window_local_cutoff", physics_step)
 

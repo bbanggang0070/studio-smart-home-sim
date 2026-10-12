@@ -26,7 +26,7 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 def main() -> None:
-    from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdLux, UsdPhysics, UsdShade
+    from pxr import Gf, PhysxSchema, Sdf, Usd, UsdGeom, UsdLux, UsdPhysics, UsdShade
 
     L = yaml.safe_load((REPO / "config" / "scene_layout.yaml").read_text(encoding="utf-8"))
     A = yaml.safe_load((REPO / "config" / "actuator_limits.yaml").read_text(encoding="utf-8"))
@@ -43,6 +43,10 @@ def main() -> None:
     ph = L["physics"]
 
     # ---- 도우미 ----
+
+    def no_shadow(prim):
+        """유리 — 표시용 투명도(displayOpacity)는 렌더러 그림자에 반영되지 않아 햇빛을 통째로 막는다 → 그림자를 만들지 않게."""
+        UsdGeom.PrimvarsAPI(prim).CreatePrimvar("doNotCastShadows", Sdf.ValueTypeNames.Bool).Set(True)
 
     def color(prim, rgb, opacity=None):
         g = UsdGeom.Gprim(prim)
@@ -117,13 +121,16 @@ def main() -> None:
         fj.CreateLocalPos0Attr(Gf.Vec3f(*mount_pos))
         return mount
 
-    def joint(kind, path, body0, body1, axis, pos0, pos1, lim=None, drive=None, drive_kind="linear"):
+    def joint(kind, path, body0, body1, axis, pos0, pos1, lim=None, drive=None, drive_kind="linear", flip=False):
         j = (UsdPhysics.PrismaticJoint if kind == "prismatic" else UsdPhysics.RevoluteJoint).Define(stage, path)
         j.CreateBody0Rel().SetTargets([body0.GetPath()])
         j.CreateBody1Rel().SetTargets([body1.GetPath()])
         j.CreateAxisAttr(axis)
         j.CreateLocalPos0Attr(Gf.Vec3f(*pos0))
         j.CreateLocalPos1Attr(Gf.Vec3f(*pos1))
+        if flip:                                       # 조인트 프레임을 Z 축으로 180° — 회전축이 −X 가 되어 양의 각도 방향이 바뀐다
+            j.CreateLocalRot0Attr(Gf.Quatf(0.0, 0.0, 0.0, 1.0))
+            j.CreateLocalRot1Attr(Gf.Quatf(0.0, 0.0, 0.0, 1.0))
         if lim is not None:
             j.CreateLowerLimitAttr(lim[0])
             j.CreateUpperLimitAttr(lim[1])
@@ -227,6 +234,7 @@ def main() -> None:
                         compliance=wd["seal_compliance"]))
     cube(f"{frame}/outer_pane", ((wx0 + wx1) / 2 + (wx1 - wx0) / 4, D + T / 2 + 0.03, (z0 + z1) / 2),
          ((wx1 - wx0) / 2, 0.02, wd["opening_height_m"]), rgb=(0.7, 0.85, 0.95), opacity=0.25, collide=False)
+    no_shadow(stage.GetPrimAtPath(f"{frame}/outer_pane"))
     cube(f"{frame}/windowsill", ((wx0 + wx1) / 2, D - wd["windowsill_depth_m"] / 2, z0 - 0.02),
          (wx1 - wx0, wd["windowsill_depth_m"], 0.04), rgb=(0.9, 0.9, 0.88))
     closed_cx = wx0 + seal_t + pw / 2                                 # 닫힘(q = 0) 때 패널 중심
@@ -238,6 +246,7 @@ def main() -> None:
     wp = rigid("/World/window/window_panel", pc, mass=wd["panel_mass_kg"])
     PhysxSchema.PhysxContactReportAPI.Apply(wp).CreateThresholdAttr(0.0)
     cube("/World/window/window_panel/panel_glass", (0, 0, 0), (pw, pt, ph_), rgb=(0.7, 0.85, 0.95), opacity=0.35)
+    no_shadow(stage.GetPrimAtPath("/World/window/window_panel/panel_glass"))
     cube("/World/window/window_panel/motor_unit", (pw / 2 - 0.08, pt / 2 + 0.02, -ph_ / 2 + 0.04),
          (0.10, 0.04, 0.07), rgb=(0.2, 0.2, 0.2), collide=False)
     # 스프링식 레일 씰 (T5.8 — Zone A · B · C 의 물리적 근거): 패드 + Z 스프링 조인트 + 레일 띠 + 엔드존 경사로
@@ -313,7 +322,7 @@ def main() -> None:
         joint("revolute", f"/World/blind/blind_joint_{k:02d}", bmount, s, "X",
               tuple(sc[i] - ((wx0 + wx1) / 2, by, z1 + 0.05)[i] for i in range(3)), (0, 0, 0), lim=blj["range_deg"],
               drive={"stiffness": blj["drive"]["stiffness"], "damping": blj["drive"]["damping"], "max": blj["max_torque_nm"]},
-              drive_kind="angular")
+              drive_kind="angular", flip=True)   # 닫힘 = 방 쪽 끝이 위로 (위에서 내리쬐는 햇빛을 막는 방향)
 
     # ---- 팬 3종 (T4.4) — 날개 Revolute 속도 드라이브 · 충돌 없음 ----
     def fan(name, pos, diameter, axis, lim_key, blades=4):
@@ -385,7 +394,7 @@ def main() -> None:
     cube("/World/lighting_module/desk_lamp/stand", (-0.06, 0, -0.2), (0.02, 0.02, 0.4), rgb=(0.2, 0.2, 0.2), collide=False)
     sun = UsdLux.DistantLight.Define(stage, "/World/lighting_module/sun")
     sun.CreateIntensityAttr(0.0)                   # 일사 — 브릿지가 시각 · 날씨로 켠다
-    UsdGeom.Xformable(sun).AddRotateXYZOp().Set(Gf.Vec3f(-50.0, 0.0, 180.0))
+    UsdGeom.Xformable(sun).AddRotateXYZOp().Set(Gf.Vec3f(*L["sun"]["rotate_xyz_deg"]))   # 창밖 → 방 안
 
     # ---- 센서 위치 (표시용 작은 상자) ----
     xform("/World/sensors")

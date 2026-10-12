@@ -68,7 +68,7 @@ obstacles:
 
 # ---- 블라인드 (창 안쪽) — 슬랫 회전 0–90° (W04 T4.2) ----
 blind:
-  slat_count: 16
+  slat_count: 28                    # [2026-10-12] 16 → 28 — 간격(≈ 43 mm) < 슬랫 폭(50 mm) 이라 닫으면 겹쳐 햇빛을 막는다 (16장은 다 닫아도 1/3 이 비었다)
   slat_depth_m: 0.05
   slat_thickness_m: 0.004
   y_offset_m: -0.14                 # 내창보다 안쪽
@@ -93,6 +93,9 @@ dehumidifier:    { min: [0.75, 4.40, 0.0], size: [0.30, 0.25, 0.55] }
 purifier:        { min: [2.60, 2.10, 0.0], size: [0.30, 0.30, 0.60] }
 ceiling_light:   { pos: [1.75, 2.40, 2.38], size_m: 0.60, intensity: 30000.0 }   # draft — W05 lux 매핑 (ceiling_lux_at_full)
 desk_lamp:       { pos: [0.20, 2.95, 1.15], radius_m: 0.04, intensity: 30000.0, cct_k: 4000.0, cone_deg: 60.0 }   # 갓 — 아래로 원뿔 배광   # draft — 책상면 520 lux @100 %
+# [2026-10-12] 해 — 창밖(+Y)에서 방 안(−Y)으로 내리쬐게 (기존 (−50, 0, 180) 은 방 안 → 창밖으로 비춰 햇빛이 들지 않았다)
+#   세기는 장면에서 0 (화면용 — 조도 센서 값은 환경 모델이 계산한다 · lighting_model)
+sun:             { rotate_xyz_deg: [-65.0, 0.0, 15.0] }   # 고도 25° (오후 · 수평 슬랫 사이로 들어오는 높이)
 mmwave_sensor:   { pos: [1.75, 0.05, 2.30], facing: +Y }
 temp_humidity_sensor: { pos: [1.75, 2.40, 2.35] }
 illuminance_sensor:   { pos: [2.30, 2.40, 2.38] }           # 천장 BH1750 (lighting_model 기준점) — 실링팬 날개 반경 밖 (팬 하우징이 가리지 않게 · T5.7)

@@ -28,7 +28,7 @@ ap.add_argument("--record-camera", default="overview",
 ap.add_argument("--record-fps", type=float, default=10.0)
 ap.add_argument("--record-from", type=float, default=0.0, help="녹화 시작 시각 [s] (브릿지 시작 기준)")
 ap.add_argument("--record-ambient", type=float, default=150.0, help="녹화용 주변광(돔) 세기 — 화면용, 조도 센서는 환경 모델이 계산")
-ap.add_argument("--record-sun", type=float, default=0.0, help="녹화용 햇빛(장면의 sun) 세기 — 화면용 (0 = 장면 기본값)")
+ap.add_argument("--record-sun", type=float, default=0.0, help="녹화용 햇빛(장면의 sun) 세기 — 화면용 (0 = 장면 기본값 · 꺼짐)")
 ap.add_argument("--record-hide", default="", help="녹화에서 숨길 프림 경로 (쉼표) — 예: /World/blind (물리는 그대로)")
 args, _ = ap.parse_known_args()
 
@@ -318,7 +318,7 @@ def main() -> None:
     if args.record:
         import omni.replicator.core as rep
         from PIL import Image
-        from pxr import Gf, UsdGeom
+        from pxr import UsdGeom
         rec_dir = Path(args.record)
         rec_dir.mkdir(parents=True, exist_ok=True)
         if args.record_ambient > 0:
@@ -326,10 +326,7 @@ def main() -> None:
             UsdLux.DomeLight.Define(stage, "/World/lighting_module/record_ambient").CreateIntensityAttr(args.record_ambient)
         if args.record_sun > 0:
             from pxr import UsdLux
-            sun_prim = stage.GetPrimAtPath("/World/lighting_module/sun")
-            UsdLux.DistantLight(sun_prim).GetIntensityAttr().Set(args.record_sun)
-            # 장면의 해는 방 안 → 창밖으로 비춘다 (build_scene 회전 (-50, 0, 180)) — 화면에서만 창밖 → 방 안으로 돌린다
-            sun_prim.GetAttribute("xformOp:rotateXYZ").Set(Gf.Vec3f(-35.0, 0.0, 20.0))
+            UsdLux.DistantLight(stage.GetPrimAtPath("/World/lighting_module/sun")).GetIntensityAttr().Set(args.record_sun)
         for path in filter(None, args.record_hide.split(",")):
             UsdGeom.Imageable(stage.GetPrimAtPath(path)).MakeInvisible()
         if ":" in args.record_camera:

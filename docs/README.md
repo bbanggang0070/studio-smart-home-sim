@@ -56,6 +56,7 @@
 | 자료 | 링크 | 반영 상태 |
 |---|---|---|
 | **W02 발표자료 (17장 / 15:00)** | https://www.figma.com/slides/Wfy4nSGRJxxnW34RUvRYB3 | ⚠️ **v2.1 기준** — 중간 점검(10/23) 전 v3.0 갱신 필요 |
+| **중간발표 10/23 (20장)** | https://www.figma.com/slides/gYoSgMdBzvRJ4GT4WiuUe9 | ✅ **v3.4** — W10 까지 진행 현황(물리 8/8 · 고속 96/96 · 센서리스 안전) + 논문 주제(EXP-5 · docs/10) |
 | **피드백 2 반영 발표 (19장)** | https://www.figma.com/slides/oNdg9iU5NSZiNigikV5py6 | ✅ **v3.1** — 피드백 5건 대응 · 반영 후 전체 구성 · 참고문헌 |
 | W01 발표자료 (20장) | https://www.figma.com/slides/dKaN1pbrEsOu0C1Ok4URij | v1.0 기록 (수정 안 함) |
 | 간트차트 (단계별 6블록, 메인) | https://www.figma.com/design/rc0ZUsVZyWFtE7ANccryK9 | v2.1 · 단계 라벨 v3.0 갱신 대기 |

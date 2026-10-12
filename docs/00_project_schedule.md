@@ -285,6 +285,7 @@ W03 Scene → W04 액추에이터 조인트 → W05 독립 구동·캘리브레�
   - 마일스톤 5개(발표·점검·완료 시점)를 세로 가이드라인으로 표시
 - **상세 간트차트 (FigJam, 주차 단위):** https://www.figma.com/board/ifDXNuQtjrxM6akQKJhAeu
 - **W02 발표자료 (Figma Slides, 17장 / 15:00) — v2.1:** https://www.figma.com/slides/Wfy4nSGRJxxnW34RUvRYB3
+- **중간발표 (10/23) — 진행 현황 + 논문 주제 (Figma Slides, 20장) — v3.4:** https://www.figma.com/slides/gYoSgMdBzvRJ4GT4WiuUe9
 - **피드백 2 반영 발표 (Figma Slides, 19장) — v3.1:** https://www.figma.com/slides/oNdg9iU5NSZiNigikV5py6
 - **W01 발표자료 (Figma Slides, 20장) — v1.0 기록:** https://www.figma.com/slides/dKaN1pbrEsOu0C1Ok4URij
 

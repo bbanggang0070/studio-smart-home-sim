@@ -22,11 +22,19 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--gui", action="store_true")
 ap.add_argument("--duration", type=float, default=0.0, help="초 (0 = 끝없이)")
 ap.add_argument("--no-local-cutoff", action="store_true", help="Baseline A — 로컬 컷오프 없음 (C2 대비군 · 단독 규칙 제어기)")
+ap.add_argument("--record", default="", help="발표 영상용 — 이 폴더에 카메라 프레임(JPG)을 저장")
+ap.add_argument("--record-camera", default="overview",
+                help="scene_layout 카메라 이름 또는 'x,y,z:tx,ty,tz' (위치:바라보는 점)")
+ap.add_argument("--record-fps", type=float, default=10.0)
+ap.add_argument("--record-from", type=float, default=0.0, help="녹화 시작 시각 [s] (브릿지 시작 기준)")
+ap.add_argument("--record-ambient", type=float, default=150.0, help="녹화용 주변광(돔) 세기 — 화면용, 조도 센서는 환경 모델이 계산")
+ap.add_argument("--record-sun", type=float, default=0.0, help="녹화용 햇빛(장면의 sun) 세기 — 화면용 (0 = 장면 기본값)")
+ap.add_argument("--record-hide", default="", help="녹화에서 숨길 프림 경로 (쉼표) — 예: /World/blind (물리는 그대로)")
 args, _ = ap.parse_known_args()
 
 from isaacsim import SimulationApp  # noqa: E402
 
-app = SimulationApp({"headless": not args.gui})
+app = SimulationApp({"headless": not args.gui, "width": 1280, "height": 720})
 
 import math  # noqa: E402
 import traceback  # noqa: E402
@@ -305,6 +313,36 @@ def main() -> None:
                                                                  else round(lat["stop_ms"], 1)})))
         p(T.S_DOOR_CONTACT, door_contact())
 
+    # ---- 발표 영상 녹화 (선택) — 실시간 제어 루프는 그대로, 일정 간격으로 렌더해 프레임 저장 ----
+    rec = None
+    if args.record:
+        import omni.replicator.core as rep
+        from PIL import Image
+        from pxr import Gf, UsdGeom
+        rec_dir = Path(args.record)
+        rec_dir.mkdir(parents=True, exist_ok=True)
+        if args.record_ambient > 0:
+            from pxr import UsdLux
+            UsdLux.DomeLight.Define(stage, "/World/lighting_module/record_ambient").CreateIntensityAttr(args.record_ambient)
+        if args.record_sun > 0:
+            from pxr import UsdLux
+            sun_prim = stage.GetPrimAtPath("/World/lighting_module/sun")
+            UsdLux.DistantLight(sun_prim).GetIntensityAttr().Set(args.record_sun)
+            # 장면의 해는 방 안 → 창밖으로 비춘다 (build_scene 회전 (-50, 0, 180)) — 화면에서만 창밖 → 방 안으로 돌린다
+            sun_prim.GetAttribute("xformOp:rotateXYZ").Set(Gf.Vec3f(-35.0, 0.0, 20.0))
+        for path in filter(None, args.record_hide.split(",")):
+            UsdGeom.Imageable(stage.GetPrimAtPath(path)).MakeInvisible()
+        if ":" in args.record_camera:
+            pos, tgt = (tuple(float(v) for v in part.split(",")) for part in args.record_camera.split(":"))
+            cam = rep.create.camera(position=pos, look_at=tgt, focal_length=18.0)
+        else:
+            cam = f"/World/cameras/{args.record_camera}"
+        rp = rep.create.render_product(cam, (1280, 720))
+        ann = rep.AnnotatorRegistry.get_annotator("rgb")
+        ann.attach([rp])
+        rec = {"ann": ann, "dir": rec_dir, "n": 0, "every": max(1, int(round(hz / args.record_fps))), "img": Image}
+        log.info(f"녹화 — {rec_dir} · {args.record_camera} · {args.record_fps:g} fps · {args.record_from:g} s 부터")
+
     log.info(f"브릿지 시작 — 물리 {hz:.0f} Hz · 상태 {B['state_hz']:.0f} Hz · 전류 {B['current_hz']:.0f} Hz")
     # 발행 주기 — 물리 주기의 정수배가 아니어도 맞게 (120 Hz 에서 50 Hz 를 '2 스텝마다'로 반올림하면 60 Hz 가 된다)
     rates = {"state": B["state_hz"], "cur": B["current_hz"], "pos": sm["window_current"]["position_est_hz"]}
@@ -328,7 +366,13 @@ def main() -> None:
         lvl = fan_guard.apply(fan_want["level"], k * dt)                     # L0 — 실링팬 방향 전환 대기
         act.set_fan_rpm("ceiling_fan", math.copysign(levels[abs(lvl)], lvl) if lvl else 0.0)
         act.step(dt)
-        world.step(render=args.gui and k % B["render_every_n_steps"] == 0)
+        shoot = rec is not None and k * dt >= args.record_from and k % rec["every"] == 0
+        world.step(render=shoot or (args.gui and k % B["render_every_n_steps"] == 0))
+        if shoot:
+            frame = np.asarray(rec["ann"].get_data())
+            if frame.size:
+                rec["img"].fromarray(frame[..., :3]).save(rec["dir"] / f"f{rec['n']:05d}.jpg", quality=90)
+                rec["n"] += 1
         k += 1
         if st["new_trip"]:
             n, st["new_trip"] = st["new_trip"], 0

@@ -117,14 +117,18 @@ class ComfortLadders:
         # 목표 + margin − release_band 아래로 내려오거나 냉방이 끝날 때까지 유지한다. 승격 중엔 무료 냉방을 요청하지 않는다
         # (I2 로 창문이 닫히면 승격 조건이 풀려 다시 창문을 여는 채터링 방지 — C5)
         cl = "comfort_ladders."
-        if not self.cooling or not free_cool:
+        if not self.cooling or not free_cool or not ac_allowed:
+            # 에어컨이 없으면 승격할 곳이 없다 — 무료 냉방을 멈추면 아무 냉방도 안 하게 된다 (X8 P-core · 상충 점검 R10)
             self._escalated, self._free_cool_since = False, None
         else:
             if self._free_cool_since is None:
                 self._free_cool_since = o.now_s
             over_at = sp + g(cl + "escalate_above_setpoint_c")
+            # 외기가 냉방 목표보다 더우면 환기로는 목표에 닿을 수 없다 — 15분을 기다리지 않고 바로 승격 (EXP-1 28 °C 귀가 · v3.4.20)
+            sp_reach = sp + (g("interaction_rules.I5_ceiling_fan_setpoint_relax_c") if "ceiling_fan" in self.rules.devices else 0.0)
+            unreachable = o.outdoor_temp_c > sp_reach - g(cl + "free_cool_reach_margin_c")
             if (not self._escalated and o.temp_c > over_at
-                    and o.now_s - self._free_cool_since >= g(cl + "escalate_to_ac_after_s")):
+                    and (unreachable or o.now_s - self._free_cool_since >= g(cl + "escalate_to_ac_after_s"))):
                 self._escalated = True
             elif self._escalated and o.temp_c <= over_at - self._band("escalate_release_band_c"):
                 self._escalated = False

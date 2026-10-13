@@ -751,6 +751,7 @@ smart_home_controller:
       min_free_cool_exhaust_rpm: 1000.0    # draft — 창문을 못 쓸 때, (소음 · 외기 등급) 상한 뒤 배기가 이 아래면 무료 냉방이 없는 것으로 본다 (X1 수면 N0 600 rpm)
       escalate_to_ac_after_s: 900.0        # draft — 무료 냉방(창문 · 배기)만으로 이 시간 안에 못 내리면 에어컨으로 승격 (C5 '필요 시')
       escalate_above_setpoint_c: 1.0       # draft — 승격 판단: 실내 > 목표 + 1.0 °C (C5 예산 ≤ 28 °C = 수면 목표 27 + 1)
+      free_cool_reach_margin_c: 0.5        # [v3.4.20] draft — 외기 > 냉방 목표(I5 완화 포함) − 0.5 °C 면 환기로 목표에 닿을 수 없다 → 15분 대기 없이 승격
       escalate_release_band_c: 0.5         # 승격 유지 — 실내 ≤ 목표 + 1.0 − 0.5 °C (= 냉방 진입 기준) 가 되거나 냉방이 끝나야 무료 냉방으로 돌아간다 (I2 창문 ↔ 에어컨 채터링 방지)
       ac_dry_within_setpoint_c: 0.5        # draft — 냉방 + 제습이 함께 필요할 때, 실내 ≤ 냉방 설정 + 0.5 면 제습 모드 (C1)
       ac_cool_resume_above_c: 1.5          # draft — 제습 모드 중 실내 > 냉방 설정 + 1.5 면 다시 냉방

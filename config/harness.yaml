@@ -52,6 +52,7 @@ conflict_audit:
   exhaust_high_rpm: 1500.0       # R8 — 이 이상 배기는 '강' (기본 환기 · 저속 병행은 제외)
   open_blind_max_deg: 15.0       # R9 — 이 이하면 '열림'
   sunny_outdoor_lux: 10000.0     # R9 — 외부 조도가 이 이상이면 일사
+  cooling_gap_above_c: 27.0      # R10 — 실내가 이 이상인데 외기가 더 시원하고 냉방 수단(에어컨 · 창문 · 배기 · 흡기)을 하나도 안 쓰면 공백
   min_duration_s: 10.0           # 이보다 짧게 이어진 경우는 동작이 바뀌는 순간의 과도 상태로 보고 뺀다 (창문 이동 · 에어컨 기동)
 
 # ---- 외기 PM 등급 (에어코리아 API 대체) — 환경부 PM2.5 예보 등급 -----------------
@@ -141,6 +142,13 @@ occupancy_generator:
                    p_home: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.9, 0.5, 0.8, 0.95, 0.95, 0.9, 0.6, 0.7, 0.95, 1, 1, 1, 1] }
         weekend: { weight_weekday: 0.0, weight_weekend: 1.0,
                    p_home: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.9, 0.7, 0.4, 0.2, 0.2, 0.3, 0.5, 0.7, 0.9, 1, 1, 1, 1, 1] }
+
+exp1_setback:                    # EXP-1 셋백 vs 끄기 (docs/08 §5.4 · W12 T12.w2) — tools/energy/exp1_setback_sweep.py · draft
+  template: C16                  # 13:00 외출 · 귀가 · 일사 이벤트를 이 시나리오에서 가져온다
+  away_h: [0.5, 1.0, 2.0, 4.0, 8.0]
+  outdoor_c: [28.0, 32.0, 35.0]  # 외출 내내 고정 (C16 의 외기온 이벤트는 뺀다)
+  strategies: ['setback', 'off', 'precool']   # 따옴표 필수 — YAML 은 off 를 거짓(False)으로 읽는다
+  after_arrival_min: 60.0        # 귀가 후 이만큼까지 비용을 센다 (planner after_arrival_horizon_min 과 같게)
 
 exp4_identification:             # EXP-4 (docs/08 §5.3-1 · §5.8) — tools/energy/exp4_identification.py · draft
   train_days: [7, 14, 28]        # 학습 기록 길이 (1 · 2 · 4주)

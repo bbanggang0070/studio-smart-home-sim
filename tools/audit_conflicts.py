@@ -13,6 +13,7 @@
   R7 더운 날 더 더운 외기 유입
   R8 에어컨 냉방 + 배기 강               냉기를 내보낸다
   R9 에어컨 냉방 + 일사 중 블라인드 열림  막을 수 있는 열을 들인다
+  R10 냉방 수단 공백                    덥고 외기가 더 시원한데 에어컨 · 창문 · 배기 · 흡기 어느 것도 안 쓴다 (없는 수단을 기다림)
 결과: 규칙 × 시나리오별 해당 초 · 처음 시각 · 그때 제어기 사유(관련 장치만)
 """
 
@@ -39,6 +40,7 @@ RULES = {
     "R7": ("더운 외기 유입", ("window",)),
     "R8": ("에어컨 냉방 + 배기 강", ("ac", "exhaust")),
     "R9": ("에어컨 냉방 + 일사 중 블라인드 열림", ("ac", "blind")),
+    "R10": ("냉방 수단 공백", ("ac", "window", "exhaust", "intake")),
 }
 
 
@@ -63,6 +65,9 @@ def masks(d: pd.DataFrame, c: dict) -> dict[str, pd.Series]:
         "R7": win & (t_out >= t_in + c["outdoor_warmer_c"]) & (t_in >= c["hot_indoor_c"]) & ~hood,
         "R8": ac_cool & (num("act.exhaust_fan_rpm") >= c["exhaust_high_rpm"]) & ~hood,
         "R9": ac_cool & (blind <= c["open_blind_max_deg"]) & (num("ext.outdoor_illuminance_lux") >= c["sunny_outdoor_lux"]),
+        "R10": (t_in >= c["cooling_gap_above_c"]) & (t_out <= t_in - c["outdoor_cooler_c"]) & ~ac_cool & ~ac_dry
+               & (num("act.window_open_ratio") <= c["window_open_min"]) & (num("act.exhaust_fan_rpm") < 1.0)
+               & (num("act.intake_fan_rpm") < c["exhaust_high_rpm"] / 2) & (num("truth.occupied") > 0),
     }
 
 

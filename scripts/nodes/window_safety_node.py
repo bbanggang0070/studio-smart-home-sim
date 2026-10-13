@@ -28,8 +28,15 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 def main() -> None:
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--run-torque-end-pct", type=float, default=-1.0,
+                    help="시험 전용 — 주행 구간 끝 토크 % (W12 T12.3 토크 스윕 · 기본 = thresholds)")
+    args, _ = ap.parse_known_args()
     p = load_params()
     ws = p.get("window_sensorless")
+    if args.run_torque_end_pct > 0:
+        ws = {**ws, "torque_profile": {**ws["torque_profile"], "run_torque_end_pct": args.run_torque_end_pct}}
     A = yaml.safe_load((REPO / "config" / "actuator_limits.yaml").read_text(encoding="utf-8"))
     travel = ws["travel_length_m"]
     speed = A["window_prismatic_joint"]["max_speed_mps"]
@@ -101,7 +108,8 @@ def main() -> None:
                        bool(st["pinch"] or st["local"].get("tripped")))
 
     node.create_timer(1.0 / p.get("current_sample_rate_hz"), tick)
-    log.info(f"창문 상위 안전 노드 시작 — {p.get('current_sample_rate_hz'):.0f} Hz · 기준 전류 models/window_reference_profile.csv")
+    log.info(f"창문 상위 안전 노드 시작 — {p.get('current_sample_rate_hz'):.0f} Hz · 기준 전류 models/window_reference_profile.csv"
+             f" · 주행 끝 토크 {ws['torque_profile']['run_torque_end_pct']:g} %")
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

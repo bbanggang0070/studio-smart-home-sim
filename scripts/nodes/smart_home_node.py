@@ -17,7 +17,7 @@ from pathlib import Path
 import rclpy
 
 from controller.params import load_params
-from controller.smart_home import SmartHomeController
+from harness.controllers import make_controller
 from interfaces import ros_io
 from interfaces import topics as T
 
@@ -34,7 +34,10 @@ def main() -> None:
     args, _ = ap.parse_known_args()
 
     p = load_params()
-    ctrl = SmartHomeController()
+    # baseline → 제어기 구현 — 고속 모드와 같은 매핑 (config/harness.yaml controllers · A = 장치별 독립 규칙)
+    import yaml
+    hcfg = yaml.safe_load((Path(__file__).resolve().parents[2] / "config" / "harness.yaml").read_text(encoding="utf-8"))
+    ctrl = make_controller(hcfg["controllers"][args.baseline])
     sc = {}
     if args.scenario:                                   # 고속 모드와 같은 reset — 프로파일이 다르면 쓸 수 있는 가전이 다르다 (X2 P-core)
         from harness.scenario import load_scenarios

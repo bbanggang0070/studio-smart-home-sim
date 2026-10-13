@@ -424,7 +424,7 @@ smart_home_controller:
       personas: ['commuter', 'irregular', 'home']
       away_strategy:                     # 셋백 vs 끄기 — T*는 EXP-1 결과로 채운다
         setback_c: 2.0
-        t_star_min_by_outdoor_c: { t28: -1.0, t32: -1.0, t35: -1.0 }   # -1 = EXP-1 결과로 채움 (ROS 2 파라미터는 null 불가)
+        t_star_min_by_outdoor_c: { t28: 60.0, t32: 120.0, t35: 240.0 }   # [v3.4.20] EXP-1 결과 (2026-10-14 · 고속 · 제안 제어기 · 비용 = Wh + 2000 × 귀가 후 불쾌 K·h) — 검증 기준, 운영은 기대비용 계획기
         sleep_policy: 'keep_setpoint'
       power_limit_w: 3000.0              # 가정 A17 — 원룸마다 다름
       progressive_tariff:                # 선택 · 기본 비활성 (user_modes.yaml 에서 켬)

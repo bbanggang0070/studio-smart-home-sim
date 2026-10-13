@@ -205,8 +205,24 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
         tt = float(np.interp(anchors["arrive_start"], df["time_s"], df["truth.temperature_c"]))
         out["arrival_comfort"] = float(tt <= sp_c + 1.0)
     out["ir_tx_ac"] = float(df["bridge.ir_tx_ac"].iloc[-1]) if "bridge.ir_tx_ac" in df.columns else math.nan
-    out["rule_violation_count"] = (float(df["ctrl.rule_violations"].iloc[-1])
-                                   if "ctrl.rule_violations" in df.columns else math.nan)
+    # 지표 #12 규칙 위반 — 로그로 확인할 수 있는 하드 규칙: I1 제습 + 가습 · I2 에어컨 냉방 중 창문 · L1 우천 창문
+    #   rule_violation.min_duration_s 이상 이어진 구간 1개 = 1회 (동작이 바뀌는 순간의 과도 상태는 세지 않는다)
+    rv = cfg_metrics["rule_violation"]
+
+    def _flag(col):
+        return df[col].astype(str).isin(["True", "1", "1.0"]) if col in df.columns else pd.Series(False, index=df.index)
+
+    win = pd.to_numeric(df.get("act.window_open_ratio", pd.Series(0.0, index=df.index)), errors="coerce").fillna(0) > rv["window_open_min"]
+    viol = [(_flag("act.dehumidifier") | _flag("act.ac_dry")) & _flag("act.humidifier"),
+            _flag("act.ac_cool") & win, _flag("ext.raining") & win]
+    n_min = max(1, int(round(rv["min_duration_s"] / dt_s)))
+    count = 0
+    for m in viol:
+        m = m.reset_index(drop=True)
+        run = (m != m.shift()).cumsum()
+        lengths = m.groupby(run).transform("size")
+        count += int(((m & (lengths >= n_min)) & ~(m & (lengths >= n_min)).shift(fill_value=False)).sum())
+    out["rule_violation_count"] = float(count)
 
     # 지표 #8 — 장치 전환(구동) 횟수 (불필요 구동 · 채터링은 Baseline B 대비로 본다)
     n = 0

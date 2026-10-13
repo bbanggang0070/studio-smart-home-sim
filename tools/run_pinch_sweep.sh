@@ -17,7 +17,7 @@ for item in $PLAN; do
   tools/ros/run.sh stop
   (tools/ros/run.sh node scripts/nodes/window_safety_node.py --run-torque-end-pct "$PCT" > "$LOGS/safety_${PCT}.log" 2>&1 &)
   sleep 6
-  tools/ros/run.sh node tools/ros/pinch_sweep.py --torque "$PCT" --trials "$N" 2>&1 | grep -E "토크|Traceback|Error"
+  tools/ros/run.sh node tools/ros/pinch_sweep.py --torque "$PCT" --trials "$N" ${SWEEP_ARGS:-} 2>&1 | grep -E "토크|Traceback|Error"
 done
 tools/ros/run.sh stop; docker rm -f studio-isaac >/dev/null 2>&1
 echo "=== 끝"

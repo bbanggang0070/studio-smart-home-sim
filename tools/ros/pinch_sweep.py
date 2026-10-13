@@ -30,6 +30,10 @@ def main() -> None:
     ap.add_argument("--torque", type=float, required=True, help="기록용 — 안전 노드에 준 주행 끝 토크 %")
     ap.add_argument("--objects", default="rigid_pot,soft_cushion,elastic_sponge")
     ap.add_argument("--trials", type=int, default=10)
+    ap.add_argument("--at", type=float, default=-1.0, help="물체 위치 — 문설주에서 m (기본 0.20 = 엔드존 끼임 · 0.30 = 주행 구간 끝 끼임)")
+    ap.add_argument("--mass", type=float, default=-1.0, help="물체 질량 kg — 주행 구간 끼임은 밀리지 않게 무겁게 (기본 = 장면 값)")
+    ap.add_argument("--open", type=float, default=0.5, help="시행마다 먼저 여는 비율 (물체가 패널과 겹쳐 생기지 않게)")
+    ap.add_argument("--out", default="pinch_sweep.csv")
     args = ap.parse_args()
     p = load_params()
     hold_s = p.get("window_sensorless.layered_safety.safety_hold_s")
@@ -53,10 +57,10 @@ def main() -> None:
 
     out = REPO / "results" / "sweep"
     out.mkdir(parents=True, exist_ok=True)
-    path = out / "pinch_sweep.csv"
+    path = out / args.out
     new = not path.exists()
     f = open(path, "a", newline="", encoding="utf-8")
-    w = csv.DictWriter(f, fieldnames=["torque_pct", "object", "trial", "detected", "upper_seen", "contact_peak_n",
+    w = csv.DictWriter(f, fieldnames=["torque_pct", "object", "at_m", "trial", "detected", "upper_seen", "contact_peak_n",
                                       "detect_ms", "stop_ms", "stop_mm", "pass"])
     if new:
         w.writeheader()
@@ -64,9 +68,10 @@ def main() -> None:
     for obj in args.objects.split(","):
         for k in range(1, args.trials + 1):
             obstacle.publish(String(data="park"))
-            ros_io.publish(win, T.C_WINDOW_OPEN_RATIO, 0.5)
-            spin(13.0)
-            obstacle.publish(String(data=obj))
+            ros_io.publish(win, T.C_WINDOW_OPEN_RATIO, args.open)
+            spin(13.0 + 20.0 * max(0.0, args.open - 0.5))
+            spec = obj if args.at <= 0 else f"{obj}@{args.at:g}"
+            obstacle.publish(String(data=spec + (f":{args.mass:g}" if args.mass > 0 else "")))
             spin(1.5)
             ros_io.publish(win, T.C_WINDOW_OPEN_RATIO, 0.0)
             seen = {"pinch": False, "upper": False, "q": None}
@@ -79,7 +84,7 @@ def main() -> None:
             spin(14.0, probe)
             loc = st["local"]
             peak = float(loc.get("contact_peak_n") or 0.0)
-            row = {"torque_pct": args.torque, "object": obj, "trial": k, "detected": int(seen["pinch"]), "upper_seen": int(seen["upper"]),
+            row = {"torque_pct": args.torque, "object": obj, "at_m": args.at if args.at > 0 else 0.20, "trial": k, "detected": int(seen["pinch"]), "upper_seen": int(seen["upper"]),
                    "contact_peak_n": round(peak, 1), "detect_ms": loc.get("detect_ms"), "stop_ms": loc.get("stop_ms"),
                    "stop_mm": round(seen["q"] * 700.0, 1) if seen["q"] is not None else None,
                    "pass": int(seen["pinch"] and peak <= fmax)}
@@ -90,7 +95,7 @@ def main() -> None:
             obstacle.publish(String(data="park"))
             spin(hold_s + 2.0)                                   # SAFETY_HOLD 해제
             ros_io.publish(win, T.C_WINDOW_OPEN_RATIO, 0.0)        # 물체 없이 끝까지 닫기 → 그 자리 반복 기록 삭제
-            spin(14.0)
+            spin(14.0 + 20.0 * max(0.0, args.open - 0.5))
     f.close()
     rclpy.shutdown()
 

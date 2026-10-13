@@ -395,7 +395,15 @@ smart_home_controller:
     # ---- 에너지 예측 · 전략 — [신설 v3.1] (docs/08 §5) ---------------------------
     energy:
       #  [v3.1 개정] 질문별 모델 분리 (docs/08 §5.1) — LSTM은 검토 후 제외
-      arrival_model: 'empirical'         # quantile_gbm | empirical — [v3.4.6] v1 은 경험 분포 (GBM 비교는 W11 EXP-2)
+      arrival_model: 'auto'              # auto | quantile_gbm | empirical — [v3.4.19] auto = 학습 때 검증 2주 분위 손실로 고른 쪽 (EXP-2)
+      arrival_gbm:                       # [v3.4.19] 분위수 GBM 귀가 예측 (tools/energy/train_arrival_gbm.py → models/arrival_gbm_<persona>.json)
+        model_file: 'models/arrival_gbm_commuter.json'
+        quantiles: [0.05, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.9, 0.95]
+        n_estimators: 150
+        max_depth: 3
+        learning_rate: 0.05
+        min_samples_leaf: 5
+        default_weekday: 2               # 시뮬레이션 시각에 요일이 없다 — 평일 대표(수) draft
       learned_model_file: 'models/energy_commuter.yaml'   # [v3.4.6] tools/energy/train_energy_model.py 산출물
       planner:                           # [v3.4.6] 기대비용 격자 탐색 (docs/08 §5.3) — draft
         sim_step_s: 300.0                # 2R2C 예측 적분 보폭

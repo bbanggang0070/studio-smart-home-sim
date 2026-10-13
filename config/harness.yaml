@@ -103,6 +103,58 @@ personas:
     train_weeks: 8
     weekdays_per_week: 5
     seed: 20261100
+# ---- 재실 생성기 — 비균질 마르코프 (docs/08 §5.8 · T10.w2 · scripts/harness/occupancy_gen.py) — draft ------------
+#  5분 단위 2상태(집 · 외출). 시간대별 '집에 있을 확률' p(h) 와 평균 머무름 tau 로 전이확률을 만든다:
+#    P(외출→집) = dt/tau · p(h)      P(집→외출) = dt/tau · (1 − p(h))       (정상 분포 = p(h))
+#  날마다 근무 형태(day_types)를 뽑아 프로필을 바꾼다 — 불규칙 페르소나의 교대 · 야근
+#  '주 귀가' = min_absence_h 이상 비운 뒤 처음 들어온 시각 (짧은 외출 · 잡음은 귀가로 세지 않는다)
+occupancy_generator:
+  dt_min: 5.0
+  tau_min: 30.0
+  min_absence_h: 3.0
+  weeks: 12                      # 학습 8 · 검증 2 · 시험 2 (thresholds energy.synthetic_weeks)
+  personas:
+    commuter:                    # ① 정시 출퇴근 — 평일 8–18시 외출 · 주말 오후 외출
+      seed: 20261200
+      day_types:
+        weekday: { weight_weekday: 1.0, weight_weekend: 0.0,
+                   p_home: [1, 1, 1, 1, 1, 1, 1, 0.95, 0.3, 0.03, 0.02, 0.02, 0.03, 0.02, 0.02, 0.02, 0.03, 0.08, 0.35, 0.75, 0.9, 0.95, 1, 1] }
+        late:    { weight_weekday: 0.12, weight_weekend: 0.0,          # 야근 · 회식 — 귀가 21–23시
+                   p_home: [1, 1, 1, 1, 1, 1, 1, 0.95, 0.3, 0.03, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.03, 0.15, 0.55, 0.85, 0.95] }
+        weekend: { weight_weekday: 0.0, weight_weekend: 1.0,
+                   p_home: [1, 1, 1, 1, 1, 1, 1, 1, 1, 0.95, 0.9, 0.7, 0.4, 0.2, 0.2, 0.25, 0.4, 0.6, 0.8, 0.9, 0.95, 1, 1, 1] }
+    irregular:                   # ② 불규칙 — 주간 · 오후 · 야간 근무 · 휴무를 날마다 무작위
+      seed: 20261201
+      day_types:
+        day:     { weight_weekday: 0.35, weight_weekend: 0.2,
+                   p_home: [1, 1, 1, 1, 1, 1, 0.6, 0.1, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.1, 0.5, 0.85, 0.95, 1, 1, 1, 1, 1] }
+        evening: { weight_weekday: 0.3, weight_weekend: 0.2,
+                   p_home: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.95, 0.9, 0.5, 0.05, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.05, 0.4, 0.85] }
+        night:   { weight_weekday: 0.2, weight_weekend: 0.2,
+                   p_home: [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.1, 0.5, 0.9, 1, 1, 1, 1, 1, 1, 1, 1, 0.95, 0.9, 0.9, 0.7, 0.2, 0.02, 0.02] }
+        rest:    { weight_weekday: 0.15, weight_weekend: 0.4,
+                   p_home: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.9, 0.8, 0.6, 0.5, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1, 1, 1, 1] }
+    home:                        # ③ 재택 중심 — 짧은 외출 (점심 · 저녁 장보기) 뿐
+      seed: 20261202
+      day_types:
+        weekday: { weight_weekday: 1.0, weight_weekend: 0.0,
+                   p_home: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.9, 0.5, 0.8, 0.95, 0.95, 0.9, 0.6, 0.7, 0.95, 1, 1, 1, 1] }
+        weekend: { weight_weekday: 0.0, weight_weekend: 1.0,
+                   p_home: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.9, 0.7, 0.4, 0.2, 0.2, 0.3, 0.5, 0.7, 0.9, 1, 1, 1, 1, 1] }
+
+exp4_identification:             # EXP-4 (docs/08 §5.3-1 · §5.8) — tools/energy/exp4_identification.py · draft
+  train_days: [7, 14, 28]        # 학습 기록 길이 (1 · 2 · 4주)
+  seeds: [1, 2, 3]               # 학습 기록 시드 반복 (energy_training.seed + k)
+  test_days: 7                   # 따로 만든 시험 기록 (시드 energy_training.seed + 99)
+  outdoor_c: [28.0, 32.0, 35.0]  # T* 를 구할 외기온 (EXP-1 과 같은 축)
+  away_grid_h: [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0]
+  precool_lead_min: [0, 15, 30, 45, 60, 90, 120]   # 끄기 + 귀가 L 분 전 냉방 (0 = 그냥 끄기)
+  setpoint_c: 26.0
+  dt_s: 120.0
+  warmup_h: 6.0                  # 출발 전 설정온도로 평형 (축열 질량까지)
+  depart_tod_h: 9.0              # 낮 외출 — 일사가 있어야 끄는 동안 방이 데워진다 (해가 없으면 빈 방이 거의 안 데워져 늘 '끄기')
+  sun_peak_lux: 40000.0          # 맑은 날 외부 조도 최고 (해 뜨고 지는 시각은 thresholds virtual_sensors.lux)
+
 energy_training:                 # 2R2C 식별용 참값 운전 기록 (draft)
   days: 14
   dt_s: 300.0

@@ -2,8 +2,9 @@
 
 ROS 비의존 순수 Python. 학습 산출물(models/energy_<persona>.yaml)을 읽는다 — 만드는 쪽은 tools/energy/train_energy_model.py.
 
-  귀가 분포   학습 기간의 귀가 시각 이력 → 부트스트랩 표본 (경험 분포 · arrival_model 'empirical')
-              분위수 GBM(quantile_gbm)은 요일 · 외출 시각 특성이 쌓이는 W11 EXP-2 에서 비교한다
+  귀가 분포   empirical — 학습 기간의 귀가 시각 이력 → 부트스트랩 표본
+              quantile_gbm — 요일 · 출발 시각 · 직전 귀가 → 분위수 (controller/arrival_gbm.py · EXP-2)
+              auto — 학습 도구가 검증 2주 분위 손실로 고른 쪽 (규칙적인 일정 · 적은 데이터는 경험 분포가 낫다)
   열모델      제어용 2R2C (공기 · 축열 질량) — 기록 데이터로 식별한 R · C · 이득 (참값 3R3C 와 다르다, §5.3-1)
                 Ca·dT/dt  = (Tm−T)/Rim + (To−T)/Rao + gs·L + go·occ + q0 − η·Q_ac
                 Cm·dTm/dt = (T−Tm)/Rim + (To−Tm)/Rmo
@@ -14,6 +15,7 @@ ROS 비의존 순수 Python. 학습 산출물(models/energy_<persona>.yaml)을 �
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -78,6 +80,21 @@ class EnergyPlanner:
             m = yaml.safe_load(f)
         self.model = Thermal2R2C.from_dict(m["thermal_2r2c"])
         self.arrivals = np.asarray(m["arrival_history_tod_s"], dtype=float)
+        # 귀가 예측 모델 — auto 면 학습 산출물의 선택을 따른다 (파일이 없으면 경험 분포)
+        self.gbm = None
+        kind = g(e + "arrival_model")
+        gpath = Path(g(e + "arrival_gbm.model_file"))
+        gpath = gpath if gpath.is_absolute() else REPO / gpath
+        if kind != "empirical" and gpath.exists():
+            from controller.arrival_gbm import ArrivalGBM
+            gm = ArrivalGBM(gpath)
+            selected = json.loads(gpath.read_text(encoding="utf-8")).get("selected", "quantile_gbm")
+            if kind == "quantile_gbm" or selected == "quantile_gbm":
+                self.gbm = gm
+        self.arrival_model = "quantile_gbm" if self.gbm is not None else "empirical"
+        self.weekday = int(g(e + "arrival_gbm.default_weekday"))
+        self.prev_arrive_tod: float = float(np.median(self.arrivals))   # 직전 귀가 — 처음엔 학습 이력의 중앙값
+        self.depart_tod: float | None = None
         ac = g("appliances.ac")
         self.ac = AcSpec(ac["cooling_kw"] * 1000.0, ac["cooling_kw"] * 1000.0 / ac["power_w"],
                          g(e + "planner.ac_modulation_w_per_k"), g(e + "planner.ac_band_c"))
@@ -101,8 +118,11 @@ class EnergyPlanner:
         self.tm_hat: float | None = None
         self.end_away()
 
-    def end_away(self) -> None:
-        """귀가 — 계획 · 프리쿨링 상태를 지운다 (관측기 상태는 유지)."""
+    def end_away(self, now_tod: float | None = None) -> None:
+        """귀가 — 계획 · 프리쿨링 상태를 지운다 (관측기 상태는 유지). now_tod = 귀가 시각 (GBM 의 '직전 귀가' 특성)."""
+        if now_tod is not None and getattr(self, "depart_tod", None) is not None:
+            self.prev_arrive_tod = now_tod
+        self.depart_tod = None
         self.decision: dict[str, Any] = {}
         self._last_plan: float | None = None
         self.precool_started: float | None = None
@@ -121,6 +141,10 @@ class EnergyPlanner:
 
     def _arrival_samples(self, now_tod: float) -> np.ndarray:
         """학습 이력에서 부트스트랩 — 이미 지난 시각의 표본은 버린다 (조건부 분포)."""
+        if self.gbm is not None:
+            depart = self.depart_tod if self.depart_tod is not None else now_tod
+            x = self.gbm.features(self.weekday, depart / 3600.0, self.prev_arrive_tod / 3600.0)
+            return self.gbm.sample_h(x, now_tod / 3600.0, self.n_samples, self.rng) * 3600.0
         later = self.arrivals[self.arrivals > now_tod]
         if later.size == 0:
             later = np.array([now_tod + self.grid_s])
@@ -186,12 +210,14 @@ class EnergyPlanner:
             "cost_setback": round(cands[0][2], 1), "cost_off": round(cands[1][2], 1),
             "cost_precool_best": round(best_pre[2], 1) if best_pre else -1.0,
             "arrival_q20": float(np.quantile(arr, 0.2)), "arrival_q50": float(np.quantile(arr, 0.5)),
-            "arrival_q80": float(np.quantile(arr, 0.8)),
+            "arrival_q80": float(np.quantile(arr, 0.8)), "arrival_model": self.arrival_model,
         }
         return self.decision
 
     def step(self, now_tod: float, t_out: float, lux_fn, sp: float) -> dict[str, Any]:
         """외출 중 매 주기 — 재계획(격자 주기) · 프리쿨링 시작 판단. 반환 decision + active."""
+        if self.depart_tod is None:
+            self.depart_tod = now_tod                   # 외출 중 처음 불린 시각 = 출발 (GBM 특성)
         if self.precool_started is None and (self._last_plan is None or now_tod - self._last_plan >= self.replan_s):
             self.plan(now_tod, t_out, lux_fn, sp)
             self._last_plan = now_tod

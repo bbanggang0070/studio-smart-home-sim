@@ -245,7 +245,7 @@ class RuleEngine:
         if mode == "AWAY" and "ac" in self.devices:
             self._away_ac(o, ev, add)
         elif self.energy is not None:
-            self.energy.end_away()
+            self.energy.end_away(o.tod_s)
         pm = "indoor_pm."
         # 히스테리시스 — 켜는 기준(목표 · 나쁨)을 넘어 켰으면 기준 − off_band 아래로 내려가야 한 단 내린다 (센서 잡음 채터링, B5)
         band = g(pm + "purifier_off_band_ugm3") if self.hysteresis else 0.0

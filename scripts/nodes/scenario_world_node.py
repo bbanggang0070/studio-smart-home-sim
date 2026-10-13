@@ -127,6 +127,9 @@ def main() -> None:
         if now == 0 and state["wait"] % 5 == 0:              # 초기 액추에이터 상태 → Isaac (대기 중 몇 번 되풀이 — 브릿지가 늦게 떠도)
             pub_init.publish(String(data=json.dumps({"window_open_ratio": ini_act.window_open_ratio,
                                                      "blind_angle_deg": ini_act.blind_angle_deg})))
+            # t = 0 시험 물체도 대기 중 되풀이 — 연결 전에 한 번만 보내면 사라진다 (W11 물리 배치 C2_B_3: 화분 없이 창문 완주)
+            for iv in tl.instants_between(-1.0, 1e-9, "obstacle"):
+                pub_obstacle.publish(String(data=str(iv.spec["obstacle"])))
         state["t0_done"] = True
         if fresh:
             for iv in tl.instants_between(now - dt if now else -1.0, now + 1e-9, "obstacle"):

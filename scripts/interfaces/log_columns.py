@@ -18,4 +18,10 @@ def fill_act_from_topics(df):
         col = f"act.{name}"
         if col not in df.columns and tp in df.columns:
             df[col] = df[tp]
+    # 시작 직후 상태 토픽이 아직 안 온 첫 행들 — 처음 들어온 값으로 채운다 (중간의 빈 값은 그대로 둔다)
+    #   (물리 B3 · C3: 첫 1 행 act.ac_power 가 비어 'ac_power == 0 for all t' 가 FAIL — 2026-10-13 W11 배치)
+    for col in [c for c in df.columns if c.startswith("act.")] + [c for c in AC_COLUMNS if c in df.columns]:
+        first = df[col].first_valid_index()
+        if first is not None and first > df.index[0]:
+            df.loc[:first, col] = df.loc[:first, col].bfill()
     return df

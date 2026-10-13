@@ -52,6 +52,11 @@ environment_model:
       #  같은 압력차에서 유량은 개구 면적에 비례하므로 창문 몫 = A_창 / (A_창 + A_틈새).
       #  창문이 닫혀 있으면 부족분 전부가 틈새로 → docs/06 §5.1 식과 같다 (후드 37배 재현 유지).
       crack_leakage_area_m2: 0.01      # draft — 틈새 등가 누기 면적 100 cm² (원룸 기밀 수준, W13 민감도)
+      #  [2026-10-13] 창 안쪽 블라인드가 바람을 막는다 — 유효 유량 = 창문 유량 × 계수(블라인드 각도).
+      #  0° → open, 차광각(thermal.blind_shade_angle_deg) → shaded, 사이는 선형. 슬랫이 닫힐수록 개구가 좁아진다.
+      #  ⚠ 값은 문헌 근거 확인 전 draft (W13 민감도 대상) — 0.5 는 '75° 에서 절반'이라는 보수적 가정
+      blind_flow_factor_open: 1.0
+      blind_flow_factor_shaded: 0.5
 
     # ---- 결로 (docs/06 §5.5) ---------------------------------------------------
     #  T_s = T_in - R_si/(R_si + R_rest)·(T_in - T_out) · Δ = T_s - T_dew
@@ -83,8 +88,13 @@ environment_model:
       solar_luminous_efficacy_lm_per_w: 105.0 # draft — 외부 조도 → 일사 [W/m²] 환산
       solar_heat_gain_fraction: 0.6    # draft — 투과광 중 실내 열로 남는 비율 (SHGC 근사)
       solar_to_mass_fraction: 0.6      # draft — 일사열 중 축열 질량에 흡수되는 비율
-      blind_transmittance_open: 0.85   # thresholds lighting_model 과 같은 초기값 (참값 사본)
+      blind_transmittance_open: 0.85   # 빛 투과율 — thresholds lighting_model 과 같은 초기값 (참값 사본) · 조도에만 쓴다
       blind_transmittance_shaded: 0.12 # 75° 차광
+      #  [2026-10-13] 일사'열' 계수는 빛 투과율과 다르다 — 창 안쪽 블라인드는 흡수한 햇빛이 실내에서 열이 된다.
+      #  일사열 = 유리 면적 × 일사 × SHGC × 계수(각도). 0.55 는 밝은색 실내 베니션 블라인드 닫힘의 감쇠 수준 (draft —
+      #  ASHRAE 실내 차폐 감쇠계수(IAC) 범위로 가정, 원문 확인 필요)
+      blind_solar_heat_factor_open: 0.95
+      blind_solar_heat_factor_shaded: 0.55
       blind_shade_angle_deg: 75.0
 
     # ---- 재실자 (1인 기준 · 가정 A3 · A22) --------------------------------------
@@ -140,6 +150,8 @@ environment_model:
         min_plr: 0.15                  # draft — 인버터 최저 부하율 (이하 단속 운전)
         modulation_w_per_k: 1500.0     # draft — 설정온도 편차 1 K 당 냉방 출력
         thermo_off_band_c: 0.5         # draft — 설정 −0.5 °C 아래면 써모오프(송풍) · 냉방 · 제습 모두 [v1.9]
+        thermo_restart_above_c: 0.5    # [2026-10-13] draft — 써모오프 뒤 설정 +0.5 °C 를 넘어야 압축기 재기동 (온도차 · 압축기 보호)
+                                       #   없으면 최소 출력 > 부하일 때 1 s 가동 · 4 s 정지를 반복했다 (B11 · 블라인드 일사열 계수 변경 뒤 발견)
         fan_only_power_w: 30.0         # docs/08 §6.3 송풍 20–100 W
         dry_mode_removal_g_per_h: 500.0
         dry_mode_sensible_w: 500.0     # draft

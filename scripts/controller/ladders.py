@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import math
 
+from controller.cooling_blind import CoolingBlind
 from controller.params import ControllerParams
 from controller.signals import Observation, Psychro
 
@@ -31,7 +32,8 @@ class ComfortLadders:
         self._escalated = False
         self._ac_on = False
         self._outdoor_cooler = False
-        self._sunny = False
+        self._shade_useful = False
+        self._blind_choice = None                    # CoolingBlind — 조명 모듈이 필요해 처음 쓸 때 만든다
 
     def _dry_sp(self, sp: float) -> float:
         """에어컨 제습 운전 설정 — 냉방 목표보다 낮춰 둔다. 제습 운전도 실내가 설정 아래로 내려가면 압축기가 멈춰
@@ -126,22 +128,34 @@ class ComfortLadders:
                 self._escalated = True
             elif self._escalated and o.temp_c <= over_at - self._band("escalate_release_band_c"):
                 self._escalated = False
-        shading = False
-        # 일사 판단 — 블라인드 개방 환산 작업면 주광 + 히스테리시스 (차광 ↔ 해제 채터링 방지 · B3 물리 모드)
-        sun_lux = self.rules.lighting.daylight_open_equiv(o)
-        if sun_lux >= g("comfort_ladders.shade_requires_lux"):
-            self._sunny = True
-        elif sun_lux < (g("comfort_ladders.shade_release_lux") if self.hyst else g("comfort_ladders.shade_requires_lux")):
-            self._sunny = False
-        sunny = self._sunny
+        window_cool = free_cool and not blocked and not self._escalated   # 창문을 냉방에 쓰나
+        if self._blind_choice is None:
+            self._blind_choice = CoolingBlind(self.p, self.rules.lighting)
+        saving_w = self._blind_choice.solar_w(o, 0.0) - self._blind_choice.solar_w(o, g("setpoints.blind_shade_angle_deg"))
+        cb = "means_ladder.cooling_blind."
+        if saving_w >= g(cb + "engage_min_saving_w"):          # 흐린 날도 막을 열이 있으면 판단 (상충 점검 R9)
+            self._shade_useful = True
+        elif saving_w < (g(cb + "engage_release_saving_w") if self.hyst else g(cb + "engage_min_saving_w")):
+            self._shade_useful = False
+        shade_useful = self._shade_useful
         if self.cooling:
-            if sunny:
-                add("blind", "need", g("setpoints.blind_shade_angle_deg"), L5, "냉방 ① 블라인드 차광")
-                # 열원 먼저 — 블라인드가 차광각에 닿을 때까지 창문 · 배기(②)를 미룬다 (docs/03 C3 · B3 순서)
-                shading = o.blind_deg < g("setpoints.blind_shade_angle_deg") - g("means_ladder.blind_first_tolerance_deg")
-            elif m.get("blind_policy") == "night_cooling" and outdoor_cooler:   # 복사냉각은 공기를 들이지 않는다 — I10 무관
-                add("blind", "need", g("setpoints.blind_night_cooling_deg"), L5, "냉방 — 야간 복사냉각 블라인드 개방 (수면)")
-            if free_cool and not blocked and not self._escalated and not shading:
+            if shade_useful:
+                # 블라인드 각도 — 막는 일사열 vs 잃는 환기 냉방 vs 늘어나는 조명 열 (v3.4.18 · 고정 순서 없음)
+                li = self.rules.lighting
+                lm = m.get("lighting") or {}
+                target = 0.0 if lm.get("target") in (None, "none") else float(
+                    lm.get("ceiling_lux", lm.get("lux", 0.0)) if lm.get("target") == "desk" else lm.get("lux", 0.0))
+                glare_min = (li._glare_deg or 0.0) if li._glare else 0.0      # 눈부심 차광보다 덜 가리지는 않는다
+                ratio = g("setpoints.window_vent_ratio_pct") / 100.0 if window_cool else 0.0
+                deg, why = self._blind_choice.choose(o, target, ratio, glare_min)
+                add("blind", "need", deg, L5, why)
+                info["cooling_blind"] = self._blind_choice.last
+            else:
+                if self._blind_choice is not None:
+                    self._blind_choice.reset()
+                if m.get("blind_policy") == "night_cooling" and outdoor_cooler:   # 복사냉각은 공기를 들이지 않는다 — I10 무관
+                    add("blind", "need", g("setpoints.blind_night_cooling_deg"), L5, "냉방 — 야간 복사냉각 블라인드 개방 (수면)")
+            if window_cool:
                 add("window", "need", g("setpoints.window_vent_ratio_pct") / 100.0, L5, "냉방 ② 창문 (외기가 더 시원)")
                 add("exhaust", "need", g("setpoints.fan_low_rpm"), L5, "냉방 ② 배기 저속 (창문 병행)")
             hi_at = sp + g("comfort_ladders.ceiling_fan_high_above_setpoint_c")
@@ -200,7 +214,7 @@ class ComfortLadders:
         # 목표별 '쓸모 있는 수단' — 제어 가능성 판정(feasibility)이 소진 여부를 볼 때 쓴다 (외기가 더 더우면 환기는 냉방 수단이 아니다)
         info["useful_means"] = {
             "cooling": {"ac": ac_allowed, "window": free_cool, "exhaust": free_cool, "intake": free_cool,
-                        "ceiling_fan": True, "blind": sunny},
+                        "ceiling_fan": True, "blind": shade_useful},
             "dehum": {"ac": ac_allowed and season == "summer", "dehumidifier": True, "window": i10, "exhaust": i10},
         }
 
@@ -208,7 +222,7 @@ class ComfortLadders:
         lo = (m.get("humidity_range_pct") or [None, None])[0]
         r_si = self.psy.surface_resistance(o.blind_deg, o.ceiling_fan)
         cap = self._humidify_cap(o, r_si)
-        target = min(hi if hi is not None else 100.0, cap)
+        target = min(hi - g("comfort_ladders.humidify_target_below_hi_pct") if hi is not None else 100.0, cap)
         info["humidify_cap_pct"] = round(cap, 1)
         if lo is None:
             self.humidifying = False
@@ -219,7 +233,7 @@ class ComfortLadders:
                 self._hum_paused = True
             elif o.rh_pct < target - self._band("humidify_restart_band_pct"):
                 self._hum_paused = False
-            if not self._hum_paused:
+            if not self._hum_paused and not self.dehumidifying:     # 제습 중에는 가습하지 않는다 (상충 점검 R5)
                 add("humidifier", "need", 1, L5, f"가습 (유효 상한 {target:.0f} %)")
             if (g("comfort_ladders.cap_extension_by_ceiling_fan") and hi is not None and season == "winter"
                     and self._humidify_cap(o, self.psy.r_si["default"]) < hi and "ceiling_fan" in self.rules.devices):

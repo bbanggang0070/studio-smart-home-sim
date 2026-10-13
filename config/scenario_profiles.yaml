@@ -1612,7 +1612,7 @@ scenarios:
       outdoor_rh_pct: 50.0
     pass_criteria:
       - "ac_power == 0 for all t"                                # 에어컨은 기동하지 않는다
-      - "blind_angle >= 30 within 120 after 0"                   # ① 블라인드 (부분) 차광
+      - "blind_angle <= 50 when t > 120"                         # ① 블라인드가 창문 환기를 막지 않는다 (v3.4.18 순 열량 선택 — 바깥이 시원)
       - "window_open_ratio >= 0.35 within 120 after 0"           # ② 창문 40 %
       - "exhaust_fan_rpm >= 500 within 300 after 0"              # ③ 팬 저속
       - "value_at('temperature', 300) < value_at('temperature', 0)"   # 온도 하강 추세 (docs/03 B3 · W08 T8.6)
@@ -1699,7 +1699,7 @@ scenarios:
 
   - id: C3
     tier: 2
-    name: "고온 + 강한 일사 — 열원 차단 우선"
+    name: "고온 + 강한 일사 · 바깥이 시원 — 차광과 환기의 균형"
     duration_s: 600
     repeat: 3
     baselines: [A, B, proposed]
@@ -1729,10 +1729,48 @@ scenarios:
       outdoor_temp_c: 25.0
       outdoor_rh_pct: 50.0
     pass_criteria:
-      - "blind_lead_s > 0"                                        # 블라인드 차광이 창문 개방보다 선행 (동작 순서)
-      - "blind_angle >= 70 within 120 after 0"                    # ① 열원 차단
-      - "temperature < value_at('temperature', 0) by 600 after 0" # 실내 온도 상승 억제 → 하강
-      - "energy_wh <= baseline_A.energy_wh"                       # A 는 에어컨이 자체 판단으로 바로 기동
+      # v3.4.18 — '차광 먼저 → 창문' 고정 순서를 없앴다. 창 안쪽 블라인드는 창문 바람을 막고 방을 어둡게 해,
+      # 바깥이 시원할 때는 막는 일사열보다 잃는 환기 · 조명 손해가 크다 (제어기가 순 열량으로 각도를 고른다)
+      - "window_open_ratio >= 0.35 within 120 after 0"            # 바깥 공기로 냉방
+      - "blind_angle <= 50 when t > 120"                          # 블라인드가 환기를 막지 않는다
+      - "temperature < value_at('temperature', 0) by 600 after 0" # 실내 온도 하강
+      - "ac_power == 0 for all t"                                 # 에어컨 없이
+
+  - id: C3b
+    tier: 2
+    name: "고온 + 강한 일사 · 바깥이 더 더움 — 완전 차광"
+    duration_s: 600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261029
+    run_mode: fast                     # 블라인드 · 창문 판단만 본다 — 열 · 환기는 두 모드가 같은 환경 모델
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 29.0
+      humidity_pct: 55.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 400.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "14:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_illuminance_lux: 25000.0
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 32.0             # C3 와 같고 바깥만 더 덥다 — 창문 환기는 냉방이 아니다
+      outdoor_rh_pct: 50.0
+    pass_criteria:
+      - "blind_angle >= 70 within 120 after 0"                    # 막을 것은 일사열뿐 — 완전 차광
+      - "window_open_ratio <= 0.15 when t > 60"                   # 뜨거운 외기를 들이지 않는다
+      - "temp_end_c < baseline_A.temp_end_c"                      # A(온도 규칙으로 창문 개방)보다 시원
 
   - id: X4
     tier: 3

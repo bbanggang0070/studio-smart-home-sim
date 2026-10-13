@@ -246,8 +246,9 @@ def test_away_dehumidifies_with_dehumidifier_not_ac(params):
 
 
 def test_hysteresis_cuts_actuations_vs_baseline_b(tmp_path):
-    """지표 #8 — 같은 제어기에서 히스테리시스만 뺀 B 대비 장치 전환이 50 % 이상 줄어야 한다 (C12 수면 6시간)."""
-    res = run_batch(["C12"], baselines=["B", "proposed"], reps=1, out_dir=tmp_path, progress=lambda *_: None)
+    """지표 #8 — 같은 제어기에서 히스테리시스만 뺀 B 대비 장치 전환이 50 % 이상 줄어야 한다 (C11 공부 · 기본 환기 40 m³/h).
+    v3.4.18 — C12(수면)는 블라인드가 닫혀 창문 환기가 줄면서 경계를 오가지 않게 되어 비교 대상에서 뺐다."""
+    res = run_batch(["C11"], baselines=["B", "proposed"], reps=1, out_dir=tmp_path, progress=lambda *_: None)
     b = next(r for r in res if r.run.baseline == "B").metrics["actuation_count"]
     p = next(r for r in res if r.run.baseline == "proposed").metrics["actuation_count"]
     assert p <= 0.5 * b
@@ -320,14 +321,26 @@ def test_manual_control_state_issues_no_actuator_commands():
     assert [a["code"] for a in json.loads(out[T.T_ALERTS])] == ["W_PINCH", "W_LOCK"]
 
 
-def test_window_waits_for_blind_and_safety_hold_redistributes_to_fans():
+def test_blind_and_window_chosen_together_by_net_heat_and_safety_hold_redistributes():
+    """v3.4.18 — '차광 먼저 → 창문' 고정 순서 없음. 창문을 냉방에 쓰면 블라인드가 바람을 막는 손실까지 계산해 각도를 고른다."""
     c = SmartHomeController()
     c.reset({"baseline": "proposed", "scenario": {}})
     hot = dict(**{T.S_TEMPERATURE: 29.0, T.S_ILLUMINANCE: 400.0,
                   T.S_WEATHER: json.dumps({"raining": False, "outdoor_temp_c": 24.0, "outdoor_rh_pct": 50.0})})
     out = c.step(50000.0, inbox(**hot, **{T.T_BLIND_ANGLE: 0.0}))
-    assert out[T.C_BLIND_ANGLE] >= 70 and out[T.C_WINDOW_OPEN_RATIO] < 0.35           # 블라인드 먼저 (0.1 은 기본 환기 틈)
-    out = c.step(50001.0, inbox(**hot, **{T.T_BLIND_ANGLE: 75.0}))
-    assert out[T.C_WINDOW_OPEN_RATIO] > 0.3                                           # 차광 뒤 창문
-    out = c.step(50002.0, inbox(**hot, **{T.T_BLIND_ANGLE: 75.0, T.T_SAFETY_STATE: "SAFETY_HOLD"}))
+    assert out[T.C_WINDOW_OPEN_RATIO] > 0.3                                           # 블라인드를 기다리지 않는다
+    nets = c.rules.ladders._blind_choice.last
+    assert out[T.C_BLIND_ANGLE] == min(nets, key=lambda d: nets[d]["net_w"])          # 순 열량이 가장 작은 각도
+    assert nets[75.0]["vent_w"] < nets[0.0]["vent_w"]                                 # 닫을수록 환기 냉방을 잃는다
+    out = c.step(50002.0, inbox(**hot, **{T.T_BLIND_ANGLE: out[T.C_BLIND_ANGLE], T.T_SAFETY_STATE: "SAFETY_HOLD"}))
     assert any("창문 불가 safety" in r for r in c.reasons())                         # 창문 불가 → 배기 + 흡기로
+
+
+def test_blind_fully_shades_when_window_cannot_cool():
+    """바깥이 더 더우면 창문 환기 냉방이 없다 → 일사열을 가장 많이 막는 완전 차광."""
+    c = SmartHomeController()
+    c.reset({"baseline": "proposed", "scenario": {}})
+    hot = dict(**{T.S_TEMPERATURE: 29.0, T.S_ILLUMINANCE: 400.0,
+                  T.S_WEATHER: json.dumps({"raining": False, "outdoor_temp_c": 32.0, "outdoor_rh_pct": 50.0})})
+    out = c.step(50000.0, inbox(**hot, **{T.T_BLIND_ANGLE: 0.0}))
+    assert out[T.C_BLIND_ANGLE] >= 70 and out.get(T.C_WINDOW_OPEN_RATIO, 0.0) <= 0.15

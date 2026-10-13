@@ -193,6 +193,7 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
     if T.T_WINDOW_POSITION_EST in df.columns and "act.window_open_ratio" in df.columns:
         travel = (ctx or {})["window_travel_m"]
         out["ripple_pos_err_mm"] = float((df[T.T_WINDOW_POSITION_EST] - df["act.window_open_ratio"] * travel).abs().max() * 1000)
+    out["temp_end_c"] = float(df["truth.temperature_c"].iloc[-1])      # 마지막 실내 온도 — baseline 간 냉방 결과 비교 (C3b)
     # C3 동작 순서 — 블라인드 차광 도달 시각이 창문 개방 시각보다 몇 초 앞섰나 (창문을 안 열었으면 +inf → 준수)
     oc = cfg_metrics["order_check"]
     if "act.blind_angle_deg" in df.columns and "act.window_open_ratio" in df.columns:

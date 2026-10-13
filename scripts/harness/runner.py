@@ -217,6 +217,7 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
             row["ext.outdoor_pm25_ugm3"] = world.ext.outdoor_pm25_ugm3
             row["ext.outdoor_dew_c"] = _dew(world.ext.outdoor_temp_c, world.ext.outdoor_rh_pct, env_cfg)
             row["ext.outdoor_temp_c"] = world.ext.outdoor_temp_c
+            row["ext.outdoor_illuminance_lux"] = world.ext.outdoor_illuminance_lux   # 상충 점검 R9 (일사 중 블라인드 열림)
             row["ext.raining"] = world.raining
             row["injections"] = ",".join(tl.active_labels(now))
             if callable(reasons_fn):

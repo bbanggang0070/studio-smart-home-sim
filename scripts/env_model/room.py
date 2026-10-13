@@ -102,6 +102,7 @@ class RoomState:
 class RoomModel:
     def __init__(self, cfg: EnvModelConfig, state: RoomState):
         self.ac_state = "off"
+        self._thermo_off = False                         # 써모오프 중 — 설정 + restart 를 넘어야 압축기 재기동
         self.cfg = cfg
         self.state = state
         self._b = cfg.get("condensation.magnus_b")
@@ -169,9 +170,16 @@ class RoomModel:
         """에어컨 → (현열 냉방 W, 제습 g/h, 전력 W). 인버터 비례 제어 + 써모오프."""
         self.ac_state = "off"                          # 참값 상태 — 전력 기반 판정(B11)의 정답
         if not ac.power:
+            self._thermo_off = False
             return 0.0, 0.0, 0.0
         p = "appliances.ac."
         g = self.cfg.get
+        # 써모오프 히스테리시스 — 설정 − band 아래로 내려가면 멈추고, 설정 + restart 를 넘어야 다시 돈다
+        err0 = temp_c - ac.setpoint_c
+        if err0 < -g(p + "thermo_off_band_c"):
+            self._thermo_off = True
+        elif err0 > g(p + "thermo_restart_above_c"):
+            self._thermo_off = False
         self.ac_state = "fan_only"
         if ac.mode == "fan":
             return 0.0, 0.0, g(p + "fan_only_power_w")
@@ -180,7 +188,7 @@ class RoomModel:
         f_rh = min(1.0, max(0.0, (rh_pct - floor) / (full - floor)))
         cap = g(p + "cooling_capacity_w")
         if ac.mode == "dry":
-            if temp_c - ac.setpoint_c < -g(p + "thermo_off_band_c"):
+            if self._thermo_off:
                 return 0.0, 0.0, g(p + "fan_only_power_w")   # 제습 운전도 설정 아래로 내려가면 압축기 정지 (송풍)
             removal = g(p + "dry_mode_removal_g_per_h") * f_rh
             sensible = g(p + "dry_mode_sensible_w")
@@ -188,7 +196,7 @@ class RoomModel:
         else:
             err = temp_c - ac.setpoint_c
             band = g(p + "thermo_off_band_c")
-            if err < -band:
+            if self._thermo_off:
                 return 0.0, 0.0, g(p + "fan_only_power_w")
             q_total = min(cap, max(g(p + "min_plr") * cap, g(p + "modulation_w_per_k") * (err + band)))
             shr = g(p + "sensible_heat_ratio")
@@ -240,11 +248,19 @@ class RoomModel:
         g = self.cfg.get
         p = "thermal."
         frac = min(max(blind_deg / g(p + "blind_shade_angle_deg"), 0.0), 1.0)
-        tau = g(p + "blind_transmittance_open") + frac * (
-            g(p + "blind_transmittance_shaded") - g(p + "blind_transmittance_open")
+        # 열 계수 — 빛 투과율이 아니다 (창 안쪽 블라인드는 흡수한 햇빛이 실내 열로 남는다 · 2026-10-13)
+        heat = g(p + "blind_solar_heat_factor_open") + frac * (
+            g(p + "blind_solar_heat_factor_shaded") - g(p + "blind_solar_heat_factor_open")
         )
         irradiance = max(lux, 0.0) / g(p + "solar_luminous_efficacy_lm_per_w")
-        return g("window.glazing_area_m2") * irradiance * tau * g(p + "solar_heat_gain_fraction")
+        return g("window.glazing_area_m2") * irradiance * heat * g(p + "solar_heat_gain_fraction")
+
+    def _blind_flow_factor(self, blind_deg: float) -> float:
+        """창 안쪽 블라인드가 창문 환기를 막는 정도 — 유효 유량 계수 (0° 개방 → 차광각, 선형)."""
+        g = self.cfg.get
+        frac = min(max(blind_deg / g("thermal.blind_shade_angle_deg"), 0.0), 1.0)
+        return g("window.blind_flow_factor_open") + frac * (
+            g("window.blind_flow_factor_shaded") - g("window.blind_flow_factor_open"))
 
     # -- 적분 --
 
@@ -285,12 +301,14 @@ class RoomModel:
             g("window.opening_width_max_m"), g("window.opening_height_m"),
             g("window.discharge_coefficient"), g("window.wind_coefficient"),
         )
+        flow_k = self._blind_flow_factor(act.blind_angle_deg)     # 창 안쪽 블라인드가 바람을 막는다 (2026-10-13)
+        q_win *= flow_k
         q_intake = self._intake_flow(act.intake_fan_rpm)
         q_exhaust = self._fan_flow(act.exhaust_fan_rpm, "appliances.exhaust_fan.")
         # 배기 부족분 중 열린 창문이 받는 몫 — 창문은 큰 개구라 틈새보다 먼저 보충 공기를 받는다
         deficit = max(0.0, q_exhaust + q_hood - q_intake)
         q_win += deficit * air_balance.window_makeup_share(
-            act.window_open_ratio, g("window.opening_width_max_m"), g("window.opening_height_m"),
+            act.window_open_ratio * flow_k, g("window.opening_width_max_m"), g("window.opening_height_m"),
             g("window.crack_leakage_area_m2"))
         q_inf0 = g("air_balance.base_infiltration_ach") * v
         net = q_intake + q_win - q_exhaust - q_hood

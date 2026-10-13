@@ -463,6 +463,7 @@ smart_home_controller:
       control_filter_s: 30.0           # [v3.4.15] draft — 청정기 판단용 PM 이동평균 시정수 (센서 잡음 σ ≈ 2.5 µg/m³ · 이벤트 감지는 원값)
       purifier_level_above_bad: 3      # 2026-10-09: 2 → 3 (docs/09 '청정기 PM 높으면 가동' · 요리 후 회복 지연 개선)
       recovery_target_ugm3: 35.0       # 지표 #10 회복 기준
+      window_block_grade_while_purifying: 'moderate'   # [v3.4.18] 청정기가 실내 PM 을 낮추는 중이면 외기가 이 등급 이상일 때 창문을 쓰지 않는다 (필터 흡기로 · 상충 점검 R6)
 
     # ---- 결로 (Condensation) — [신설 v3.0] --------------------------------------
     #  T_s = T_in - (R_si / (R_si + R_rest)) * (T_in - T_out),  Δ = T_s - T_dew
@@ -702,7 +703,28 @@ smart_home_controller:
       pm_remove:  [dilution_if_cleaner_outside, purifier, range_hood]
       anti_condensation: [ceiling_fan_reverse, blind_open, dehumidifier, pulse_vent_if_drier_outside]
       window_cooling_requires_outdoor_below_c: 1.0   # 외기 < 실내 - 1 °C
-      blind_first_tolerance_deg: 5.0       # [v3.4.16] draft — 냉방 차광 중이면 블라인드가 차광각 − 5° 에 닿은 뒤 창문 · 배기 (열원 먼저 차단 · C3 · B3)
+      # [v3.4.18] 냉방 중 블라인드 각도 — 고정 순서(차광 먼저 → 창문)를 없애고 후보 각도마다 순 열량을 비교해 고른다
+      #   순 열량(θ) = 일사열(θ) + 조명 열(θ, 어두워져 켜는 천장등) − 환기 냉방(θ, 창문을 쓸 때 · 블라인드가 바람을 막는다)
+      #   제어용 추정값 — 참값(environment_model)과 같은 초기값으로 시작하는 '제어용 모델' 사본 (참값 · 제어용 분리 원칙)
+      cooling_blind:
+        candidates_deg: [0.0, 45.0, 75.0]   # 열기 · 부분 차광 · 완전 차광
+        switch_margin_w: 15.0               # draft — 지금 각도보다 이만큼 이상 나아야 바꾼다 (경계 채터링 방지)
+        engage_min_saving_w: 30.0           # draft — 완전 차광이 막는 일사열이 이 이상일 때만 블라인드를 판단 (흐린 날도 포함 · 상충 점검 R9)
+        engage_release_saving_w: 20.0       # draft — 이 아래로 내려가야 판단을 멈춘다 (조도 센서 잡음 채터링 방지)
+        glazing_area_m2: 1.8
+        solar_luminous_efficacy_lm_per_w: 105.0
+        solar_heat_gain_fraction: 0.6
+        heat_factor_open: 0.95              # draft — 창 안쪽 블라인드의 일사열 계수 (빛 투과율과 다르다)
+        heat_factor_shaded: 0.55            # draft — ASHRAE 실내 차폐 감쇠계수 범위로 가정 (원문 확인 필요)
+        flow_factor_open: 1.0
+        flow_factor_shaded: 0.5             # draft — 차광각에서 창문 유효 유량 50 % (문헌 확인 전 가정 · W13 민감도)
+        window_width_max_m: 0.70
+        window_height_m: 1.2
+        discharge_coefficient: 0.6
+        wind_coefficient: 0.025
+        wind_speed_ms: 2.0
+        air_heat_capacity_wh_per_m3k: 0.335
+        ceiling_light_w: 40.0
       window_cooling_release_band_c: 0.5   # [v3.4.15] draft — 한번 들어가면 차이가 1.0 − 0.5 °C 로 줄 때까지 유지 (경계 근처 센서 잡음 채터링 — 물리 모드 X2)
       base_vent_window_outdoor_temp_range_c: [15.0, 28.0]  # 이 범위 밖이면 기본 환기에 창문을 쓰지 않음
 
@@ -714,10 +736,9 @@ smart_home_controller:
       cooling_off_band_c: 1.0              # 해제: 실내 < 목표 − 1.0
       ceiling_fan_high_above_setpoint_c: 2.0   # 목표 + 2 °C 초과면 실링팬 강 (소음 등급 허용 시)
       ceiling_fan_speed_band_c: 0.5        # 강 → 약 복귀는 목표 + 2 − 0.5 °C 아래 (I5 로 에어컨이 목표 + 1 근처에 머물 때 강/약 채터링 방지)
-      shade_requires_lux: 250.0            # 작업면 주광이 이 이상(낮 · 일사)일 때만 냉방 차광 [v3.4.12 — 센서 원값 → 작업면 추정 · v3.4.17 블라인드 개방 환산]
-      shade_release_lux: 200.0             # [v3.4.17] draft — 개방 환산 주광이 이 아래로 내려가야 냉방 차광 해제 (히스테리시스)
       dehumidify_off_band_pct: 5.0         # 제습: 상한 초과 진입 → 상한 − 5 %p 아래에서 해제
       humidify_restart_band_pct: 3.0       # 가습: 하한 미만 진입 → 유효 상한 도달 정지 · 상한 − 3 %p 아래로 내려오면 재개 허용
+      humidify_target_below_hi_pct: 3.0    # [v3.4.18] draft — 가습 목표 = 모드 상한 − 3 %p (상한까지 올려 제습이 켜지는 상충 방지 · 상충 점검 R5)
       cap_extension_by_ceiling_fan: true   # I4 — 결로 상한이 모드 상한보다 낮으면 실링팬 역회전으로 상한 확장 (C10)
       min_free_cool_exhaust_rpm: 1000.0    # draft — 창문을 못 쓸 때, (소음 · 외기 등급) 상한 뒤 배기가 이 아래면 무료 냉방이 없는 것으로 본다 (X1 수면 N0 600 rpm)
       escalate_to_ac_after_s: 900.0        # draft — 무료 냉방(창문 · 배기)만으로 이 시간 안에 못 내리면 에어컨으로 승격 (C5 '필요 시')

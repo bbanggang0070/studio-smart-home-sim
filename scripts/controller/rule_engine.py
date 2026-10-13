@@ -119,6 +119,10 @@ class RuleEngine:
             why.append("rain")
         if GRADE_ORDER.index(o.outdoor_pm_grade) >= GRADE_ORDER.index("bad"):
             why.append("outdoor_pm_bad")
+        elif (self._pm_level >= 1 and GRADE_ORDER.index(o.outdoor_pm_grade)
+              >= GRADE_ORDER.index(self.p.get("indoor_pm.window_block_grade_while_purifying"))):
+            # 청정기가 실내 PM 을 낮추는 중인데 외기가 목표보다 깨끗하지 않다 — 창문은 PM 을 들여 청정기와 상충 (v3.4.18 상충 점검 R6)
+            why.append("pm_purifying")
         if o.ac_cooling:
             why.append("ac_cooling")
         if mode == "AWAY":

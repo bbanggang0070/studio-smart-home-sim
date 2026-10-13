@@ -39,6 +39,21 @@ metrics:
   order_check: { blind_shaded_deg: 70.0, window_opened_ratio: 0.15 }   # C3 — 블라인드 차광 도달이 창문 개방(기본 환기 틈 위)보다 먼저 (blind_lead_s)
   user_modes: config/user_modes.yaml   # 지표 #9 — 모드별 기본 환기 목표 (시나리오 initial.user_mode 기준)
 
+# ---- 상충 제어 점검 (v3.4.18 · tools/audit_conflicts.py) ---------------------------------------------
+#  서로 효과를 깎는 동시 동작을 로그에서 찾는다. 기본 환기 틈(window ≤ window_open_min) · 요리 중 보충 공기(후드 가동)는 예외
+conflict_audit:
+  window_open_min: 0.15          # 이보다 크게 열려야 '창문 환기' — 기본 환기 틈(0.1)은 제외
+  blind_closed_min_deg: 60.0     # 이 각도 이상이면 '닫힘' (창 바람을 크게 막는다)
+  outdoor_cooler_c: 1.0          # 외기가 실내보다 이만큼 이상 시원하면 '환기 냉방'
+  outdoor_warmer_c: 1.0          # 외기가 실내보다 이만큼 이상 더우면 '더운 외기'
+  hot_indoor_c: 26.0             # 실내가 이 이상일 때만 R7 (더운 외기 유입)
+  dew_margin_c: 0.0              # R4 — 외기 이슬점이 실내보다 높으면 습기 유입
+  dry_margin_c: 2.0              # R5 — 외기 이슬점이 실내보다 이만큼 낮으면 건조 공기 유입
+  exhaust_high_rpm: 1500.0       # R8 — 이 이상 배기는 '강' (기본 환기 · 저속 병행은 제외)
+  open_blind_max_deg: 15.0       # R9 — 이 이하면 '열림'
+  sunny_outdoor_lux: 10000.0     # R9 — 외부 조도가 이 이상이면 일사
+  min_duration_s: 10.0           # 이보다 짧게 이어진 경우는 동작이 바뀌는 순간의 과도 상태로 보고 뺀다 (창문 이동 · 에어컨 기동)
+
 # ---- 외기 PM 등급 (에어코리아 API 대체) — 환경부 PM2.5 예보 등급 -----------------
 outdoor_api:
   pm_grade_bounds_ugm3: [15.0, 35.0, 75.0]

@@ -182,3 +182,28 @@ def test_closed_loop_controller_contract_c9(hcfg, tmp_path):
     hood_on = p.df["act.range_hood_level"] > 0
     steady = p.df.loc[hood_on, "truth.q_net_m3h"].iloc[15:]
     assert steady.min() == pytest.approx(-240.0, abs=0.5)
+
+
+def test_response_time_and_budget_violation_metrics():
+    """W13 T13.1 — 지표 #2 응답 시간(지령 → 허용 오차 도달) · #16 예산 위반(이벤트 구간 × 항목, 30 s 이상)."""
+    import numpy as np
+    import pandas as pd
+
+    from harness.criteria import _budget_violations, _response_time
+    t = np.arange(0.0, 10.0)
+    cmd = pd.Series([np.nan, 0.4, 0.4, 0.4, 0.4, 0.4, 0.0, 0.0, 0.0, 0.0])
+    act = pd.Series([0.0, 0.1, 0.2, 0.3, 0.39, 0.4, 0.3, 0.1, 0.0, 0.0])
+    assert _response_time(t, cmd, act, 0.02) == 3.0                     # 0.4 지령 t=1 → 도달 t=4 · 0 지령 t=6 → t=8 (2 s)
+    n = 100
+    df = pd.DataFrame({
+        T.T_ACTIVE_EVENTS: ['["LAUNDRY_DRYING"]'] * 60 + ["[]"] * 40,
+        "truth.temperature_c": np.r_[np.linspace(26.0, 27.5, 60), np.full(40, 27.5)],
+        "truth.occupied": [True] * n,
+        "act.exhaust_fan_rpm": np.r_[np.full(50, 1000.0), np.full(10, 1600.0), np.zeros(40)],
+    })
+    b = {"LAUNDRY_DRYING": {"indoor_temp_rise_c": 1.0, "indoor_temp_rise_away_c": 3.0,
+                            "noise_caps": {"act.exhaust_fan_rpm": 1400.0}}}
+    assert _budget_violations(df, b, [], 5) == 2.0                     # 온도 +1.5 °C · 배기 1,600 rpm 10 샘플
+    assert _budget_violations(df, b, [], 15) == 1.0                    # 소음은 15 샘플 미만 — 온도만
+    b["LAUNDRY_DRYING"]["indoor_temp_rise_c"] = 2.0
+    assert _budget_violations(df, b, [], 15) == 0.0

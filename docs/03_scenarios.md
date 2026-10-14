@@ -800,7 +800,11 @@ EXP-5  제어 방식 비교(논문용): ① 질문별 모델 ② LSTM ③ 심층
 > #1 `comfort_ratio`(재실 중 온도 ≤ 냉방 목표 + 0.5 °C ∧ 습도 모드 범위 — 조도는 C4 `lux_temp_ok_ratio` 로 따로) · #3 `window_track_err_pct` · `blind_track_err_deg`(지령이 15 s 그대로인 시각의 95 백분위) ·
 > #4 `pinch_events` · `pinch_detect_ms` · `pinch_stop_ms` · #5 `max_contact_force_n`(브릿지 접촉 센서) · #6 `ripple_pos_err_mm` · #7 `energy_wh` · #8 `actuation_count` · #9 `base_vent_compliance` · `co2_compliance` ·
 > #10 `pm25_peak` · `pm25_recovery_time` · #11 `condensation_exposure_s` · #12 `rule_violation_count`(I1 제습 + 가습 · I2 냉방 중 창문 · L1 우천 창문이 30 s 이상 — v2.30 에서 실제 구현, 이전엔 비어 있었다) · #13 `appliance_state_accuracy` · #14 `humidity_recovery_time` · #15 `arrival_comfort` · C3 순서 `blind_lead_s`.
-> **미구현:** #2 응답 시간 · #16 허용 손실 예산 위반 (우선 목표 예산 추적이 제어기에 아직 없음).
+> ~~미구현: #2 · #16~~ → **v2.31 (W13 T13.1) 구현** — #2 `response_<장치>_s`(지령 변화 → 실제가 허용 오차 안, 최댓값 · 해상도 = 로그 주기) ·
+> #16 `budget_violation_count`(E3 샤워 · E10 빨래 건조 활성 구간마다 온도 예산 · 예산 소음 등급의 장치 상한 초과가 30 s 이상) ·
+> **정의 보정:** #1 은 **체감온도**로 판정(공기 온도는 I5 실링팬 완화를 '더움'으로 센다 — `overheat_time_s` 와 같은 기준) ·
+> #2 · #3 · #12 창문 위반(I2 · L1)은 **안전 계층 첫 개입 전까지만**(끼임 반전 · 잠금 뒤 지령 ≠ 실제는 의도된 동작 — C2 · X2 · X4) ·
+> 집계 `scripts/analyze_results.py` → `results/tables/w13_metrics.md` (지표 → 목표 매핑 · 적용 시나리오 · 예외 사유는 harness.yaml `analysis`).
 
 ---
 
@@ -1003,3 +1007,4 @@ scenarios:
 | 2026-10-12 | v2.28 | **물리 모드 C2 · C3 · X4 수록 → 40개 전부** — C2 여는 방향 끼임(화분 `rigid_pot@1.03`) · 판정 `pinch_events` · `max_contact_force_n ≤ 100` · `pinch_stop_ms ≤ 200` · 팬 보상 · C3 `blind_lead_s > 0`(블라인드 선행) · X4 MANUAL + 수동 창문 명령 주입(`manual: {device: window}`) + 알림 `W_PINCH` · 물리 시나리오 반복 3회(문서 기준) · Baseline A 물리 모드는 창문 안전 계층 없음 · §7 지표 구현 현황 · 조합 **240회**(고속 201 + 물리 39 — B5 는 Baseline B 대비 유지, 사용자 결정 · §5.2 · §5.3 표 갱신) |
 | 2026-10-13 | v2.29 | **C3 개정 · C3b 신설 → 41개 249회(고속 210)** — 블라인드가 창문 바람을 막는 효과 반영(사용자 피드백) · '열원 먼저' 판정 폐지 · C3 = 바깥 시원(환기를 막지 않음) · C3b = 바깥 더움(완전 차광 · A 보다 시원) · **B3 판정도 개정**(블라인드 ≥ 30° → ≤ 50°) · 지표 `temp_end_c` · **상충 제어 점검** `tools/audit_conflicts.py` (R1–R9 · 제안 제어기 고속 33개 상충 0건) · 히스테리시스 단위 테스트를 C11 로 (C12 는 블라인드가 닫혀 창문 경계를 오가지 않음) |
 | 2026-10-14 | v2.30 | 지표 #12 규칙 위반을 실제로 구현 (v2.28 에 '구현'으로 적었지만 제어기가 내지 않는 열을 읽어 늘 비어 있었다) — 로그로 I1 · I2 · L1 위반 구간 수 · X1 · C1 · C7 제안 0회, A 1–2회 |
+| 2026-10-15 | v2.31 | W13 T13.1 — 지표 #2 응답 시간 · #16 예산 위반 구현 · #1 체감온도 기준 · #2 · #3 · #12(창문) 안전 개입 전 구간 · 지표 16종 집계 스크립트 (§7 구현 현황) |

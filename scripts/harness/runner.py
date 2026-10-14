@@ -237,6 +237,21 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
     return finish_run(run, df, tl, hcfg, env_cfg, log_every, controller_name, notes)
 
 
+def _budgets(hcfg: dict[str, Any], um: dict[str, Any]) -> dict[str, Any]:
+    """지표 #16 — 이벤트별 예산(thresholds events.<키>.budget) + 예산 소음 등급의 장치 상한(user_modes noise_grades)."""
+    bc = hcfg["metrics"].get("budget_check") or {}
+    p = load_params()
+    out: dict[str, Any] = {}
+    for ev_name, key in (bc.get("events") or {}).items():
+        b = dict(p.get(f"events.{key}.budget"))
+        grade = um["noise_grades"].get(b.get("noise_grade", ""), {})
+        b["noise_caps"] = {col: (0.0 if grade_key == "dehumidifier_allowed" and not grade.get(grade_key) else
+                                 math.inf if grade_key == "dehumidifier_allowed" else float(grade[grade_key]))
+                           for col, grade_key in (bc.get("noise_columns") or {}).items() if grade_key in grade}
+        out[ev_name] = b
+    return out
+
+
 def finish_run(run: Run, df: pd.DataFrame, tl, hcfg: dict[str, Any], env_cfg, log_every: float,
                controller_name: str, notes: list[str]) -> RunResult:
     """로그(DataFrame) → 지표 · 앵커 · 구간이 붙은 RunResult. 고속 모드와 물리 모드(scripts/physics_eval.py)가 함께 쓴다."""
@@ -251,6 +266,7 @@ def finish_run(run: Run, df: pd.DataFrame, tl, hcfg: dict[str, Any], env_cfg, lo
            "cooling_setpoint_c": (um["modes"].get(mode0) or {}).get("cooling_setpoint_c"),
            "window_travel_m": load_params().get("window_sensorless.travel_length_m"),
            "q_inf0_m3h": env_cfg.get("air_balance.base_infiltration_ach") * env_cfg.get("room.volume_m3")}
+    ctx["budgets"] = _budgets(hcfg, um)
     metrics = C.compute_metrics(df, tl.anchors(), sources, hcfg["metrics"], log_every, ctx)
     res = RunResult(run=run, status="", controller=controller_name, df=df, metrics=metrics, notes=notes)
     res.intervals = {iv.label: (iv.start_s, iv.end_s) for iv in tl.intervals}   # type: ignore[attr-defined]

@@ -122,6 +122,70 @@ def _first_time(t: np.ndarray, mask: np.ndarray) -> float:
     return float(t[idx[0]]) if idx.size else math.nan
 
 
+def _response_time(t: np.ndarray, cmd: pd.Series, act: pd.Series, tol: float) -> float:
+    """지표 #2 — 지령 값이 바뀐 샘플 → 실제 상태가 지령 ± tol 안에 든 샘플까지 [s] 의 최댓값.
+    이미 목표 근처였던 지령 · 다음 지령 전에 도달하지 못한 지령(덮어씀)은 세지 않는다. 해상도 = 로그 주기."""
+    c = pd.to_numeric(cmd, errors="coerce").ffill().to_numpy()
+    a = pd.to_numeric(act, errors="coerce").ffill().to_numpy()
+    starts = [i for i in range(1, len(c)) if not np.isnan(c[i]) and (np.isnan(c[i - 1]) or c[i] != c[i - 1])
+              and not abs(a[i - 1] - c[i]) <= tol]
+    worst = math.nan
+    for n, i in enumerate(starts):
+        j = starts[n + 1] if n + 1 < len(starts) else len(c)
+        hit = np.flatnonzero(np.abs(a[i:j] - c[i]) <= tol)
+        if hit.size:
+            dt = float(t[i + hit[0]] - t[i])
+            worst = dt if math.isnan(worst) else max(worst, dt)
+    return worst
+
+
+def _longest_run(m: np.ndarray) -> int:
+    best = cur = 0
+    for x in m:
+        cur = cur + 1 if x else 0
+        best = max(best, cur)
+    return best
+
+
+def _budget_violations(df: pd.DataFrame, budgets: dict[str, Any], exempt: list[str], n_min: int) -> float:
+    """지표 #16 — 우선 목표 이벤트(예산이 있는 E3 샤워 · E10 빨래 건조)가 켜진 구간마다 온도 · 소음 예산을 넘었는지.
+    구간 1개 × 예산 항목 1개 = 최대 1회 · n_min 샘플 이상 이어져야 센다. 다른 이벤트의 소음 완화(요리 N3) 중인 시각은 소음에서 뺀다."""
+    col = T.T_ACTIVE_EVENTS
+    if col not in df.columns or not budgets:
+        return math.nan
+    ev = df[col].ffill().fillna("[]").astype(str).reset_index(drop=True)
+    temp = df["truth.temperature_c"].reset_index(drop=True)
+    occ = (df["truth.occupied"].astype(bool) if "truth.occupied" in df.columns
+           else pd.Series(True, index=df.index)).reset_index(drop=True)
+    relaxed = pd.Series(False, index=ev.index)
+    for name in exempt:
+        relaxed |= ev.str.contains(f'"{name}"', regex=False)
+    count = 0
+    for name, b in budgets.items():
+        active = ev.str.contains(f'"{name}"', regex=False)
+        if not active.any():
+            continue
+        run = (active != active.shift()).cumsum()
+        for _, idx in active[active].groupby(run[active]).groups.items():
+            idx = list(idx)
+            d_t = (temp[idx] - temp[idx[0]]).to_numpy()
+            checks = []
+            if b.get("indoor_temp_change_c", -1.0) >= 0:
+                checks.append(np.abs(d_t) > b["indoor_temp_change_c"])
+            if b.get("indoor_temp_rise_c", -1.0) >= 0:
+                lim = np.where(occ[idx].to_numpy(), b["indoor_temp_rise_c"],
+                               b.get("indoor_temp_rise_away_c", b["indoor_temp_rise_c"]))
+                checks.append(d_t > lim)
+            noise = np.zeros(len(idx), dtype=bool)
+            for act_col, cap in (b.get("noise_caps") or {}).items():
+                if act_col in df.columns:
+                    v = pd.to_numeric(df[act_col].reset_index(drop=True)[idx], errors="coerce").fillna(0.0).to_numpy()
+                    noise |= v > cap + 1e-6
+            checks.append(noise & ~relaxed[idx].to_numpy())
+            count += sum(_longest_run(m) >= n_min for m in checks)
+    return float(count)
+
+
 def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[str, str],
                     cfg_metrics: dict[str, Any], dt_s: float, ctx: dict[str, Any] | None = None) -> dict[str, float]:
     """docs/03 §7 지표 중 참값 로그로 계산할 수 있는 것. 계산할 수 없으면 NaN (사유는 metric_notes)."""
@@ -162,25 +226,32 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
         occ = df["truth.occupied"].astype(bool) if "truth.occupied" in df.columns else pd.Series(True, index=df.index)
         ok = (df["truth.desk_illuminance_lux"] >= lt["desk_lux_min"]) & (df["truth.temperature_c"] <= lt["temp_max_c"])
         out["lux_temp_ok_ratio"] = float(ok[occ].mean()) if occ.any() else math.nan
-    # #1 환경 목표 유지율 — 재실 중 온도 ≤ 냉방 목표 + 0.5 · 습도가 모드 범위 안 (ctx 모드)
+    # #1 환경 목표 유지율 — 재실 중 체감온도 ≤ 냉방 목표 + 0.5 · 습도가 모드 범위 안 (ctx 모드)
+    #   체감온도(실링팬 기류 보정) — 공기 온도로 세면 I5(실링팬으로 설정 완화)가 만든 쾌적 상태를 '더움'으로 센다 (overheat_time_s 와 같은 기준 · W13)
     occ_mask = df["truth.occupied"].astype(bool) if "truth.occupied" in df.columns else pd.Series(True, index=df.index)
     sp_c = (ctx or {}).get("cooling_setpoint_c")
     hr = (ctx or {}).get("humidity_range_pct") or [None, None]
     ok = pd.Series(True, index=df.index)
     if sp_c is not None:
-        ok &= df["truth.temperature_c"] <= sp_c + cfg_metrics["overheat_margin_c"]
+        ok &= df["truth.operative_temp_c"] <= sp_c + cfg_metrics["overheat_margin_c"]
     if hr[0] is not None:
         ok &= df["truth.humidity_pct"] >= hr[0]
     if hr[1] is not None:
         ok &= df["truth.humidity_pct"] <= hr[1]
     out["comfort_ratio"] = float(ok[occ_mask].mean()) if occ_mask.any() else math.nan
     # 물리 모드 전용 (#3 추종 오차 · #4 끼임 · #5 접촉 반력 · #6 리플 위치 오차) — 열이 없으면 NaN
+    # #2 · #3 은 안전 계층이 처음 개입(끼임 반전 · 정지 유지 · 잠금)하기 전까지만 — 그 뒤 지령 ≠ 실제는 의도된 동작이다
+    if T.T_SAFETY_STATE in df.columns:
+        normal = df[T.T_SAFETY_STATE].ffill().fillna("NORMAL").astype(str).eq("NORMAL")
+        pre_safety = normal.astype(int).cummin().astype(bool).to_numpy()
+    else:
+        pre_safety = np.ones(len(df), dtype=bool)
     for name, cmd_col, act_col, scale in (("window_track_err_pct", T.C_WINDOW_OPEN_RATIO, "act.window_open_ratio", 100.0),
                                           ("blind_track_err_deg", T.C_BLIND_ANGLE, "act.blind_angle_deg", 1.0)):
         if cmd_col in df.columns and act_col in df.columns:
             c = df[cmd_col].ffill()
             n = max(1, int(round(cfg_metrics["tracking_steady_s"] / dt_s)))
-            steady = c.eq(c.shift(n)) & c.notna()                       # 지령이 tracking_steady_s 이상 그대로인 시각만 (이동 중 제외)
+            steady = c.eq(c.shift(n)) & c.notna() & pre_safety          # 지령이 tracking_steady_s 이상 그대로인 시각만 (이동 중 제외)
             out[name] = float((c[steady] - df[act_col][steady]).abs().quantile(0.95) * scale) if steady.any() else math.nan
     if T.T_PINCH_DETECTED in df.columns:
         p = df[T.T_PINCH_DETECTED].fillna(False).astype(bool)
@@ -213,6 +284,7 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
         return df[col].astype(str).isin(["True", "1", "1.0"]) if col in df.columns else pd.Series(False, index=df.index)
 
     win = pd.to_numeric(df.get("act.window_open_ratio", pd.Series(0.0, index=df.index)), errors="coerce").fillna(0) > rv["window_open_min"]
+    win &= pre_safety                 # 안전 계층이 창문을 잠근 뒤(L0 > L1)의 열림은 제어기 위반이 아니다 (X2 물리)
     viol = [(_flag("act.dehumidifier") | _flag("act.ac_dry")) & _flag("act.humidifier"),
             _flag("act.ac_cool") & win, _flag("ext.raining") & win]
     n_min = max(1, int(round(rv["min_duration_s"] / dt_s)))
@@ -269,6 +341,17 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
     ref = cfg_metrics["co2_reference_ppm"]["study" if ctx.get("user_mode") == "STUDY" else "other"]
     co2 = df["truth.co2_ppm"].to_numpy()
     out["co2_compliance"] = float((co2[occ] <= ref).mean()) if occ.any() else math.nan
+
+    # 지표 #2 응답 시간 (물리 모드에서 의미 — 고속 모드 액추에이터는 1차 지연 근사)
+    for name, spec in ((cfg_metrics.get("response_time") or {}).get("pairs") or {}).items():
+        k = int(pre_safety.sum()) if not pre_safety.all() else len(df)          # 안전 개입 전까지
+        out[f"response_{name}_s"] = (_response_time(t[:k], df[spec["cmd"]].iloc[:k], df[spec["act"]].iloc[:k], float(spec["tol"]))
+                                     if spec["cmd"] in df.columns and spec["act"] in df.columns else math.nan)
+    # 지표 #16 허용 손실 예산 위반
+    bc = cfg_metrics.get("budget_check") or {}
+    out["budget_violation_count"] = _budget_violations(
+        df, ctx.get("budgets") or {}, list(bc.get("noise_exempt_events") or []),
+        max(1, int(round(float(bc.get("min_duration_s", 30.0)) / dt_s))))
     return out
 
 

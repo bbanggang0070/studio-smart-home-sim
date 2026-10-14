@@ -441,7 +441,7 @@ v2.0까지는 제어기 노드가 모든 판단을 했다. 그 구조에서는 *
 | `/studio/sensor/door_contact` | `std_msgs/Bool` | 변경 시 | **v3.2** — 현관문 열림 |
 | `/studio/sensor/hood_temperature` | `std_msgs/Float32` | 1 Hz | **v3.3** — 후드 아래 온도 °C |
 | `/studio/sensor/appliance_power` | `std_msgs/String` | 1 Hz | **v3.1** — JSON `{device: W}` |
-| `/studio/sensor/weather` | `std_msgs/String` | 변경 시 | **v3.4.2** — 기상청 API · JSON `{"raining", "outdoor_temp_c", "outdoor_rh_pct"}` — E5 강우 · I10 외기 이슬점 · 결로 여유(외기온) 입력 |
+| `/studio/sensor/weather` | `std_msgs/String` | 변경 시 | **v3.4.2** — 기상청 API · JSON `{"raining", "sky", "outdoor_temp_c", "outdoor_rh_pct"}` — E5 강우 · I10 외기 이슬점 · 결로 여유(외기온) 입력 · `sky`(clear · cloudy · overcast · rain, v3.4.21) = 주광 직사광 비율 |
 
 ### 명령 (16)
 
@@ -695,3 +695,4 @@ v2.0까지는 제어기 노드가 모든 판단을 했다. 그 구조에서는 *
 | 2026-10-13 | v3.4.18 | thresholds — `means_ladder.cooling_blind`(블라인드 × 창문 순 열량 선택 · 제어용 추정 사본) · `indoor_pm.window_block_grade_while_purifying` · `comfort_ladders.humidify_target_below_hi_pct` 추가 · `means_ladder.blind_first_tolerance_deg` · `comfort_ladders.shade_requires_lux` · `shade_release_lux` 삭제 · environment_model — 블라인드 유량 · 일사열 계수 · 에어컨 재기동 폭 · 토픽 계약 변경 없음 |
 | 2026-10-14 | v3.4.19 | thresholds — `energy.arrival_model: auto` · `energy.arrival_gbm`(분위수 · 나무 수 · 기본 요일) · harness.yaml `occupancy_generator`(페르소나 3종 프로필) · `exp4_identification` · 토픽 계약 변경 없음 |
 | 2026-10-14 | v3.4.20 | thresholds `comfort_ladders.free_cool_reach_margin_c`(외기가 목표보다 더우면 즉시 에어컨 승격) · harness.yaml `exp1_setback` · `conflict_audit.cooling_gap_above_c`(R10) · 토픽 계약 변경 없음 |
+| 2026-10-14 | v3.4.21 | **주광 모델 개정** (W12 T12.5 렌더 대조) — `/studio/sensor/weather` JSON 에 `sky` 필드 추가(토픽 수 · 타입 변경 없음) · thresholds `lighting_model.daylight`(직사광 비율 · 블라인드 각도 표) 추가 · `daylight_factor` · `daylight_sensor_ratio` · `outdoor_transmittance_open/shaded` 삭제 |

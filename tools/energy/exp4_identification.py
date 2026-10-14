@@ -25,6 +25,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts"))
 sys.path.insert(0, str(REPO / "tools" / "energy"))
 
+from common import daylight as daylight_model  # noqa: E402
 from controller.energy import AcSpec, Thermal2R2C  # noqa: E402
 from controller.params import load_params  # noqa: E402
 from env_model.config import load_config  # noqa: E402
@@ -100,8 +101,7 @@ def cost_model(m: Thermal2R2C, ac: AcSpec, tout: float, sched, D: float, c: dict
 
 def env_lux(env_cfg, outdoor_lux: float) -> float:
     """천장 센서 위치 주광 (참값 환경 모델과 같은 식 · 블라인드 열림 · 조명 꺼짐) — 식별 모델 입력."""
-    g = env_cfg.get
-    return outdoor_lux * g("lighting.daylight_factor") * g("thermal.blind_transmittance_open") * g("lighting.daylight_sensor_ratio")
+    return outdoor_lux * daylight_model.sensor_per_outdoor(env_cfg.get("lighting.daylight"), "clear", 0.0)
 
 
 def t_star(cost_fn, c: dict, setback: float) -> float:

@@ -161,7 +161,7 @@ def main() -> None:
             "t": now, "tod_s": (clock0 + now) % 86400.0, "scenario": args.scenario,
             "obs": obs,                                       # energy_wh(누적) 포함 — 로거 · 지표
             "ext": {"outdoor_temp_c": world.ext.outdoor_temp_c, "outdoor_rh_pct": world.ext.outdoor_rh_pct,
-                    "outdoor_pm25_ugm3": world.ext.outdoor_pm25_ugm3, "raining": world.raining,
+                    "outdoor_pm25_ugm3": world.ext.outdoor_pm25_ugm3, "raining": world.raining, "sky": world.ext.sky,
                     "outdoor_dew_c": dew_point_c(world.ext.outdoor_temp_c, world.ext.outdoor_rh_pct,
                                                env_cfg.get("condensation.magnus_b"), env_cfg.get("condensation.magnus_c"))},
             "injections": ",".join(tl.active_labels(now)),

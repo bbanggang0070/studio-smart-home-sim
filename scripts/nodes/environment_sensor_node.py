@@ -66,7 +66,7 @@ def main() -> None:
         power.update({k: round(float(v), 1) for k, v in truth.get("extra_power_w", {}).items()})
         ros_io.publish(pubs[T.S_APPLIANCE_POWER], T.S_APPLIANCE_POWER, json.dumps(power, sort_keys=True))
         t, e = truth["t"], truth["ext"]
-        w = json.dumps({"raining": e["raining"], "outdoor_temp_c": round(e["outdoor_temp_c"], 1),
+        w = json.dumps({"raining": e["raining"], "sky": e.get("sky", "clear"), "outdoor_temp_c": round(e["outdoor_temp_c"], 1),
                         "outdoor_rh_pct": round(e["outdoor_rh_pct"], 1)})
         if w != api["weather"] or t - api["t_weather"] >= cfg["api"]["weather_period_s"]:
             api["weather"], api["t_weather"] = w, t

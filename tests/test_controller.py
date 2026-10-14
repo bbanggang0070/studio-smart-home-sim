@@ -325,12 +325,14 @@ def test_blind_and_window_chosen_together_by_net_heat_and_safety_hold_redistribu
     """v3.4.18 — '차광 먼저 → 창문' 고정 순서 없음. 창문을 냉방에 쓰면 블라인드가 바람을 막는 손실까지 계산해 각도를 고른다."""
     c = SmartHomeController()
     c.reset({"baseline": "proposed", "scenario": {}})
-    hot = dict(**{T.S_TEMPERATURE: 29.0, T.S_ILLUMINANCE: 400.0,
-                  T.S_WEATHER: json.dumps({"raining": False, "outdoor_temp_c": 24.0, "outdoor_rh_pct": 50.0})})
+    # 맑은 날 강한 해 — 센서 2100 lux ≈ 바깥 7만 lux (v3.4.21 주광 모델: 센서/바깥 0.029 · 블라인드 열림)
+    hot = dict(**{T.S_TEMPERATURE: 29.0, T.S_ILLUMINANCE: 2100.0,
+                  T.S_WEATHER: json.dumps({"raining": False, "sky": "clear", "outdoor_temp_c": 24.0, "outdoor_rh_pct": 50.0})})
     out = c.step(50000.0, inbox(**hot, **{T.T_BLIND_ANGLE: 0.0}))
     assert out[T.C_WINDOW_OPEN_RATIO] > 0.3                                           # 블라인드를 기다리지 않는다
     nets = c.rules.ladders._blind_choice.last
-    assert out[T.C_BLIND_ANGLE] == min(nets, key=lambda d: nets[d]["net_w"])          # 순 열량이 가장 작은 각도
+    glare = c.rules.lighting._glare_deg or 0.0                                        # 눈부심 차광보다 덜 가리지는 않는다
+    assert out[T.C_BLIND_ANGLE] == max(min(nets, key=lambda d: nets[d]["net_w"]), glare)  # 순 열량이 가장 작은 각도
     assert nets[75.0]["vent_w"] < nets[0.0]["vent_w"]                                 # 닫을수록 환기 냉방을 잃는다
     out = c.step(50002.0, inbox(**hot, **{T.T_BLIND_ANGLE: out[T.C_BLIND_ANGLE], T.T_SAFETY_STATE: "SAFETY_HOLD"}))
     assert any("창문 불가 safety" in r for r in c.reasons())                         # 창문 불가 → 배기 + 흡기로
@@ -340,7 +342,7 @@ def test_blind_fully_shades_when_window_cannot_cool():
     """바깥이 더 더우면 창문 환기 냉방이 없다 → 일사열을 가장 많이 막는 완전 차광."""
     c = SmartHomeController()
     c.reset({"baseline": "proposed", "scenario": {}})
-    hot = dict(**{T.S_TEMPERATURE: 29.0, T.S_ILLUMINANCE: 400.0,
-                  T.S_WEATHER: json.dumps({"raining": False, "outdoor_temp_c": 32.0, "outdoor_rh_pct": 50.0})})
+    hot = dict(**{T.S_TEMPERATURE: 29.0, T.S_ILLUMINANCE: 2100.0,
+                  T.S_WEATHER: json.dumps({"raining": False, "sky": "clear", "outdoor_temp_c": 32.0, "outdoor_rh_pct": 50.0})})
     out = c.step(50000.0, inbox(**hot, **{T.T_BLIND_ANGLE: 0.0}))
     assert out[T.C_BLIND_ANGLE] >= 70 and out.get(T.C_WINDOW_OPEN_RATIO, 0.0) <= 0.15

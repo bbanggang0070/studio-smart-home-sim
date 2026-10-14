@@ -1,8 +1,10 @@
 """조도 해석 모델 대조 — 주광 (W12 T12.5) · 렌더(경로 추적) vs 제어 · 참값 모델의 주광 가정.
 
-모델 가정 (thresholds lighting_model · environment_model lighting):
-  작업면 주광 = 외부 조도 × 주광률(0.02) × 블라인드 투과율(0.85 → 0.12 @ 75°, 선형)
-  천장 센서 주광 = 작업면 주광 × daylight_sensor_ratio(0.38 · draft — 천장등 비를 빌려 씀)
+모델 (v3.4.21 개정 — thresholds lighting_model.daylight · common/daylight.py):
+  작업면 주광 = 외부 조도 × [직사광 · 확산광별 주광률 × 블라인드 각도 표 투과 비]
+  천장 센서 주광 = 작업면 주광 × 각도 표 센서 비
+  (개정 전: 주광률 0.02 × 투과율 0.85 → 0.12 선형 · 센서 비 0.38 고정 — 이 도구의 첫 대조 결과로 개정했다)
+  렌더 '해만' = 직사광 성분 · '돔' = 확산광 성분으로 비교한다
 렌더: 조명 끔 · 흰 확산 패치(ρ = 0.8)의 휘도 L → E = π·L/ρ (calibrate_lighting.py 와 같은 방법)
   바깥 기준 = 건물 밖 수평 패치 · 작업면 = 바닥 6점 평균(높이 0) · 센서 = 천장 센서 위치(아래를 봄)
   하늘 조건 (가) 해만(맑음 · 고도 = scene_layout sun) (나) 돔(흐림 · 균일 하늘)
@@ -128,14 +130,15 @@ def main() -> None:
             print(rows[-1], flush=True)
     import pandas as pd
     df = pd.DataFrame(rows)
-    shade = th["setpoints"]["blind_shade_angle_deg"]
-    t_open, t_sh = lm["outdoor_transmittance_open"], lm["outdoor_transmittance_shaded"]
+    sys.path.insert(0, str(REPO / "scripts"))
+    from common import daylight as dlm
+    dl = {**lm["daylight"], "direct_fraction": {"sun": 1.0, "overcast": 0.0, "clear": 1.0}}   # 렌더 조건 = 성분 하나씩
     df["df_render"] = df.workplane_lux / df.outdoor_lux
-    df["df_model"] = lm["daylight_factor"] * (t_open + np.clip(df.blind_deg / shade, 0, 1) * (t_sh - t_open))
+    df["df_model"] = [dlm.workplane_per_outdoor(dl, s, d) for s, d in zip(df.sky, df.blind_deg)]
     df["sensor_ratio_render"] = df.sensor_lux / df.workplane_lux
-    df["sensor_ratio_model"] = lm["daylight_sensor_ratio"]
+    df["sensor_ratio_model"] = [1.0 / dlm.sensor_to_workplane(dl, s, d) for s, d in zip(df.sky, df.blind_deg)]
     df["blind_rel_render"] = df.workplane_lux / df.groupby("sky").workplane_lux.transform("first")
-    df["blind_rel_model"] = (t_open + np.clip(df.blind_deg / shade, 0, 1) * (t_sh - t_open)) / t_open
+    df["blind_rel_model"] = [dlm.relative_transmittance(dl, s, d) for s, d in zip(df.sky, df.blind_deg)]
     out = REPO / "results" / "validation"
     out.mkdir(parents=True, exist_ok=True)
     df.round(4).to_csv(out / "daylight_check.csv", index=False)

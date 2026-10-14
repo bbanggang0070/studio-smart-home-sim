@@ -87,6 +87,7 @@ class WorldInputs:
                 outdoor_illuminance_lux=float(ext.get("outdoor_illuminance_lux", 0.0)),
                 wind_speed_ms=float(ext.get("wind_speed_ms", -1.0)),
                 heating_setpoint_c=float(ext.get("heating_setpoint_c", -1.0)),
+                sky=str(ext.get("weather", "clear")),   # 날씨 = 하늘 상태 (clear | cloudy | overcast | rain)
             ),
             raining=ext.get("weather") == "rain",
             occupancy=bool(ini.get("occupancy", True)),
@@ -103,6 +104,7 @@ class WorldInputs:
         for key, val in changes.items():
             if key == "weather":
                 self.raining = val == "rain"
+                self.ext.sky = str(val)
             elif hasattr(self.ext, key):
                 setattr(self.ext, key, float(val))
             elif key == "illuminance_lux":
@@ -253,7 +255,7 @@ def sensor_topics(obs: dict[str, Any], world: WorldInputs, door_open: bool, extr
         T.S_WIFI_PRESENCE: wifi if wifi is not None else world.occupancy,
         T.S_OUTDOOR_PM_GRADE: pm_grade(world.ext.outdoor_pm25_ugm3, grade_bounds, grade_names),
         T.S_APPLIANCE_POWER: json.dumps(power, sort_keys=True),
-        T.S_WEATHER: json.dumps({"raining": world.raining,
+        T.S_WEATHER: json.dumps({"raining": world.raining, "sky": world.ext.sky,
                                            "outdoor_temp_c": world.ext.outdoor_temp_c,
                                            "outdoor_rh_pct": world.ext.outdoor_rh_pct}),
     }

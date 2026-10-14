@@ -2,7 +2,7 @@
 
 목표: 모드의 lighting {target, lux, cct, ceiling_lux, off_after_min} — lux 는 작업면(바닥 · 책상) 기준
   천장 센서(아래를 봄)는 반사광만 받아 작업면보다 낮게 읽는다 (W05 T5.7 · config/lighting_calibration.yaml) →
-  작업면 주광 = (센서 측정 − 자기 조명의 센서 기여) / daylight_sensor_ratio
+  작업면 주광 = (센서 측정 − 자기 조명의 센서 기여) × 센서→작업면 배율(하늘 상태 · 블라인드 각도) — common/daylight.py (v3.4.21)
   천장등 % = (방 목표 − 작업면 주광) / ceiling_lux_at_floor_full
   스탠드 % = (책상 목표 − 작업면 주광 − 천장등의 책상 기여) / desk_lux_at_desk_full   (책상 조도 센서 없이 추정 — docs/02 §2.5)
   수면: off_after_min 뒤 소등 · 외출 · 빈방 절전: 소등 · 눈부심(700 lux 초과) → 블라인드 차광 (620 lux 해제)
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 
+from common import daylight as dlm
 from controller.params import ControllerParams
 from controller.signals import Observation
 
@@ -38,11 +39,11 @@ class Lighting:
         rise, sset = g(v + "sunrise_h"), g(v + "sunset_h")
         sun = math.sin(math.pi * (h - rise) / (sset - rise)) if rise < h < sset else 0.0
         out = g(v + "clear_sky_peak_lux") * sun * (g(v + "rain_factor") if o.raining else 1.0)
-        lm = "lighting_model."
-        frac = min(max(o.blind_deg / g("setpoints.blind_shade_angle_deg"), 0.0), 1.0)
-        tau = g(lm + "outdoor_transmittance_open") + frac * (g(lm + "outdoor_transmittance_shaded") - g(lm + "outdoor_transmittance_open"))
         # 센서 눈금으로 돌려준다 (측정값 대신 쓰므로)
-        return out * g(lm + "daylight_factor") * tau * g(lm + "daylight_sensor_ratio") + self._own_light(o)
+        return out * dlm.sensor_per_outdoor(self._dl(), o.sky, o.blind_deg) + self._own_light(o)
+
+    def _dl(self) -> dict:
+        return self.p.get("lighting_model.daylight")
 
     def _own_light(self, o: Observation) -> float:
         g = self.p.get
@@ -75,15 +76,19 @@ class Lighting:
             lux = self._last_valid[1]
         else:
             lux = self._virtual_lux(o)                 # measured() 와 같은 규칙 — 페일세이프 상태는 바꾸지 않는다 (알림은 apply 가 낸다)
-        return max(0.0, lux - self._own_light(o)) / g("lighting_model.daylight_sensor_ratio")
+        return self._to_workplane(o, lux)
+
+    def _to_workplane(self, o: Observation, lux: float) -> float:
+        """센서 값 → 작업면 주광 (자기 조명 기여를 빼고 하늘 상태 · 블라인드 각도의 센서 비로 환산)."""
+        return max(0.0, lux - self._own_light(o)) * dlm.sensor_to_workplane(self._dl(), o.sky, o.blind_deg)
+
+    def _open_equiv(self, o: Observation, workplane: float) -> float:
+        rel = dlm.relative_transmittance(self._dl(), o.sky, o.blind_deg)
+        return workplane / max(rel, 1e-6)
 
     def daylight_open_equiv(self, o: Observation) -> float:
         """블라인드를 열었을 때의 작업면 주광 — 차광하면 측정 주광이 줄어 차광 판단이 스스로 풀리는 채터링을 막는다."""
-        g = self.p.get
-        lm = "lighting_model."
-        frac = min(max(o.blind_deg / g("setpoints.blind_shade_angle_deg"), 0.0), 1.0)
-        t_open, t_sh = g(lm + "outdoor_transmittance_open"), g(lm + "outdoor_transmittance_shaded")
-        return self.daylight_workplane(o) * t_open / (t_open + frac * (t_sh - t_open))
+        return self._open_equiv(o, self.daylight_workplane(o))
 
     def apply(self, o: Observation, mode: str, saving: bool, cooling: bool, add) -> dict:
         g = self.p.get
@@ -103,7 +108,7 @@ class Lighting:
             add("ceiling_light", "force", 0, L6, "조명 소등 (빈방 · 외출 · 수면 경과)")
             add("desk_light", "force", 0, L6, "스탠드 소등")
             return info
-        daylight = max(0.0, lux - self._own_light(o)) / g(lm + "daylight_sensor_ratio")   # 작업면 주광 추정
+        daylight = self._to_workplane(o, lux)                 # 작업면 주광 추정
         info["daylight_workplane_lux"] = round(daylight, 1)
         ceil_target = m.get("ceiling_lux", m["lux"]) if m["target"] == "desk" else m["lux"]
         # 블라인드가 움직이는 중이거나 막 멈췄으면(센서 · 조명 지연) 조도로 다시 판단하지 않는다 — 과보정 진동 방지 (B2 물리 모드)
@@ -130,9 +135,7 @@ class Lighting:
         # 눈부심 — 차광 (B2 · 히스테리시스 700 / 620). 블라인드를 닫으면 측정 주광이 줄어 바로 풀리므로
         # '블라인드를 열었을 때의 주광'으로 환산해 판단한다 (차광 ↔ 개방 채터링 방지)
         il = "illuminance."
-        frac = min(max(o.blind_deg / g("setpoints.blind_shade_angle_deg"), 0.0), 1.0)
-        t_open, t_sh = g(lm + "outdoor_transmittance_open"), g(lm + "outdoor_transmittance_shaded")
-        open_equiv = daylight * t_open / (t_open + frac * (t_sh - t_open))
+        open_equiv = self._open_equiv(o, daylight)
         if settled:
             if open_equiv > g(il + "over_bright_lux"):
                 self._glare = True
@@ -142,7 +145,7 @@ class Lighting:
             if not g(il + "glare_partial_shade"):
                 deg = g("setpoints.blind_shade_angle_deg")
             elif settled or self._glare_deg is None:
-                deg = self._partial_shade_deg(open_equiv, ceil_target, t_open, t_sh)
+                deg = self._partial_shade_deg(open_equiv, ceil_target, o.sky)
             else:
                 deg = self._glare_deg                      # 움직이는 중 — 직전 지령 유지
             add("blind", "need", deg, L6, f"눈부심 — 블라인드 차광 {deg:g}°")
@@ -151,17 +154,18 @@ class Lighting:
             self._glare_deg = None
         return info
 
-    def _partial_shade_deg(self, open_equiv: float, target: float, t_open: float, t_sh: float) -> float:
-        """방 조도 목표에 맞는 차광 각도 — 블라인드를 연 상태의 작업면 주광(open_equiv)에서 필요한 투과율을 거꾸로 푼다.
-        목표가 눈부심 해제 조도보다 높으면 해제 조도에 맞춘다. 각도 단위 · 데드밴드로 떨림을 막는다."""
+    def _partial_shade_deg(self, open_equiv: float, target: float, sky: str) -> float:
+        """방 조도 목표에 맞는 차광 각도 — 블라인드를 연 상태의 작업면 주광(open_equiv)에서 필요한 투과 비를 구해
+        각도 표(직사광 · 확산광 혼합)에서 거꾸로 찾는다. 목표가 눈부심 해제 조도보다 높으면 해제 조도에 맞춘다.
+        각도 단위 · 데드밴드로 떨림을 막는다."""
         g = self.p.get
         il = "illuminance."
+        shade = g("setpoints.blind_shade_angle_deg")
         goal = min(target, g(il + "shade_release_lux"))
-        tau = t_open * goal / max(open_equiv, 1e-6)
-        frac = min(max((tau - t_open) / (t_sh - t_open), 0.0), 1.0)
+        exact = dlm.angle_for_relative(self._dl(), sky, goal / max(open_equiv, 1e-6), shade)
         step = g(il + "glare_angle_step_deg")
         # 내림 — 덜 가리는 쪽으로 (주광이 목표보다 약간 밝게 남아 조명이 켜지지 않게)
-        deg = min(g("setpoints.blind_shade_angle_deg"), math.floor(frac * g("setpoints.blind_shade_angle_deg") / step) * step)
+        deg = min(shade, math.floor(exact / step) * step)
         if self._glare_deg is None or abs(deg - self._glare_deg) > step:
             self._glare_deg = deg
         return self._glare_deg

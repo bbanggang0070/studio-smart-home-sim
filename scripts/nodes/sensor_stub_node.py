@@ -26,7 +26,7 @@ def main() -> None:
         T.S_ILLUMINANCE: args.lux, T.S_TEMPERATURE: args.temp, T.S_HUMIDITY: args.rh, T.S_OCCUPANCY: True,
         T.S_OCCUPANT_ZONE: args.zone, T.S_OUTDOOR_PM_GRADE: "good", T.S_PM25: 10.0, T.S_WIFI_PRESENCE: True,
         T.S_DOOR_CONTACT: False, T.S_HOOD_TEMPERATURE: args.temp, T.S_APPLIANCE_POWER: json.dumps({}),
-        T.S_WEATHER: json.dumps({"raining": False, "outdoor_temp_c": args.temp - 2, "outdoor_rh_pct": 55.0}),
+        T.S_WEATHER: json.dumps({"raining": False, "sky": "clear", "outdoor_temp_c": args.temp - 2, "outdoor_rh_pct": 55.0}),
         T.C_MODE: args.mode, T.C_ACTIVITY: "",
     }
     rclpy.init()

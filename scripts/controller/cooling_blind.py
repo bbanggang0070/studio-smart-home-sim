@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import math
 
+from common import daylight as dlm
+
 KELVIN, GRAVITY = 273.15, 9.81
 
 
@@ -35,9 +37,8 @@ class CoolingBlind:
         return self.p.get("setpoints.blind_shade_angle_deg")
 
     def solar_w(self, o, deg: float) -> float:
-        lm = "lighting_model."
-        g = self.p.get
-        outdoor_lux = self.lighting.daylight_open_equiv(o) / (g(lm + "daylight_factor") * g(lm + "outdoor_transmittance_open"))
+        dl = self.p.get("lighting_model.daylight")
+        outdoor_lux = self.lighting.daylight_open_equiv(o) / max(dlm.workplane_per_outdoor(dl, o.sky, 0.0), 1e-9)
         irr = max(outdoor_lux, 0.0) / self._c("solar_luminous_efficacy_lm_per_w")
         heat = _lerp(deg, self._shade(), self._c("heat_factor_open"), self._c("heat_factor_shaded"))
         return self._c("glazing_area_m2") * irr * self._c("solar_heat_gain_fraction") * heat
@@ -59,8 +60,7 @@ class CoolingBlind:
             return 0.0
         g = self.p.get
         lm = "lighting_model."
-        t_open, t_sh = g(lm + "outdoor_transmittance_open"), g(lm + "outdoor_transmittance_shaded")
-        daylight = self.lighting.daylight_open_equiv(o) * _lerp(deg, self._shade(), t_open, t_sh) / t_open
+        daylight = self.lighting.daylight_open_equiv(o) * dlm.relative_transmittance(g(lm + "daylight"), o.sky, deg)
         short = target_lux - daylight
         if short < g("illuminance.ceiling_deadband_lux"):
             return 0.0

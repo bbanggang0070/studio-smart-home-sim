@@ -56,6 +56,7 @@ class Observation:
     desk_pct: float
     appliance_states: dict
     safety_state: str = "NORMAL"           # 창문 안전 계층 (W10) — SAFETY_HOLD · LOCKED_* 이면 창문을 못 쓴다
+    sky: str = "clear"                     # 날씨 API 하늘 상태 — 주광의 직사광 비율 (common/daylight.py · v3.4.21)
 
     @property
     def tod_s(self) -> float:
@@ -78,6 +79,7 @@ def parse_inbox(now_s: float, inbox: dict[str, Any]) -> Observation:
         outdoor_pm_grade=str(inbox.get(T.S_OUTDOOR_PM_GRADE, "good")),
         power_w=json.loads(inbox.get(T.S_APPLIANCE_POWER) or "{}"),
         raining=bool(weather.get("raining", False)),
+        sky=str(weather.get("sky", "clear")),
         outdoor_temp_c=float(weather.get("outdoor_temp_c", math.nan)),
         outdoor_rh_pct=float(weather.get("outdoor_rh_pct", math.nan)),
         user_mode=str(inbox.get(T.C_MODE, "NORMAL")),

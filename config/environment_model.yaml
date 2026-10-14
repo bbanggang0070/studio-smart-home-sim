@@ -88,8 +88,6 @@ environment_model:
       solar_luminous_efficacy_lm_per_w: 105.0 # draft — 외부 조도 → 일사 [W/m²] 환산
       solar_heat_gain_fraction: 0.6    # draft — 투과광 중 실내 열로 남는 비율 (SHGC 근사)
       solar_to_mass_fraction: 0.6      # draft — 일사열 중 축열 질량에 흡수되는 비율
-      blind_transmittance_open: 0.85   # 빛 투과율 — thresholds lighting_model 과 같은 초기값 (참값 사본) · 조도에만 쓴다
-      blind_transmittance_shaded: 0.12 # 75° 차광
       #  [2026-10-13] 일사'열' 계수는 빛 투과율과 다르다 — 창 안쪽 블라인드는 흡수한 햇빛이 실내에서 열이 된다.
       #  일사열 = 유리 면적 × 일사 × SHGC × 계수(각도). 0.55 는 밝은색 실내 베니션 블라인드 닫힘의 감쇠 수준 (draft —
       #  ASHRAE 실내 차폐 감쇠계수(IAC) 범위로 가정, 원문 확인 필요)
@@ -115,10 +113,12 @@ environment_model:
     lighting:
       ceiling_light_w: 40.0            # draft — LED 천장등 (약 100 lm/W 기준)
       desk_lamp_w: 8.0                 # draft
-      #  조도 참값 — 위치별: 작업면 주광 = 외부 조도 × 주광률 × 블라인드 투과율 · 센서 주광 = 작업면 주광 × daylight_sensor_ratio
-      #  천장등 · 스탠드 기여는 W05 T5.7 캘리브레이션 (config/lighting_calibration.yaml · 2026-10-11)
-      daylight_factor: 0.02            # draft — 주광률 2 % (원룸 측창, 작업면 기준)
-      daylight_sensor_ratio: 0.38      # draft — 주광의 센서/작업면 비 (W08 창 주광 렌더로 확정)
+      #  조도 참값 — 주광은 직사광 · 확산광 · 블라인드 각도 표 (common/daylight.py · W12 T12.5 렌더 대조) · 천장등 · 스탠드는 W05 T5.7 캘리브레이션
+      daylight:                        # [2026-10-14] 참값 주광 — 제어용(thresholds lighting_model.daylight)과 같은 초기값 — 직사광 · 확산광 분리 · 블라인드 각도 표 (common/daylight.py · W12 T12.5 렌더 대조값 · draft)
+        direct_fraction: { clear: 0.8, cloudy: 0.3, overcast: 0.0, rain: 0.0 }   # 하늘 상태별 직사광 비율 (기상청 하늘상태 SKY)
+        blind_deg: [0.0, 45.0, 75.0, 90.0]                                       # 90° 는 75° 값을 그대로 (렌더 없음)
+        direct:  { df_open: 0.084, transmittance: [1.0, 0.126, 0.053, 0.053], sensor_ratio: [0.404, 1.171, 1.342, 1.342] }
+        diffuse: { df_open: 0.012, transmittance: [1.0, 0.713, 0.284, 0.284], sensor_ratio: [0.936, 0.943, 0.782, 0.782] }
       ceiling_lux_at_sensor_full: 98.3
       ceiling_lux_at_floor_full: 256.6
       ceiling_lux_at_desk_full: 203.4

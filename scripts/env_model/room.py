@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from common import daylight as daylight_model
 from env_model import air_balance, condensation, psychro
 from env_model.config import EnvModelConfig
 
@@ -58,6 +59,7 @@ class ExternalConditions:
     outdoor_illuminance_lux: float = 0.0
     wind_speed_ms: float = -1.0       # −1 = 설정 기본값 사용 (ROS 파라미터 규칙: null 대신 −1)
     heating_setpoint_c: float = -1.0  # 겨울 난방 경계 조건 (가정 A13) · −1 = 난방 없음
+    sky: str = "clear"                # 하늘 상태 clear | cloudy | overcast | rain — 주광의 직사광 비율 (common/daylight.py)
 
 
 @dataclass
@@ -426,13 +428,13 @@ class RoomModel:
         t_dew = psychro.dew_point_c(s.temp_c, rh, b, c)
         t_s = condensation.window_surface_temp_c(
             s.temp_c, ext.outdoor_temp_c, r_si, g("condensation.r_rest_m2k_w"))
-        # 조도 — 천장 센서 위치 참값 (블라인드 투과율은 일사와 같은 각도 보간)
-        th = "thermal."
-        frac = min(max(act.blind_angle_deg / g(th + "blind_shade_angle_deg"), 0.0), 1.0)
-        tau = g(th + "blind_transmittance_open") + frac * (g(th + "blind_transmittance_shaded") - g(th + "blind_transmittance_open"))
-        daylight = max(ext.outdoor_illuminance_lux, 0.0) * g("lighting.daylight_factor") * tau   # 작업면 주광
+        # 조도 참값 — 주광은 직사광 · 확산광 · 블라인드 각도 표 (common/daylight.py · v2.2 개정 · W12 렌더 대조)
+        dl = g("lighting.daylight")
+        e_out = max(ext.outdoor_illuminance_lux, 0.0)
+        daylight = e_out * daylight_model.workplane_per_outdoor(dl, ext.sky, act.blind_angle_deg)   # 작업면 주광
+        daylight_sensor = e_out * daylight_model.sensor_per_outdoor(dl, ext.sky, act.blind_angle_deg)   # 천장 센서 위치
         pc, pd = act.ceiling_light_pct / 100.0, act.desk_light_pct / 100.0
-        lux = (daylight * g("lighting.daylight_sensor_ratio")                                # 천장 센서 위치
+        lux = (daylight_sensor                                                              # 천장 센서 위치
                + g("lighting.ceiling_lux_at_sensor_full") * pc + g("lighting.desk_lux_at_sensor_full") * pd)
         desk_lux = daylight + g("lighting.ceiling_lux_at_desk_full") * pc + g("lighting.desk_lux_at_desk_full") * pd
         floor_lux = daylight + g("lighting.ceiling_lux_at_floor_full") * pc + g("lighting.desk_lux_at_floor_full") * pd

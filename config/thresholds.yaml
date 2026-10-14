@@ -299,11 +299,12 @@ smart_home_controller:
       ceiling_lux_at_desk_full: 203.4      # 천장등 → 책상면 (= 센서 × 2.07, 옛 ceiling_to_desk_k_geo)
       desk_lux_at_sensor_full: 39.6        # 스탠드 → 천장 센서 (자기 조명 기여 빼기용)
       desk_lux_at_desk_full: 875.1         # 스탠드 → 책상면 (갓 원뿔 60°)
-      daylight_sensor_ratio: 0.38          # draft — 주광의 센서/작업면 비 (천장등의 센서/바닥 비를 임시로 · W08 창 주광 렌더로 확정)
       distance_falloff: 'inverse_square'
-      daylight_factor: 0.02        # [v3.4.3] draft — 외부 조도 → 실내 작업면 (주광률, 정의상 작업면 기준)
-      outdoor_transmittance_open: 0.85   # 블라인드 개방 시 창 투과율
-      outdoor_transmittance_shaded: 0.12 # 차광 시
+      daylight:                    # [v3.4.21] 주광 — 직사광 · 확산광 분리 · 블라인드 각도 표 (common/daylight.py · W12 T12.5 렌더 대조값 · draft)
+        direct_fraction: { clear: 0.8, cloudy: 0.3, overcast: 0.0, rain: 0.0 }   # 하늘 상태별 직사광 비율 (기상청 하늘상태 SKY)
+        blind_deg: [0.0, 45.0, 75.0, 90.0]                                       # 90° 는 75° 값을 그대로 (렌더 없음)
+        direct:  { df_open: 0.084, transmittance: [1.0, 0.126, 0.053, 0.053], sensor_ratio: [0.404, 1.171, 1.342, 1.342] }
+        diffuse: { df_open: 0.012, transmittance: [1.0, 0.713, 0.284, 0.284], sensor_ratio: [0.936, 0.943, 0.782, 0.782] }
       camera_validation_enabled: false   # W12 오프라인 대조 시에만 true
 
     # ---- 생활 모드 → config/user_modes.yaml ----------------------------------

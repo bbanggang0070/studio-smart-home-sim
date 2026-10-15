@@ -37,6 +37,11 @@ entrance_door_joint:
   range_deg: [0.0, 100.0]
   max_torque_nm: 60.0
   drive: { type: force, stiffness: 200.0, damping: 40.0 }
+bathroom_door_joint:                 # [Scene v0.3] 화장실 문 — 화장실 쪽으로 열림 (양수 = 열림) · 제어 · 판정에 쓰지 않는다 (GUI 에서 Target Position 으로 여닫기)
+  type: revolute
+  range_deg: [0.0, 100.0]
+  max_torque_nm: 40.0
+  drive: { type: force, stiffness: 150.0, damping: 30.0 }
 bridge:                              # isaac_actuator_bridge (W06)
   physics_hz: 120.0                  # scene_layout physics.steps_per_second 와 같게
   state_hz: 20.0                     # 액추에이터 상태 토픽 (명령→반응 지연 측정 해상도 50 ms)

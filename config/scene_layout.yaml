@@ -36,7 +36,7 @@ entrance_door:
 bathroom:
   interior_x_m: [-1.60, -0.15]      # 방 왼쪽 벽(두께 0.15) 바깥 · 폭 1.45 m
   interior_y_m: [0.00, 2.00]        # 깊이 2.0 m (현관 쪽) — 약 2.9 m²
-  door: { y_range_m: [1.15, 1.85], height_m: 2.00, open_deg: 70.0 }   # 왼쪽 벽 문 · 현관문(경첩 x = 0.2)이 열릴 때 막지 않는 자리 · 화면용 열림 각도
+  door: { y_range_m: [1.15, 1.85], height_m: 2.00, open_deg: 70.0, mass_kg: 15.0, thickness_m: 0.035 }   # 왼쪽 벽 문 · 현관문(경첩 x = 0.2)이 열릴 때 막지 않는 자리 · 경첩 Revolute (actuator_limits bathroom_door_joint) · 시작 각도 open_deg
   light: { pos: [-0.875, 1.00, 2.38], size_m: 0.30, intensity: 0.0 }  # 화장실 천장등 (화면용 · 스크린샷에서만 켠다)
 
 # ---- 창문 (Y = depth 벽) — 랙-피니언 미닫이 (docs/04) ----

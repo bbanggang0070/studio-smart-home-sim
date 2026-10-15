@@ -60,7 +60,7 @@ def main() -> None:
                 "/World/appliances/air_conditioner/visual/louver", "/World/appliances/range_hood/visual/lamp",
                 "/World/Looks/led_ac", "/World/furniture/bed/collider", "/World/cameras/kitchen", "/World/cameras/bedside",
                 # v0.3 — 화장실 · 도어락 · 책장 · 냉장고
-                "/World/bathroom/wall_west", "/World/bathroom/door/hinge", "/World/bathroom/fixtures/toilet",
+                "/World/bathroom/wall_west", "/World/bathroom/door/bathroom_door_joint", "/World/bathroom/fixtures/toilet",
                 "/World/entrance_door/door_leaf/lock_inside", "/World/furniture/bookshelf/visual", "/World/furniture/fridge/visual",
                 "/World/cameras/bathroom", "/World/cameras/entrance"]
     missing = [p for p in required if not stage.GetPrimAtPath(p).IsValid()]
@@ -72,9 +72,10 @@ def main() -> None:
     world.reset()
     win = SingleArticulation("/World/window", name="window")
     door = SingleArticulation("/World/entrance_door", name="door")
+    bdoor = SingleArticulation("/World/bathroom/door", name="bathroom_door")
     blind = SingleArticulation("/World/blind", name="blind")
     fans = {n: SingleArticulation(f"/World/{n}", name=n) for n in ("exhaust_fan", "intake_fan", "ceiling_fan")}
-    for a in (win, door, blind, *fans.values()):
+    for a in (win, door, bdoor, blind, *fans.values()):
         a.initialize()
     obstacles = {n: SingleRigidPrim(f"/World/obstacles/{n}", name=n) for n in ("rigid_pot", "soft_cushion", "elastic_sponge")}
     for o in obstacles.values():
@@ -173,6 +174,19 @@ def main() -> None:
     ang_closed = math.degrees(float(door.get_joint_positions()[0]))
     record("현관문 개방 각도 → 문 열림 판정", is_open and ang_closed < L["entrance_door"]["contact_open_angle_deg"],
            f"30° 지령 → {ang:.1f}° (열림 {is_open}) · 닫기 → {ang_closed:.1f}°")
+    # v0.3 화장실 문 — 경첩 개폐 (시작 각도 → 닫힘 → 90° → 시작 각도로 되돌림)
+    bpath = "/World/bathroom/door/bathroom_door_joint"
+    b0 = math.degrees(float(bdoor.get_joint_positions()[0]))
+    drive(bpath, "angular", 0.0)
+    steps(3.0)
+    b_closed = math.degrees(float(bdoor.get_joint_positions()[0]))
+    drive(bpath, "angular", 90.0)
+    steps(3.0)
+    b_open = math.degrees(float(bdoor.get_joint_positions()[0]))
+    drive(bpath, "angular", L["bathroom"]["door"]["open_deg"])
+    steps(3.0)
+    record("화장실 문 경첩 개폐", abs(b_closed) < 2.0 and abs(b_open - 90.0) < 3.0,
+           f"시작 {b0:.1f}° · 닫기 → {b_closed:.1f}° · 90° 지령 → {b_open:.1f}°")
 
     # ---- 6. 블라인드 · 팬 ----
     n = L["blind"]["slat_count"]

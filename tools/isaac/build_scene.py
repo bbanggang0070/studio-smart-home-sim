@@ -207,10 +207,25 @@ def main() -> None:
     cube(f"{bshell}/wall_west", (bx0 - T / 2, (by0 + by1) / 2, H / 2), (T, by1 - by0 + 2 * T, H), rgb=tile_rgb)
     cube(f"{bshell}/wall_front", ((bx0 + bx1) / 2, by0 - T / 2, H / 2), (bx1 - bx0, T, H), rgb=tile_rgb)
     cube(f"{bshell}/wall_back", ((bx0 + bx1) / 2, by1 + T / 2, H / 2), (bx1 - bx0, T, H), rgb=tile_rgb)
-    bdoor = bt["door"]
-    xform(f"{bshell}/door")
-    props.xform(f"{bshell}/door/hinge", (bx1 + 0.02, bd1, 0.0), rot_deg=(0.0, 0.0, -float(bdoor["open_deg"])))   # 화장실 쪽으로 열림 (화면용 · 물리 없음)
-    props.bathroom_door(f"{bshell}/door/hinge", bd1 - bd0 - 0.02, bdh - 0.01, 0.035)
+    # 화장실 문 — 현관문과 같은 경첩 Revolute + 각도 드라이브 (화장실 쪽으로 열림 = 양수 · 시작 각도 open_deg)
+    bdoor, bdl = bt["door"], A["bathroom_door_joint"]
+    bdw, bdth = bd1 - bd0 - 0.02, bdoor["thickness_m"]
+    # 경첩 = 화장실 쪽 벽면(x = bx1) · 문짝은 그 안쪽(+X)으로 두께만큼 — 경첩을 벽 두께 안에 두면 35° 에서 옆 벽에 부딪힌다 (2026-10-15)
+    bhinge = (bx1, bd1 - 0.005, bdh / 2)
+    bleaf_c = (bx1 + bdth / 2, bhinge[1] - bdw / 2, bdh / 2)
+    bmount = articulation(f"{bshell}/door", bhinge)
+    bleaf = rigid(f"{bshell}/door/door_leaf", bleaf_c, mass=bdoor["mass_kg"])
+    cube(f"{bshell}/door/door_leaf/geom", (0, 0, 0.005), (bdth, bdw, bdh - 0.02), rgb=(0.90, 0.89, 0.86))
+    props.bathroom_door_hardware(f"{bshell}/door/door_leaf", bdw, bdth, 1.0 - bdh / 2)
+    flip_x = Gf.Quatf(0.0, 1.0, 0.0, 0.0)              # 관절 프레임을 X 축으로 180° — 축이 −Z 가 되어 양의 각도 = 화장실 쪽(−X)으로 열림
+    bj = joint("revolute", f"{bshell}/door/bathroom_door_joint", bmount, bleaf, "Z", (0, 0, 0),
+               tuple(bhinge[i] - bleaf_c[i] for i in range(3)), lim=bdl["range_deg"],
+               drive={"stiffness": bdl["drive"]["stiffness"], "damping": bdl["drive"]["damping"], "max": bdl["max_torque_nm"]},
+               drive_kind="angular")
+    bj.CreateLocalRot0Attr(flip_x)
+    bj.CreateLocalRot1Attr(flip_x)
+    UsdPhysics.DriveAPI(bj.GetPrim(), "angular").GetTargetPositionAttr().Set(float(bdoor["open_deg"]))
+    PhysxSchema.JointStateAPI.Apply(bj.GetPrim(), "angular").CreatePositionAttr(float(bdoor["open_deg"]))   # 시작부터 그 각도
     xform(f"{bshell}/fixtures")
     props.bathroom(f"{bshell}/fixtures")
     bl_ = bt["light"]

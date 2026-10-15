@@ -372,12 +372,11 @@ class Props:
         self.box(f"{root}/towel", (xb - 0.04, ya + 0.75, 1.02), (0.02, 0.40, 0.36), "mattress")
         del H
 
-    def bathroom_door(self, root, width, height, thickness):
-        """화장실 문짝 (원점 = 경첩 · 문짝은 −Y 쪽으로 뻗는다) + 레버 손잡이."""
-        self.box(f"{root}/leaf", (0.0, -width / 2, height / 2), (thickness, width, height), "cabinet")
+    def bathroom_door_hardware(self, root, width, thickness, handle_z):
+        """화장실 문 손잡이 (문짝 강체 기준 · 문짝 중심 원점 · 문짝은 Y 방향으로 width) — 경첩 반대쪽 끝(−Y)."""
         for i, sgn in enumerate((1, -1)):
-            self.cyl(f"{root}/handle_rose_{i}", (sgn * (thickness / 2 + 0.004), -width + 0.07, 1.0), 0.025, 0.008, "stainless", axis="X")
-            self.box(f"{root}/handle_lever_{i}", (sgn * (thickness / 2 + 0.03), -width + 0.12, 1.0), (0.018, 0.12, 0.02), "stainless")
+            self.cyl(f"{root}/handle_rose_{i}", (sgn * (thickness / 2 + 0.004), -width / 2 + 0.07, handle_z), 0.025, 0.008, "stainless", axis="X")
+            self.box(f"{root}/handle_lever_{i}", (sgn * (thickness / 2 + 0.03), -width / 2 + 0.12, handle_z), (0.018, 0.12, 0.02), "stainless")
 
     # ---- 센서 (실제 모듈 크기 근사 · 하우징 포함) ----
     def sensor(self, root, name):

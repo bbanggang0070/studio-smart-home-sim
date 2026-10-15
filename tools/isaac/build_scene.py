@@ -413,9 +413,11 @@ def main() -> None:
 
     # ---- 센서 (실제 모듈 · 하우징 모양 — v0.2) ----
     xform("/World/sensors")
-    for name in ("mmwave_sensor", "temp_humidity_sensor", "illuminance_sensor", "pm25_sensor", "hood_temperature_sensor"):
+    for name in ("mmwave_sensor", "pm25_sensor", "hood_temperature_sensor", "ceiling_sensor_hub"):
         xform(f"/World/sensors/{name}", L[name]["pos"])
         props.sensor(f"/World/sensors/{name}", name)
+    for name in ("temp_humidity_sensor", "illuminance_sensor"):      # 측정점 표시 (박스 안 · 시각 모델 없음)
+        xform(f"/World/sensors/{name}", L[name]["pos"])
 
     # ---- 재실 영역 (T3.5) — guide 상자 ----
     xform("/World/zones")

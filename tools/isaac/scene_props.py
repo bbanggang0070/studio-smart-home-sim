@@ -37,7 +37,7 @@ MATS = {
     "shirt": ((0.30, 0.42, 0.62), 0.8, 0.0, 1.0),
     "pants": ((0.18, 0.19, 0.22), 0.8, 0.0, 1.0),
 }
-LEDS = ("led_ac", "led_dehumidifier", "led_humidifier", "led_purifier", "led_range_hood", "hood_lamp_panel")
+LEDS = ("led_hub", "led_ac", "led_dehumidifier", "led_humidifier", "led_purifier", "led_range_hood", "hood_lamp_panel")
 
 
 class Props:
@@ -280,6 +280,14 @@ class Props:
         if name == "mmwave_sensor":            # HLK-LD2410 (22 × 16 mm) 하우징 · 앞(+Y)에 레이돔
             self.box(f"{root}/housing", (0, 0, 0), (0.06, 0.02, 0.045), "white_plastic")
             self.box(f"{root}/radome", (0, 0.011, 0), (0.04, 0.003, 0.03), "lens")
+        elif name == "ceiling_sensor_hub":     # v0.2 천장 센서 박스 — 온습도(옆면 통풍구) + 조도(아랫면 확산 돔) 한 함체
+            sx, sy, sz = self.L["ceiling_sensor_hub"]["size_m"]
+            self.box(f"{root}/housing", (0, 0, 0), (sx, sy, sz), "white_plastic")
+            for k in range(5):                                 # 옆면 통풍 슬롯 (온습도 — 공기가 지나가게)
+                for side in (-1, 1):
+                    self.box(f"{root}/vent_{'lr'[side > 0]}{k}", (side * sx / 2, -sy / 3 + k * sy / 6, 0), (0.002, 0.008, sz * 0.5), "dark_plastic")
+            self.sphere(f"{root}/light_dome", (sx / 4, 0, -sz / 2), 0.008, "white_plastic", scale=(1.0, 1.0, 0.6))   # 조도 창 (아래를 봄)
+            self.box(f"{root}/status_led", (-sx / 3, sy / 3, -sz / 2 - 0.0005), (0.004, 0.004, 0.001), "led_hub")
         elif name == "temp_humidity_sensor":   # 천장 부착 통풍형 온습도 센서 (SHT3x 계열)
             self.box(f"{root}/housing", (0, 0, 0), (0.06, 0.06, 0.022), "white_plastic")
             for k in range(4):

@@ -35,7 +35,7 @@ fi
 HOST_IDS="$(id -u):$(id -g)"
 case "$MODE" in
   python) CMD=(bash -c '"$0" "$@"; rc=$?; find /workspace/studio -xdev -user 0 -not -path "*/.venv/*" -exec chown '"$HOST_IDS"' {} + 2>/dev/null; exit $rc' "$ISAAC/python.sh" "$@") ;;
-  gui)    CMD=("$ISAAC/isaac-sim.sh" "$@") ;;
+  gui)    CMD=("$ISAAC/isaac-sim.sh" --allow-root "$@") ;;   # 컨테이너는 root — Kit 은 플래그 없이는 root 실행을 거부한다
   shell)  CMD=(bash) ;;
   *) echo "사용법: $0 {python <script> [args] | gui | shell}" >&2; exit 2 ;;
 esac

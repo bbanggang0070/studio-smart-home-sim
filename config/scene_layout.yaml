@@ -100,8 +100,10 @@ desk_lamp:       { pos: [0.20, 2.95, 1.15], radius_m: 0.04, intensity: 30000.0, 
 #   세기는 장면에서 0 (화면용 — 조도 센서 값은 환경 모델이 계산한다 · lighting_model)
 sun:             { rotate_xyz_deg: [-65.0, 0.0, 15.0] }   # 고도 25° (오후 · 수평 슬랫 사이로 들어오는 높이)
 mmwave_sensor:   { pos: [1.75, 0.05, 2.30], facing: +Y }
-temp_humidity_sensor: { pos: [1.75, 2.40, 2.35] }
-illuminance_sensor:   { pos: [2.30, 2.40, 2.38] }           # 천장 BH1750 (lighting_model 기준점) — 실링팬 날개 반경 밖 (팬 하우징이 가리지 않게 · T5.7)
+# [v0.2 · 2026-10-15 사용자 결정] 천장 센서 박스 하나 = 온습도 + 조도 — 조도 기준점(W05 캘리브레이션 · W12 주광 대조) 자리에 둔다 · mmWave 는 현관 벽 그대로
+ceiling_sensor_hub:   { pos: [2.30, 2.40, 2.39], size_m: [0.10, 0.10, 0.02] }   # 박스 아랫면 = 조도 센서 높이 2.38 m
+temp_humidity_sensor: { pos: [2.30, 2.40, 2.38] }           # 박스 안 (이전 단독 위치 [1.75, 2.40, 2.35] — 집중 정수 모델이라 값은 같다)
+illuminance_sensor:   { pos: [2.30, 2.40, 2.38] }           # 천장 BH1750 (lighting_model 기준점) — 실링팬 날개 반경 밖 (팬 하우징이 가리지 않게 · T5.7) · 박스 아랫면 확산 돔
 pm25_sensor:     { pos: [0.05, 3.40, 1.20] }
 
 # ---- 시각 모델 · 가전 표시등 (v0.2 · 2026-10-15 · tools/isaac/scene_props.py · scripts/sim/appliance_visuals.py) ----

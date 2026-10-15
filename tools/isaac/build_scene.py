@@ -1,4 +1,4 @@
-"""원룸 Scene v0.2 생성 (v0.1 + 실제 기기 모양 · 가습기 · 가전 표시등 — tools/isaac/scene_props.py)
+"""원룸 Scene v0.3 생성 (v0.2 + 화장실 · 배기팬 이전 · 도어락 · 책장 · 냉장고 / v0.2: 실제 기기 모양 · 가습기 · 가전 표시등 — tools/isaac/scene_props.py)
 
 원룸 Scene v0.1 생성 — worlds/lowcost_studio_room.usd (W03 T3.1–T3.9 · W04 T4.1–T4.5).
 
@@ -171,7 +171,13 @@ def main() -> None:
     wall_rgb = (0.86, 0.84, 0.80)
     cube(f"{shell}/floor", (W / 2, D / 2, -0.05), (W + 2 * T, D + 2 * T, 0.1), rgb=(0.55, 0.45, 0.35))
     cube(f"{shell}/ceiling", (W / 2, D / 2, H + 0.05), (W + 2 * T, D + 2 * T, 0.1), rgb=(0.95, 0.95, 0.95))
-    cube(f"{shell}/wall_left", (-T / 2, D / 2, H / 2), (T, D + 2 * T, H), rgb=wall_rgb)
+    # 왼쪽 벽 — v0.3 화장실 문 개구부를 남기고 세 조각
+    bt = L["bathroom"]
+    bd0, bd1 = bt["door"]["y_range_m"]
+    bdh = bt["door"]["height_m"]
+    cube(f"{shell}/wall_left_a", (-T / 2, (bd0 - T) / 2, H / 2), (T, bd0 + T, H), rgb=wall_rgb)
+    cube(f"{shell}/wall_left_b", (-T / 2, (bd1 + D + T) / 2, H / 2), (T, D + T - bd1, H), rgb=wall_rgb)
+    cube(f"{shell}/wall_left_top", (-T / 2, (bd0 + bd1) / 2, (bdh + H) / 2), (T, bd1 - bd0, H - bdh), rgb=wall_rgb)
     cube(f"{shell}/wall_right", (W + T / 2, D / 2, H / 2), (T, D + 2 * T, H), rgb=wall_rgb)
     dr = L["entrance_door"]
     dx0, dx1 = dr["x_range_m"]
@@ -188,6 +194,32 @@ def main() -> None:
     cube(f"{shell}/wall_back_b", ((wx1 + W) / 2, y, H / 2), (W - wx1, T, H), rgb=wall_rgb)
     cube(f"{shell}/wall_back_bottom", ((wx0 + wx1) / 2, y, z0 / 2), (wx1 - wx0, T, z0), rgb=wall_rgb)
     cube(f"{shell}/wall_back_top", ((wx0 + wx1) / 2, y, (z1 + H) / 2), (wx1 - wx0, T, H - z1), rgb=wall_rgb)
+
+    # ---- 화장실 (v0.3) — 방 왼쪽 벽 바깥 · 벽 · 바닥 · 천장 · 문 · 설비 · 천장등 ----
+    bx0, bx1 = bt["interior_x_m"]
+    by0, by1 = bt["interior_y_m"]
+    bshell = "/World/bathroom"
+    xform(bshell)
+    tile_rgb = (0.86, 0.87, 0.88)
+    cube(f"{bshell}/floor", ((bx0 - T + bx1) / 2, (by0 + by1) / 2, -0.05), (bx1 - bx0 + T, by1 - by0 + 2 * T, 0.1), rgb=(0.55, 0.57, 0.60))
+    cube(f"{bshell}/ceiling", ((bx0 - T + bx1) / 2, (by0 + by1) / 2, H + 0.05), (bx1 - bx0 + T, by1 - by0 + 2 * T, 0.1), rgb=(0.95, 0.95, 0.95))
+    cube(f"{bshell}/wall_west", (bx0 - T / 2, (by0 + by1) / 2, H / 2), (T, by1 - by0 + 2 * T, H), rgb=tile_rgb)
+    cube(f"{bshell}/wall_front", ((bx0 + bx1) / 2, by0 - T / 2, H / 2), (bx1 - bx0, T, H), rgb=tile_rgb)
+    cube(f"{bshell}/wall_back", ((bx0 + bx1) / 2, by1 + T / 2, H / 2), (bx1 - bx0, T, H), rgb=tile_rgb)
+    bdoor = bt["door"]
+    xform(f"{bshell}/door")
+    props.xform(f"{bshell}/door/hinge", (bx1 + 0.02, bd1, 0.0), rot_deg=(0.0, 0.0, -float(bdoor["open_deg"])))   # 화장실 쪽으로 열림 (화면용 · 물리 없음)
+    props.bathroom_door(f"{bshell}/door/hinge", bd1 - bd0 - 0.02, bdh - 0.01, 0.035)
+    xform(f"{bshell}/fixtures")
+    props.bathroom(f"{bshell}/fixtures")
+    bl_ = bt["light"]
+    blight = UsdLux.RectLight.Define(stage, f"{bshell}/ceiling_light")
+    blight.CreateWidthAttr(bl_["size_m"])
+    blight.CreateHeightAttr(bl_["size_m"])
+    blight.CreateIntensityAttr(bl_["intensity"])
+    UsdGeom.Xformable(blight).AddTranslateOp().Set(Gf.Vec3d(*bl_["pos"]))
+    cube(f"{bshell}/ceiling_light_fixture", (bl_["pos"][0], bl_["pos"][1], bl_["pos"][2] + 0.012), (bl_["size_m"], bl_["size_m"], 0.02),
+         rgb=(1.0, 1.0, 0.97), collide=False)
 
     # ---- 현관문 (T3.2 · T3.5) — 경첩 Revolute (문 열림 센서 = 개방 각도) ----
     dl = A["entrance_door_joint"]
@@ -206,6 +238,7 @@ def main() -> None:
     dcs = (dx1 - 0.05, -0.02, dh - 0.1)
     xform("/World/entrance_door/door_contact_sensor", dcs)
     props.door_contact("/World/entrance_door/door_contact_sensor", "/World/entrance_door/door_leaf", door_c, dcs)
+    props.door_hardware("/World/entrance_door/door_leaf", door_w, dth, door_c[2], dr["hardware"])   # v0.3 도어락 · 손잡이
 
     # ---- 창문 모듈 (T3.3 · T3.4 · T3.4b · T4.3 · T4.3b) ----
     wl = A["window_prismatic_joint"]
@@ -335,14 +368,14 @@ def main() -> None:
               drive_kind="angular", flip=True)   # 닫힘 = 방 쪽 끝이 위로 (위에서 내리쬐는 햇빛을 막는 방향)
 
     # ---- 팬 3종 (T4.4) — 날개 Revolute 속도 드라이브 · 충돌 없음 ----
-    def fan(name, pos, diameter, axis, lim_key, blades=4):
+    def fan(name, pos, diameter, axis, lim_key, blades=4, room_side=-1):
         fl = A[lim_key]
         m = articulation(f"/World/{name}", pos)
         xform(f"/World/{name}/mount/housing")
         if axis == "Z":
             props.ceiling_fan_housing(f"/World/{name}/mount/housing", pos)
         else:
-            props.wall_fan_housing(f"/World/{name}/mount/housing", diameter, axis, intake=name == "intake_fan")
+            props.wall_fan_housing(f"/World/{name}/mount/housing", diameter, axis, intake=name == "intake_fan", room_side=room_side)
         rotor = rigid(f"/World/{name}/rotor", pos, mass=0.3 if axis != "Z" else 3.0,
                       inertia=(0.002, 0.002, 0.002) if axis != "Z" else (0.3, 0.3, 0.5))   # 벽 팬 날개 ≈ 0.3 kg · 반경 0.1 m
         # PhysX 기본 각속도 상한이 최대 rpm 보다 낮다 — 날개 강체 · 조인트 상한을 최대 rpm 의 1.2 배로
@@ -364,7 +397,8 @@ def main() -> None:
                     drive_kind="angular")
         PhysxSchema.PhysxJointAPI(fj_.GetPrim()).CreateMaxJointVelocityAttr(vmax)
 
-    fan("exhaust_fan", L["exhaust_fan"]["pos"], L["exhaust_fan"]["diameter_m"], L["exhaust_fan"]["axis"], "exhaust_fan_joint")
+    fan("exhaust_fan", L["exhaust_fan"]["pos"], L["exhaust_fan"]["diameter_m"], L["exhaust_fan"]["axis"], "exhaust_fan_joint",
+        room_side=L["exhaust_fan"].get("room_side", -1))     # v0.3 화장실 바깥벽 — 실내 쪽 = +X
     fan("intake_fan", L["intake_fan"]["pos"], L["intake_fan"]["diameter_m"], L["intake_fan"]["axis"], "intake_fan_joint")
     fan("ceiling_fan", L["ceiling_fan"]["pos"], L["ceiling_fan"]["blade_span_m"], "Z", "ceiling_fan_joint", blades=3)
 
@@ -445,7 +479,7 @@ def main() -> None:
     for name, c in L["cameras"].items():
         look_at(f"/World/cameras/{name}", c["pos"], c["target"])
 
-    stage.GetRootLayer().customLayerData = {"generated_by": "tools/isaac/build_scene.py", "version": "0.2"}
+    stage.GetRootLayer().customLayerData = {"generated_by": "tools/isaac/build_scene.py", "version": "0.3"}
     stage.GetRootLayer().Save()
     n_prims = len(list(stage.Traverse()))
     print(f"Scene 저장: {out.relative_to(REPO)} · 프림 {n_prims}개", flush=True)

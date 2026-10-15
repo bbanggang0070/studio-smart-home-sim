@@ -58,7 +58,11 @@ def main() -> None:
                 # v0.2 — 가습기 · 시각 모델 · 가전 표시 프림 (scene_props · appliance_visuals)
                 "/World/appliances/humidifier/collider", "/World/appliances/humidifier/visual/mist",
                 "/World/appliances/air_conditioner/visual/louver", "/World/appliances/range_hood/visual/lamp",
-                "/World/Looks/led_ac", "/World/furniture/bed/collider", "/World/cameras/kitchen", "/World/cameras/bedside"]
+                "/World/Looks/led_ac", "/World/furniture/bed/collider", "/World/cameras/kitchen", "/World/cameras/bedside",
+                # v0.3 — 화장실 · 도어락 · 책장 · 냉장고
+                "/World/bathroom/wall_west", "/World/bathroom/door/hinge", "/World/bathroom/fixtures/toilet",
+                "/World/entrance_door/door_leaf/lock_inside", "/World/furniture/bookshelf/visual", "/World/furniture/fridge/visual",
+                "/World/cameras/bathroom", "/World/cameras/entrance"]
     missing = [p for p in required if not stage.GetPrimAtPath(p).IsValid()]
     record("프림 계층 (창문 모듈 구조 · 액추에이터 · 영역 · 카메라)", not missing,
            f"필수 {len(required)}개 중 누락 {missing or '없음'}")

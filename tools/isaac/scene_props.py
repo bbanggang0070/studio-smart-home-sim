@@ -36,7 +36,13 @@ MATS = {
     "skin": ((0.85, 0.66, 0.52), 0.6, 0.0, 1.0),
     "shirt": ((0.30, 0.42, 0.62), 0.8, 0.0, 1.0),
     "pants": ((0.18, 0.19, 0.22), 0.8, 0.0, 1.0),
+    "tile": ((0.86, 0.87, 0.88), 0.35, 0.0, 1.0),
+    "porcelain": ((0.97, 0.97, 0.96), 0.15, 0.0, 1.0),
+    "mirror": ((0.85, 0.88, 0.90), 0.02, 1.0, 1.0),
+    "shower_glass": ((0.80, 0.90, 0.95), 0.05, 0.0, 0.25),
+    "fridge": ((0.80, 0.81, 0.82), 0.3, 0.5, 1.0),
 }
+BOOK_RGB = ((0.55, 0.15, 0.12), (0.12, 0.25, 0.50), (0.85, 0.75, 0.40), (0.20, 0.42, 0.25), (0.40, 0.40, 0.42), (0.70, 0.45, 0.20))
 LEDS = ("led_hub", "led_ac", "led_dehumidifier", "led_humidifier", "led_purifier", "led_range_hood", "hood_lamp_panel")
 
 
@@ -47,6 +53,8 @@ class Props:
         UsdGeom.Scope.Define(stage, "/World/Looks")
         for name, (rgb, rough, metal, opacity) in MATS.items():
             self.material(name, rgb, rough, metal, opacity)
+        for k, rgb in enumerate(BOOK_RGB):
+            self.material(f"book_{k}", rgb, 0.7, 0.0, 1.0)
         off = tuple(L["indicators"]["off_rgb"])
         for name in LEDS:
             self.material(name, off, 0.3, 0.0, 1.0, emissive=off)
@@ -275,6 +283,102 @@ class Props:
             self.cyl(f"{root}/burner_{i}", (c[0], c[1] + dy, mn[2] + sz[2] + 0.0005), 0.09, 0.001, "burner")
         self.box(f"{root}/touch_panel", (mn[0] + 0.03, c[1], mn[2] + sz[2] + 0.0005), (0.04, sz[1] - 0.1, 0.001), "grey_plastic")
 
+    def bookshelf(self, root):
+        """책장 (왼쪽 벽 · 앞 = +X) — 옆판 · 위아래 · 뒤판 · 선반 4칸 · 책."""
+        mn, sz, c = self._env("bookshelf", self.L["furniture"])
+        x0, y0, _ = mn
+        sx, sy, H = sz
+        t = 0.018
+        for i, y in enumerate((y0 + t / 2, y0 + sy - t / 2)):
+            self.box(f"{root}/side_{i}", (c[0], y, H / 2), (sx, t, H), "wood")
+        self.box(f"{root}/back", (x0 + 0.005, c[1], H / 2), (0.01, sy, H), "dark_wood")
+        n = 4
+        for k in range(n + 1):
+            z = 0.05 + k * (H - 0.06) / n
+            self.box(f"{root}/shelf_{k}", (c[0], c[1], z), (sx - 0.01, sy - 2 * t, t), "wood")
+            if k == n:
+                break
+            yb, j = y0 + t + 0.01, 0
+            while True:                                  # 칸마다 책 — 폭 · 높이를 조금씩 다르게 (결정적)
+                w = 0.025 + 0.012 * ((k * 7 + j * 3) % 4)
+                h = (H - 0.06) / n * (0.62 + 0.08 * ((k + j * 5) % 4))
+                if yb + w > y0 + sy - t - 0.06:
+                    break
+                self.box(f"{root}/book_{k}_{j}", (x0 + 0.03 + (sx - 0.08) / 2, yb + w / 2, z + t / 2 + h / 2),
+                         (sx - 0.08, w, h), f"book_{(k * 2 + j) % len(BOOK_RGB)}")
+                yb += w + 0.003
+                j += 1
+
+    def fridge(self, root):
+        """원룸용 2도어 냉장고 (오른쪽 벽 · 앞 = −X) — 본체 · 냉동실 / 냉장실 문 · 세로 손잡이 · 받침."""
+        mn, sz, c = self._env("fridge", self.L["furniture"])
+        x0, y0, _ = mn
+        sx, sy, H = sz
+        self.box(f"{root}/body", (c[0] + 0.02, c[1], H / 2 + 0.01), (sx - 0.04, sy, H - 0.02), "fridge")
+        split = H * 0.66
+        self.box(f"{root}/door_fridge", (x0 + 0.015, c[1], 0.04 + (split - 0.05) / 2), (0.03, sy - 0.01, split - 0.05), "fridge")
+        self.box(f"{root}/door_freezer", (x0 + 0.015, c[1], split + (H - split - 0.01) / 2), (0.03, sy - 0.01, H - split - 0.02), "fridge")
+        for i, (z0_, z1_) in enumerate(((0.25, split - 0.08), (split + 0.04, split + 0.28))):
+            self.box(f"{root}/handle_{i}", (x0 - 0.02, y0 + sy - 0.06, (z0_ + z1_) / 2), (0.02, 0.025, z1_ - z0_), "stainless")
+        self.box(f"{root}/kick", (x0 + 0.04, c[1], 0.02), (0.02, sy - 0.04, 0.04), "dark_plastic")
+
+    def door_hardware(self, leaf_root, door_w, dth, leaf_center_z, cfg):
+        """현관문 철물 — 디지털 도어락(실내 본체 · 실외 키패드) + 레버 손잡이 (문짝 기준 · 잠금 쪽 끝)."""
+        x = door_w / 2 - cfg["from_latch_edge_m"]
+        zl, zh = cfg["lock_height_m"] - leaf_center_z, cfg["handle_height_m"] - leaf_center_z
+        self.box(f"{leaf_root}/lock_inside", (x, dth / 2 + 0.018, zl), (0.075, 0.036, 0.26), "black_metal")
+        self.box(f"{leaf_root}/lock_inside_cover", (x, dth / 2 + 0.037, zl + 0.05), (0.05, 0.004, 0.10), "dark_plastic")
+        self.box(f"{leaf_root}/lock_keypad", (x, -dth / 2 - 0.011, zl), (0.07, 0.022, 0.20), "black_metal")
+        self.box(f"{leaf_root}/lock_keypad_glass", (x, -dth / 2 - 0.023, zl + 0.02), (0.05, 0.003, 0.11), "lens")
+        for i, sgn in enumerate((1, -1)):                # 실내 · 실외 레버
+            y = sgn * (dth / 2 + 0.03)
+            self.cyl(f"{leaf_root}/handle_rose_{i}", (x, sgn * (dth / 2 + 0.005), zh), 0.028, 0.01, "stainless", axis="Y")
+            self.cyl(f"{leaf_root}/handle_neck_{i}", (x, y - sgn * 0.012, zh), 0.009, 0.045, "stainless", axis="Y")
+            self.box(f"{leaf_root}/handle_lever_{i}", (x - 0.06, y, zh), (0.13, 0.018, 0.02), "stainless")
+
+    def bathroom(self, root):
+        """화장실 설비 — 변기(서쪽 벽 · 앞쪽) · 세면대 + 거울(앞 벽) · 샤워부스(서쪽 · 안쪽) · 바닥 배수구."""
+        b = self.L["bathroom"]
+        xa, xb = b["interior_x_m"]
+        ya, yb = b["interior_y_m"]
+        H = self.L["room"]["height_m"]
+        # 변기 — 물탱크는 서쪽 벽, 앞으로 볼
+        ty = ya + 0.45
+        self.box(f"{root}/toilet/tank", (xa + 0.09, ty, 0.62), (0.18, 0.40, 0.36), "porcelain")
+        self.cyl(f"{root}/toilet/bowl", (xa + 0.42, ty, 0.20), 0.18, 0.40, "porcelain")
+        self.box(f"{root}/toilet/bowl_neck", (xa + 0.25, ty, 0.20), (0.18, 0.28, 0.40), "porcelain")
+        self.cyl(f"{root}/toilet/seat", (xa + 0.42, ty, 0.415), 0.19, 0.03, "porcelain")
+        self.cyl(f"{root}/toilet/lid_hinge", (xa + 0.24, ty, 0.44), 0.012, 0.16, "porcelain", axis="Y")
+        self.cyl(f"{root}/toilet/flush", (xa + 0.10, ty + 0.12, 0.805), 0.015, 0.012, "stainless")
+        # 세면대 — 앞 벽(y = ya), 하부장 + 세면볼 + 수전 + 거울
+        vx = xb - 0.32
+        self.box(f"{root}/vanity/cabinet", (vx, ya + 0.22, 0.38), (0.50, 0.44, 0.76), "cabinet")
+        self.box(f"{root}/vanity/top", (vx, ya + 0.23, 0.78), (0.52, 0.46, 0.04), "porcelain")
+        self.cyl(f"{root}/vanity/basin", (vx, ya + 0.25, 0.795), 0.15, 0.012, "tile")
+        self.cyl(f"{root}/vanity/faucet", (vx, ya + 0.06, 0.88), 0.012, 0.16, "stainless")
+        self.box(f"{root}/vanity/spout", (vx, ya + 0.11, 0.955), (0.02, 0.10, 0.02), "stainless")
+        self.box(f"{root}/mirror", (vx, ya + 0.008, 1.35), (0.50, 0.012, 0.60), "mirror")
+        # 샤워부스 — 서쪽 · 안쪽 (문 열리는 자리를 피한다) · 강화유리 칸막이 · 샤워기
+        sx0, sx1, sy0 = xa, xa + 0.65, yb - 0.85
+        self.box(f"{root}/shower/tray", ((sx0 + sx1) / 2, (sy0 + yb) / 2, 0.025), (sx1 - sx0, yb - sy0, 0.05), "porcelain")
+        self.box(f"{root}/shower/glass_side", (sx1, (sy0 + yb) / 2, 1.0), (0.01, yb - sy0, 1.90), "shower_glass")
+        self.box(f"{root}/shower/glass_front", (sx0 + 0.15, sy0, 1.0), (0.30, 0.01, 1.90), "shower_glass")
+        self.cyl(f"{root}/shower/riser", (sx0 + 0.32, yb - 0.03, 1.40), 0.012, 1.10, "stainless")
+        self.cyl(f"{root}/shower/head", (sx0 + 0.32, yb - 0.12, 2.00), 0.10, 0.02, "stainless")
+        self.box(f"{root}/shower/arm", (sx0 + 0.32, yb - 0.07, 2.02), (0.02, 0.10, 0.02), "stainless")
+        self.cyl(f"{root}/shower/mixer", (sx0 + 0.32, yb - 0.02, 1.05), 0.035, 0.05, "stainless", axis="Y")
+        self.cyl(f"{root}/drain", ((sx0 + sx1) / 2, (sy0 + yb) / 2, 0.052), 0.05, 0.004, "black_metal")
+        self.box(f"{root}/towel_bar", (xb - 0.02, ya + 0.75, 1.20), (0.02, 0.50, 0.02), "stainless")
+        self.box(f"{root}/towel", (xb - 0.04, ya + 0.75, 1.02), (0.02, 0.40, 0.36), "mattress")
+        del H
+
+    def bathroom_door(self, root, width, height, thickness):
+        """화장실 문짝 (원점 = 경첩 · 문짝은 −Y 쪽으로 뻗는다) + 레버 손잡이."""
+        self.box(f"{root}/leaf", (0.0, -width / 2, height / 2), (thickness, width, height), "cabinet")
+        for i, sgn in enumerate((1, -1)):
+            self.cyl(f"{root}/handle_rose_{i}", (sgn * (thickness / 2 + 0.004), -width + 0.07, 1.0), 0.025, 0.008, "stainless", axis="X")
+            self.box(f"{root}/handle_lever_{i}", (sgn * (thickness / 2 + 0.03), -width + 0.12, 1.0), (0.018, 0.12, 0.02), "stainless")
+
     # ---- 센서 (실제 모듈 크기 근사 · 하우징 포함) ----
     def sensor(self, root, name):
         if name == "mmwave_sensor":            # HLK-LD2410 (22 × 16 mm) 하우징 · 앞(+Y)에 레이돔
@@ -304,7 +408,7 @@ class Props:
             self.cyl(f"{root}/probe", (0, 0, -0.018), 0.003, 0.035, "stainless")
 
     # ---- 팬 하우징 (mount 아래 · 회전체는 build_scene) ----
-    def wall_fan_housing(self, root, diameter, axis, intake=False):
+    def wall_fan_housing(self, root, diameter, axis, intake=False, room_side=-1):
         s = diameter + 0.06
         t = 0.05
         n_ax = 0 if axis == "X" else 1
@@ -313,7 +417,7 @@ class Props:
         for i, sgn in enumerate((-1, 1)):
             self.box(f"{root}/frame_side_{i}", v(0, sgn * (s / 2 - 0.015), 0), v(t, 0.03, s), "white_plastic")
             self.box(f"{root}/frame_tb_{i}", v(0, 0, sgn * (s / 2 - 0.015)), v(t, s, 0.03), "white_plastic")
-        side = -1 if axis == "X" else -1                    # 방 쪽 (배기: −X · 흡기: −Y)
+        side = room_side                                     # 실내 쪽 (배기: 화장실 쪽 +X · 흡기: 방 쪽 −Y)
         for k in range(5):
             self.box(f"{root}/grille_{k}", v(side * 0.028, 0, -diameter / 2 + (k + 0.5) * diameter / 5), v(0.004, diameter, 0.006), "grey_plastic")
         self.cyl(f"{root}/hub_cover", v(side * 0.03, 0, 0), 0.03, 0.01, "white_plastic", axis=axis)

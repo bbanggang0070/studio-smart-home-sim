@@ -51,8 +51,11 @@ def main() -> None:
         print(f"저장: results/screenshots/{name}.png · 평균 밝기 {img.mean():.1f}", flush=True)
 
     sun = UsdLux.DistantLight(stage.GetPrimAtPath("/World/lighting_module/sun"))
+    blight = UsdLux.RectLight(stage.GetPrimAtPath("/World/bathroom/ceiling_light"))
     for cam in L["cameras"]:
         sun.GetIntensityAttr().Set(3000.0 if cam == "window" else 0.0)    # 창 쪽은 낮 미리보기
+        if blight:
+            blight.GetIntensityAttr().Set(20000.0 if cam == "bathroom" else 0.0)   # 화장실 화면만 천장등 (화면용)
         shot(cam, f"w03_{cam}")
     sun.GetIntensityAttr().Set(0.0)
     lamp = UsdLux.SphereLight(stage.GetPrimAtPath("/World/lighting_module/desk_lamp/light"))

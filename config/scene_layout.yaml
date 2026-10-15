@@ -71,6 +71,7 @@ window:
     length_ratio: 0.15               # 85–100 % (docs/04 Zone C 시작)
     rise_m: 0.006                    # draft — 스프링 추가 압축 → 마찰 약 2.2 배
   windowsill_depth_m: 0.22
+  controller: { pos_on_sill_m: [1.50, 4.82] }   # [v0.3] 창문 제어 박스 (x, y) — 방 쪽 창턱 오른쪽 끝 · 블라인드(y 4.86) 앞 · 안전 상태 LED
 
 # ---- 끼임 시험 물체 3종 (T3.4c) — 레일 경로(창 개구부 안)에 놓는다 ----
 obstacles:
@@ -134,7 +135,13 @@ indicators:
   dehumidifier: { on_rgb: [0.15, 0.85, 0.35] }
   humidifier:   { on_rgb: [0.3, 0.6, 1.0] }          # 켜지면 분무(반투명 원뿔)도 보인다
   purifier:     { on_rgb: [0.2, 0.45, 1.0] }         # 단 수 / 3 배 밝기
-  range_hood:   { on_rgb: [1.0, 0.75, 0.4], lamp_rgb: [1.0, 0.95, 0.85], lamp_intensity: 60000.0 }   # 후드 등 (조리면 비춤 · 화면용)
+  range_hood:   { on_rgb: [1.0, 0.75, 0.4], lamp_rgb: [1.0, 0.95, 0.85], lamp_intensity: 60000.0, max_level: 2 }   # 후드 등 (조리면 비춤 · 화면용) · LED 밝기 = 단 / max_level
+  cooktop:      { on_w: 50.0, glow_rgb: [1.0, 0.25, 0.05], emissive_scale: 1.2 }   # /studio/sensor/appliance_power 의 cooktop 이 on_w 넘으면 화구가 달아오른다 (플러그 차단 → 꺼짐)
+  window_safety:                    # 창문 제어 박스 상태 LED (/studio/state/safety_state)
+    emissive_scale: 1.2             # 공통 배율보다 낮게 — 빨강이 흰색으로 날지 않게 (2026-10-16 녹화 확인)
+    normal_rgb: [0.1, 0.9, 0.2]
+    alarm_rgb: [1.0, 0.0, 0.0]      # PINCH_REVERSE · SAFETY_HOLD
+    locked_rgb: [1.0, 0.55, 0.0]    # LOCKED_* (정지 유지가 끝나고 잠금만 남으면)
 
 # ---- 재실 영역 (트리거 볼륨 — mmWave 구간과 같은 거리) ----
 zones:
@@ -176,6 +183,7 @@ cameras:
   bedside:  { pos: [1.0, 1.4, 1.9],  target: [2.9, 3.9, 0.5] }    # [v0.2] 청정기 · 가습기 · 침대 · 제습기
   bathroom: { pos: [-0.30, 0.20, 2.15], target: [-1.35, 1.45, 0.7] }   # [v0.3] 화장실 앞 모서리에서 — 변기 · 샤워부스 · 배기팬 · 문
   entrance: { pos: [1.6, 2.2, 1.6],  target: [0.5, 0.0, 1.0] }    # [v0.3] 현관문 (도어락 · 손잡이) · 화장실 문 · 책장
+  window_ctrl: { pos: [1.05, 4.25, 1.35], target: [1.50, 4.82, 0.92] }   # [v0.3] 창문 제어 박스 · 안전 상태 LED
 
 physics:
   steps_per_second: 120              # 접촉 반력 해상도 — 끼임 판정 50 Hz 보다 충분히 빠르게

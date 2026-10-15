@@ -58,7 +58,7 @@ def main() -> None:
                 # v0.2 — 가습기 · 시각 모델 · 가전 표시 프림 (scene_props · appliance_visuals)
                 "/World/appliances/humidifier/collider", "/World/appliances/humidifier/visual/mist",
                 "/World/appliances/air_conditioner/visual/louver", "/World/appliances/range_hood/visual/lamp",
-                "/World/Looks/led_ac", "/World/furniture/bed/collider", "/World/cameras/kitchen", "/World/cameras/bedside",
+                "/World/Looks/led_ac__off", "/World/Looks/led_ac__cool", "/World/furniture/bed/collider", "/World/cameras/kitchen", "/World/cameras/bedside",
                 # v0.3 — 화장실 · 도어락 · 책장 · 냉장고
                 "/World/bathroom/wall_west", "/World/bathroom/door/bathroom_door_joint", "/World/bathroom/fixtures/toilet",
                 "/World/entrance_door/door_leaf/lock_inside", "/World/furniture/bookshelf/visual", "/World/furniture/fridge/visual",

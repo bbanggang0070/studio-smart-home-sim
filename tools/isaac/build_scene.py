@@ -294,6 +294,9 @@ def main() -> None:
     no_shadow(stage.GetPrimAtPath(f"{frame}/outer_pane"))
     cube(f"{frame}/windowsill", ((wx0 + wx1) / 2, D - wd["windowsill_depth_m"] / 2, z0 - 0.02),
          (wx1 - wx0, wd["windowsill_depth_m"], 0.04), rgb=(0.9, 0.9, 0.88))
+    cc = wd["controller"]["pos_on_sill_m"]                           # v0.3 창문 제어 박스 · 안전 LED (방 쪽 창턱 · 블라인드 앞)
+    props.xform(f"{frame}/controller", (cc[0], cc[1], z0))
+    props.window_controller(f"{frame}/controller")
     closed_cx = wx0 + seal_t + pw / 2                                 # 닫힘(q = 0) 때 패널 중심
     pc = (closed_cx, track_y, (z0 + z1) / 2)
     wmount = rigid("/World/window/mount", pc, mass=1.0, inertia=(0.01, 0.01, 0.01))

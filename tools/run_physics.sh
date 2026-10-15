@@ -4,6 +4,7 @@
 #
 #    tools/run_physics.sh B3 [baseline=proposed] [rep=1]
 #    GUI=1 tools/run_physics.sh B3                      # Isaac Sim 창으로 시나리오를 보면서 실행 (X11 · 채점은 같다)
+#    BRIDGE_ARGS="--record results/media/c2 --record-camera window --record-fps 2" tools/run_physics.sh C2   # 녹화
 #
 #  1) Isaac 액추에이터 브릿지 기동 (tools/isaac/run.sh)  2) ROS 런치 (월드 · 센서 · 제어기 · 로거)
 #  3) 시나리오가 끝나고 로거가 파일을 닫으면 컨테이너를 정리  4) scripts/physics_eval.py 로 채점
@@ -26,6 +27,7 @@ rm -f "$LOGS/${SC}_bridge.log" "$LOGS/${SC}_launch.log" "$REPO/results/physics/r
 # Baseline A 는 창문 안전 계층(로컬 컷오프 · 상위 판정)이 없다 — 장치별 독립 규칙 (docs/03 C2 '계속 밀어 반력 초과')
 EXTRA=""; [ "$BASE" = "A" ] && EXTRA="--no-local-cutoff"
 if [ "${GUI:-0}" = "1" ]; then EXTRA="$EXTRA --gui"; export STUDIO_ISAAC_X11=1; fi
+EXTRA="$EXTRA ${BRIDGE_ARGS:-}"                            # 예: BRIDGE_ARGS="--record results/media/x --record-camera window" (녹화)
 timeout $((DUR + 400)) tools/isaac/run.sh python scripts/sim/isaac_actuator_bridge.py --duration $((DUR + 120)) $EXTRA \
   > "$LOGS/${SC}_bridge.log" 2>&1 &
 for i in $(seq 1 60); do grep -q "브릿지 시작\|Traceback" "$LOGS/${SC}_bridge.log" && break; sleep 5; done

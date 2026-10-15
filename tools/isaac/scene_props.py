@@ -2,14 +2,20 @@
 
 build_scene.py 가 부른다. 물리는 그대로 — 충돌체는 build_scene 이 레이아웃 상자 크기 그대로(보이지 않게) 따로 둔다.
 모든 치수는 레이아웃 상자(min · size) 또는 위치(pos) 기준 비율 · 실제 제품 치수(일반적인 원룸용 제품 기준 근사)로 만든다.
-표시등(LED) 재질은 /World/Looks/led_<기기> — scripts/sim/appliance_visuals.py 가 가전 상태로 발광색을 바꾼다.
+표시등(LED) 재질은 상태마다 /World/Looks/<계열>__<상태> 로 미리 만든다 (scripts/sim/appliance_visuals.led_states 와 같은 표) —
+프림은 처음에 '<계열>__off' 를 쓰고, 브릿지가 상태에 맞는 재질로 바꿔 끼운다.
 """
 
 from __future__ import annotations
 
 import math
+import sys
+from pathlib import Path
 
 from pxr import Gf, Sdf, UsdGeom, UsdLux, UsdShade
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+from sim.appliance_visuals import led_states  # noqa: E402
 
 # 재질 — (색, 거칠기, 금속성, 불투명도)
 MATS = {
@@ -43,7 +49,6 @@ MATS = {
     "fridge": ((0.80, 0.81, 0.82), 0.3, 0.5, 1.0),
 }
 BOOK_RGB = ((0.55, 0.15, 0.12), (0.12, 0.25, 0.50), (0.85, 0.75, 0.40), (0.20, 0.42, 0.25), (0.40, 0.40, 0.42), (0.70, 0.45, 0.20))
-LEDS = ("led_hub", "led_ac", "led_dehumidifier", "led_humidifier", "led_purifier", "led_range_hood", "hood_lamp_panel")
 
 
 class Props:
@@ -55,9 +60,11 @@ class Props:
             self.material(name, rgb, rough, metal, opacity)
         for k, rgb in enumerate(BOOK_RGB):
             self.material(f"book_{k}", rgb, 0.7, 0.0, 1.0)
-        off = tuple(L["indicators"]["off_rgb"])
-        for name in LEDS:
-            self.material(name, off, 0.3, 0.0, 1.0, emissive=off)
+        # 표시등 — 상태별 재질 (셰이더 값 변경은 물리 실행 중 렌더에 반영되지 않아 재질을 바꿔 끼운다 · 2026-10-16)
+        self.leds = led_states(L["indicators"])
+        for fam, states in self.leds.items():
+            for st_, (base, emis) in states.items():
+                self.material(f"{fam}__{st_}", base, 0.3, 0.0, 1.0, emissive=emis)
 
     # ---- 재질 · 기본 도형 ----
     def material(self, name, rgb, rough=0.5, metal=0.0, opacity=1.0, emissive=None):
@@ -79,6 +86,8 @@ class Props:
         return m
 
     def _finish(self, prim, mat):
+        if mat in self.leds:                               # 표시등 계열 → 꺼짐 재질로 시작
+            mat = f"{mat}__off"
         m, rgb, opacity = self._mats[mat]
         g = UsdGeom.Gprim(prim)
         g.CreateDisplayColorAttr([Gf.Vec3f(*rgb)])
@@ -150,7 +159,7 @@ class Props:
         del lv
         self.box(f"{root}/louver/flap", (-0.04, 0.0, 0.0), (0.08, sz[1] - 0.09, 0.005), "white_plastic")
         self.box(f"{root}/display", (x0 + 0.005, y0 + 0.18, z0 + 0.09), (0.004, 0.08, 0.025), "lens")
-        self.box(f"{root}/led", (x0 + 0.002, y0 + 0.18, z0 + 0.09), (0.003, 0.014, 0.006), "led_ac")
+        self.box(f"{root}/led", (x0 + 0.002, y0 + 0.18, z0 + 0.09), (0.003, 0.05, 0.012), "led_ac")   # 표시창 (방에서 보이게 5 × 1.2 cm)
         self.box(f"{root}/pipe_cover", (x1 - 0.02, y1 - 0.06, z0 - 0.25), (0.04, 0.05, 0.5), "white_plastic")
 
     def dehumidifier(self, root):
@@ -166,7 +175,7 @@ class Props:
             self.box(f"{root}/top_grille_{k}", (c[0], y0 + 0.04 + k * (sy - 0.08) / 6, z0 + sz_ + 0.002),
                      (sx - 0.05, 0.008, 0.004), "dark_plastic")
         self.box(f"{root}/panel", (c[0], y0 + 0.02, z0 + sz_ - 0.01), (sx - 0.06, 0.04, 0.012), "dark_plastic")
-        self.box(f"{root}/led", (c[0] + 0.06, y0 + 0.004, z0 + sz_ - 0.012), (0.012, 0.003, 0.006), "led_dehumidifier")
+        self.box(f"{root}/led", (c[0] + 0.05, y0 - 0.002, z0 + sz_ - 0.035), (0.04, 0.003, 0.015), "led_dehumidifier")   # 앞면 표시창 4 × 1.5 cm
         for k in range(5):
             self.box(f"{root}/side_vent_{k}", (x0 - 0.002, c[1], z0 + 0.32 + k * 0.03), (0.004, sy - 0.08, 0.008), "grey_plastic")
         for i, (dx, dy) in enumerate(((0.04, 0.04), (sx - 0.04, 0.04), (0.04, sy - 0.04), (sx - 0.04, sy - 0.04))):
@@ -181,7 +190,7 @@ class Props:
         self.cyl(f"{root}/tank", (c[0], c[1], z0 + 0.10 + (h - 0.16) / 2), r * 0.92, h - 0.16, "tank")
         self.cyl(f"{root}/cap", (c[0], c[1], z0 + h - 0.03), r * 0.95, 0.06, "white_plastic")
         self.cyl(f"{root}/nozzle", (c[0], c[1], z0 + h + 0.012), 0.022, 0.024, "grey_plastic")
-        self.box(f"{root}/led", (c[0], mn[1] + 0.002, z0 + 0.06), (0.012, 0.004, 0.006), "led_humidifier")
+        self.box(f"{root}/led", (c[0], mn[1] + 0.002, z0 + 0.06), (0.03, 0.004, 0.012), "led_humidifier")
         mist = self.cone(f"{root}/mist", (c[0], c[1], z0 + h + 0.024 + 0.11), 0.06, 0.22, "mist")
         UsdGeom.Xformable(mist).AddRotateXOp().Set(180.0)                  # 꼭짓점이 아래(분무구) — 위로 퍼진다
         UsdGeom.Imageable(mist).CreateVisibilityAttr("invisible")          # 켜지면 브릿지가 보이게 한다
@@ -221,7 +230,7 @@ class Props:
         UsdGeom.Xformable(lamp).AddTranslateOp().Set(Gf.Vec3d(x0 + 0.08, c[1], z0 - 0.008))
         for k in range(3):
             self.box(f"{root}/button_{k}", (x0 - 0.002, y0 + 0.12 + k * 0.035, z0 + 0.04), (0.004, 0.02, 0.012), "dark_plastic")
-        self.box(f"{root}/led", (x0 - 0.002, y0 + 0.24, z0 + 0.04), (0.003, 0.008, 0.006), "led_range_hood")
+        self.box(f"{root}/led", (x0 - 0.002, y0 + 0.26, z0 + 0.04), (0.003, 0.04, 0.012), "led_range_hood")   # 단 표시 (약 · 강 밝기)
 
     # ---- 가구 ----
     def bed(self, root):
@@ -280,7 +289,7 @@ class Props:
         mn, sz, c = self._env("cooktop", self.L["furniture"])
         self.box(f"{root}/glass", (c[0], c[1], mn[2] + sz[2] / 2), (sz[0], sz[1], sz[2]), "ceramic_glass")
         for i, dy in enumerate((-sz[1] / 4, sz[1] / 4)):
-            self.cyl(f"{root}/burner_{i}", (c[0], c[1] + dy, mn[2] + sz[2] + 0.0005), 0.09, 0.001, "burner")
+            self.cyl(f"{root}/burner_{i}", (c[0], c[1] + dy, mn[2] + sz[2] + 0.0005), 0.09, 0.001, "cooktop_burner")
         self.box(f"{root}/touch_panel", (mn[0] + 0.03, c[1], mn[2] + sz[2] + 0.0005), (0.04, sz[1] - 0.1, 0.001), "grey_plastic")
 
     def bookshelf(self, root):
@@ -437,6 +446,12 @@ class Props:
         self.box(f"{root}/gearbox", (0.02, 0.0, 0.0), (0.05, 0.035, 0.05), "black_metal")
         self.cyl(f"{root}/motor_can", (-0.025, 0.0, 0.0), 0.017, 0.05, "stainless", axis="X")
         self.cyl(f"{root}/pinion", (0.02, 0.0, -0.03), 0.010, 0.012, "black_metal", axis="Y")
+
+    def window_controller(self, root):
+        """창문 제어 박스 (방 쪽 창턱 끝 · 블라인드 앞) — 모터 드라이버 · 전류 감지 · 안전 상태 LED. 모터 LED 는 블라인드에 가려 방에서 보이지 않는다."""
+        self.box(f"{root}/housing", (0, 0, 0.015), (0.08, 0.05, 0.03), "white_plastic")
+        self.box(f"{root}/status_led", (0.02, -0.005, 0.0305), (0.025, 0.02, 0.002), "led_window")
+        self.box(f"{root}/unlock_button", (-0.022, -0.005, 0.0305), (0.016, 0.016, 0.002), "grey_plastic")   # WINDOW_UNLOCK (사용자 해제)
 
     def desk_lamp(self, root):
         self.cyl(f"{root}/base", (-0.06, 0, -0.41 + 0.008), 0.07, 0.016, "black_metal")   # 책상면(조명 위치 − 0.41 m) 위

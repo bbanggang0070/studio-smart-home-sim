@@ -179,7 +179,7 @@ def main() -> None:
     for tp in (T.C_WINDOW_OPEN_RATIO, T.C_BLIND_ANGLE, T.C_FAN_RPM, T.C_INTAKE_FAN_RPM, T.C_CEILING_FAN,
                T.C_CEILING_LIGHT, T.C_DESK_LIGHT, T.C_DESK_LIGHT_CCT):
         ros_io.subscribe(node, tp, on_cmd)
-    vis = ApplianceVisuals(stage, L)                          # v0.2 — 가전 표시등 · 에어컨 루버 · 가습 분무 (렌더 전용)
+    vis = ApplianceVisuals(stage, L, log=log.info)                          # v0.2 — 가전 표시등 · 에어컨 루버 · 가습 분무 (렌더 전용)
     for tp in ApplianceVisuals.TOPICS:
         ros_io.subscribe(node, tp, vis.on_state)
     node.create_subscription(ros_io.MSG[T.F32], T.I_WINDOW_TORQUE_PCT,
@@ -371,7 +371,8 @@ def main() -> None:
         act.set_fan_rpm("ceiling_fan", math.copysign(levels[abs(lvl)], lvl) if lvl else 0.0)
         act.step(dt)
         shoot = rec is not None and k * dt >= args.record_from and k % rec["every"] == 0
-        world.step(render=shoot or (args.gui and k % B["render_every_n_steps"] == 0))
+        # 녹화 중에는 렌더 주기마다 렌더한다 — 저장할 때만 렌더하면 렌더러의 시간 누적이 상태 변화(표시등 · 분무)를 몇 초씩 늦게 따라간다
+        world.step(render=shoot or ((args.gui or rec is not None) and k % B["render_every_n_steps"] == 0))
         if shoot:
             frame = np.asarray(rec["ann"].get_data())
             if frame.size:

@@ -38,6 +38,7 @@ metrics:
   rule_violation: { window_open_min: 0.15, min_duration_s: 30.0 }   # 지표 #12 — I1 · I2 · L1 위반이 30 s 이상 이어진 구간 수
   tracking_steady_s: 15.0         # 지표 #3 — 지령이 이만큼 그대로인 시각만 추종 오차로 본다 (이동 중 제외) · 95 백분위
   order_check: { blind_shaded_deg: 70.0, window_opened_ratio: 0.15 }   # C3 — 블라인드 차광 도달이 창문 개방(기본 환기 틈 위)보다 먼저 (blind_lead_s)
+  energy_exclude_for_compare: [lighting]   # 지표 #7 같은 목표 비교 — A 는 조명을 켜지 않으므로(C4 제외) 조명 에너지는 양쪽에서 뺀다 (v2.34)
   user_modes: config/user_modes.yaml   # 지표 #9 — 모드별 기본 환기 목표 (시나리오 initial.user_mode 기준)
   # 지표 #2 응답 시간 (W13 T13.1) — 지령 변화 → 실제 상태가 tol 안에 든 시각 · 최댓값 · 해상도 = 로그 주기
   response_time:
@@ -195,6 +196,7 @@ energy_training:                 # 2R2C 식별용 참값 운전 기록 (draft)
 #  목표 수치는 thresholds.yaml targets 에서 읽는다 (여기서는 지표 → 목표 키 · 판정 방식만)
 #  num: 지표 번호 (키 이름 no 는 YAML 이 거짓으로 읽는다) · kind: max = 값 ≤ 목표 · min = 값 ≥ 목표 · reduce = 비교 대상 대비 감소율(%) ≥ 목표 · better = 비교 대상보다 높음
 #  scale: 로그 값 × scale = 목표 단위 · mode: fast | physics | all (어느 요약에서 읽나)
+#  ref_pass_only: 비교 대상 · 제안 모두 판정을 통과한 실행만 짝짓기 · reference: 판정 없이 참고로만
 #  target_by_scenario: {시나리오: 목표(thresholds 단위)} — 시나리오 판정이 따로 정한 목표 · scenarios: 산출 대상 시나리오만 · exempt: {시나리오: 사유} — 지표 목표가 시나리오 전제와 맞지 않을 때 (표에 사유를 함께 적는다)
 analysis:
   fast_summary: results/summary.csv
@@ -211,8 +213,10 @@ analysis:
     - { num: 3,  col: window_track_err_pct,     name: 추종 오차 (창문),     kind: max, target: window_tracking_error_pct, mode: physics }
     - { num: 5,  col: max_contact_force_n,      name: 최대 접촉 반력,       kind: max, target: max_contact_force_n,     mode: physics }
     - { num: 6,  col: ripple_pos_err_mm,        name: 리플 위치 추정 오차,  kind: max, target: ripple_position_error_m, target_scale: 1000.0, mode: physics }
-    - { num: 7,  col: energy_wh,                name: 추정 소비전력량,      kind: reduce, ref: A,          target: energy_wh_reduction_pct, mode: all }
-    - { num: 7,  col: energy_wh,                name: 추정 소비전력량 (A 가 판정 통과한 시나리오만), kind: reduce, ref: A, ref_pass_only: true, target: energy_wh_reduction_pct, mode: all }   # A 는 목표를 못 지키며 덜 쓴다 — 같은 목표를 지킨 경우끼리
+    # #7 (v2.34 · 2026-10-15 사용자 결정) — 같은 목표 달성 기준: 두 제어기가 모두 시나리오 판정을 통과한 실행끼리만 비교
+    #   (A 는 목표를 못 지키며 덜 쓴다 — 전체 비교는 참고로만 낸다)
+    - { num: 7,  col: energy_compare_wh,        name: 추정 소비전력량 (같은 목표 달성 · 조명 제외), kind: reduce, ref: A, ref_pass_only: true, target: energy_wh_reduction_pct, mode: all }
+    - { num: 7,  col: energy_wh,                name: 추정 소비전력량 (전체 · 참고), kind: reduce, ref: A, target: energy_wh_reduction_pct, mode: all, reference: true }
     - { num: 8,  col: actuation_count,          name: 불필요 구동 (히스테리시스 전후), kind: reduce, ref: B, target: actuation_count_reduction_pct, mode: fast }
     - { num: 9,  col: base_vent_compliance,     name: 기본 환기 충족,       kind: min, target: base_vent_compliance_pct, scale: 100.0, mode: fast,
         exempt: { X6: '기본 환기 미달(E4)을 일부러 만드는 시나리오 — 판정은 E4 진입 · 알림' } }

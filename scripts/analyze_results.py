@@ -61,6 +61,8 @@ def eval_metric(spec: dict, runs: pd.DataFrame, targets: dict) -> dict:
     if spec.get("only_with"):
         sel = sel[_num(sel[f"m.{spec['only_with']}"]).notna() | (sel.baseline != PROPOSED)]
     p = sel[(sel.baseline == PROPOSED) & sel.v.notna()]
+    if spec.get("ref_pass_only"):
+        p = p[p.status == "PASS"]                     # 같은 목표 달성 — 제안도 통과한 실행만
     target = (float(targets[spec["target"]]) * float(spec.get("target_scale", 1.0))
               if spec.get("target") else math.nan)
     row = {"n": len(p), "target": target, "mean": p.v.mean(), "worst": math.nan, "ref_mean": math.nan,
@@ -96,6 +98,10 @@ def eval_metric(spec: dict, runs: pd.DataFrame, targets: dict) -> dict:
         per = 100.0 * (pair.v_ref - pair.v) / pair.v_ref.where(pair.v_ref > 0)
         row["pass_runs_pct"] = 100.0 * (per >= target).mean()
         row["worst"] = per.min()
+        per_s = pair.assign(per=per).groupby("scenario").per.mean().round(1)
+        row["fail_runs"] = "감소율 " + " · ".join(f"{k} {v:+g} %" for k, v in per_s.items())
+        if spec.get("reference"):
+            return {**row, "verdict": "참고"}
         return {**row, "verdict": "달성" if row["reduction_pct"] >= target else "미달"}
     better = (pair.v > pair.v_ref + 1e-9).groupby(pair.scenario).mean()
     worse = (pair.v < pair.v_ref - 1e-9).groupby(pair.scenario).mean()

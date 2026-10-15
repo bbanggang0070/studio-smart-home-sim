@@ -218,6 +218,10 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
     out["infiltration_volume_alt"] = float(df["truth.q_inf_alt_m3h"].sum() * dt_s / 3600.0)
     energy_cols = [c for c in df.columns if c.startswith("energy_wh.")]
     out["energy_wh"] = float(df[energy_cols].iloc[-1].sum()) if energy_cols else math.nan
+    # 지표 #7 '같은 목표 달성' 비교용 — 조명 제외 (Baseline A 는 C4 외에는 조명을 켜지 않아 조명 목표가 다르다 · 조명은 #1 · C4 가 본다)
+    ex = cfg_metrics.get("energy_exclude_for_compare") or []
+    keep = [c for c in energy_cols if c.split(".", 1)[1] not in ex]
+    out["energy_compare_wh"] = float(df[keep].iloc[-1].sum()) if keep else math.nan
     out["condensation_exposure_s"] = float((df["truth.dew_margin_c"] < 0).sum() * dt_s)
     if "pm.ac.state" in df.columns and "truth.ac_state" in df.columns:   # B11 — 전력 기반 상태 판정 정확도
         out["appliance_state_accuracy"] = float((df["pm.ac.state"] == df["truth.ac_state"]).mean())

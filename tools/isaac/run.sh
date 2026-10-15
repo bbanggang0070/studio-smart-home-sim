@@ -11,6 +11,7 @@
 #    tools/isaac/run.sh python tools/isaac/check_effort_sensor.py   # 헤드리스 파이썬 스크립트
 #    tools/isaac/run.sh gui                                         # GUI 실행 (X11)
 #    tools/isaac/run.sh shell                                       # 컨테이너 셸
+#    STUDIO_ISAAC_X11=1 tools/isaac/run.sh python scripts/sim/isaac_actuator_bridge.py --gui   # 브릿지를 창으로
 # ============================================================================
 set -euo pipefail
 
@@ -26,7 +27,7 @@ MODE="${1:-shell}"
 shift || true
 
 X11_ARGS=()
-if [[ "$MODE" == "gui" ]]; then
+if [[ "$MODE" == "gui" || "${STUDIO_ISAAC_X11:-0}" == "1" ]]; then   # STUDIO_ISAAC_X11=1 — python 모드에서도 창을 띄운다 (브릿지 --gui)
   xhost +local:root >/dev/null 2>&1 || true
   X11_ARGS=(-e DISPLAY="${DISPLAY:-:0}" -v /tmp/.X11-unix:/tmp/.X11-unix:rw)
 fi

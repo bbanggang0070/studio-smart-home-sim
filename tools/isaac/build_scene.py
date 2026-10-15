@@ -158,6 +158,7 @@ def main() -> None:
         UsdGeom.Xformable(cam).AddTransformOp().Set(m)
         cam.CreateFocalLengthAttr(14.0)
         cam.CreateClippingRangeAttr(Gf.Vec2f(0.05, 100.0))
+        cam.CreateVisibilityAttr("invisible")          # v0.3 — GUI 뷰포트에 카메라 모형이 보이지 않게 (뷰포트 카메라 선택 · 렌더에는 그대로 쓴다)
 
     # ---- 물리 장면 (T3.6) ----
     scene = UsdPhysics.Scene.Define(stage, "/World/physicsScene")

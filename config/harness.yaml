@@ -195,7 +195,7 @@ energy_training:                 # 2R2C 식별용 참값 운전 기록 (draft)
 #  목표 수치는 thresholds.yaml targets 에서 읽는다 (여기서는 지표 → 목표 키 · 판정 방식만)
 #  num: 지표 번호 (키 이름 no 는 YAML 이 거짓으로 읽는다) · kind: max = 값 ≤ 목표 · min = 값 ≥ 목표 · reduce = 비교 대상 대비 감소율(%) ≥ 목표 · better = 비교 대상보다 높음
 #  scale: 로그 값 × scale = 목표 단위 · mode: fast | physics | all (어느 요약에서 읽나)
-#  scenarios: 산출 대상 시나리오만 · exempt: {시나리오: 사유} — 지표 목표가 시나리오 전제와 맞지 않을 때 (표에 사유를 함께 적는다)
+#  target_by_scenario: {시나리오: 목표(thresholds 단위)} — 시나리오 판정이 따로 정한 목표 · scenarios: 산출 대상 시나리오만 · exempt: {시나리오: 사유} — 지표 목표가 시나리오 전제와 맞지 않을 때 (표에 사유를 함께 적는다)
 analysis:
   fast_summary: results/summary.csv
   physics_summary: results/physics/summary.csv
@@ -224,6 +224,19 @@ analysis:
     - { num: 12, col: rule_violation_count,     name: 규칙 위반 횟수,       kind: max, target: rule_violation_count,    mode: all }
     - { num: 13, col: appliance_state_accuracy, name: 기기 상태 판정 정확도, kind: min, target: appliance_state_accuracy_pct, scale: 100.0, mode: fast }
     - { num: 14, col: humidity_recovery_time,   name: 습도 회복 시간,       kind: max, target: humidity_recovery_min, target_scale: 60.0, mode: fast,
-        scenarios: [B6, X5, C18, C19] }   # docs/03 §7 산출 대상
+        scenarios: [B6, X5, C18, C19], target_by_scenario: { X5: 90.0 } }   # docs/03 §7 산출 대상 · X5 는 90분 (v2.32)
     - { num: 15, col: arrival_comfort,          name: 귀가 시 쾌적,         kind: min, target: arrival_comfort_rate_pct, scale: 100.0, agg: mean, mode: fast }   # 귀가 1회 = 0 · 1 → 비율로 판정
     - { num: 16, col: budget_violation_count,   name: 허용 손실 예산 위반,  kind: max, target: budget_violation_count,  mode: fast }
+
+# ---- 환경 모델 민감도 (W13 T13.v3 · tools/analysis/sensitivity.py) ---------------------------------
+#  참값 계수 하나씩 바꿔 제안 제어기(반복 1)를 고속 시나리오 전부에 돌린다 · 시나리오 자체 environment_overrides 가 우선
+#  판정은 기준선 비교(baseline_*)를 뺀 항목만 — 다른 기준선을 같이 돌리지 않기 때문
+sensitivity:
+  workers: 8
+  baseline_label: '기본값'
+  variants:
+    - { key: air_balance.base_infiltration_ach, values: [0.1, 0.5] }          # 기본 0.3
+    - { key: air_balance.infiltration_model,    values: ['positive_zero'] }   # 기본 additive (docs/06 §5.1)
+    - { key: appliances.range_hood.capture_efficiency, values: [0.4, 0.8] }   # 기본 0.6
+    - { key: window.glazing_u_w_m2k,            values: [2.0, 3.5] }          # 기본 2.8
+  metrics: [comfort_ratio, energy_wh, pm25_peak, humidity_recovery_time, condensation_exposure_s, co2_compliance]

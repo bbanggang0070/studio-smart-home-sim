@@ -69,7 +69,9 @@ def eval_metric(spec: dict, runs: pd.DataFrame, targets: dict) -> dict:
     if kind in ("max", "min"):
         if p.empty:
             return {**row, "verdict": "자료 없음"}
-        ok = p.v <= target + 1e-9 if kind == "max" else p.v >= target - 1e-9
+        tgt = p.scenario.map({k: float(v) * float(spec.get("target_scale", 1.0))
+                              for k, v in (spec.get("target_by_scenario") or {}).items()}).fillna(target)
+        ok = p.v <= tgt + 1e-9 if kind == "max" else p.v >= tgt - 1e-9
         row["worst"] = p.v.max() if kind == "max" else p.v.min()
         row["pass_runs_pct"] = 100.0 * ok.mean()
         if spec.get("agg") == "mean":

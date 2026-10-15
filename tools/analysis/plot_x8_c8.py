@@ -1,6 +1,6 @@
 """X8(우천 · 에어컨 없는 방 — 배기팬 최대) vs C8(외기 미세먼지 등급 — 나쁠수록 창문 · 배기 단계적 감소, 매우나쁨 정지) 대비 (W12 DoD).
 
-    uv run python tools/analysis/plot_c1_c8.py      → results/figures/x8_vs_c8.png
+    uv run python tools/analysis/plot_x8_c8.py      → results/figures/x8_vs_c8.png
 C1(에어컨 있는 방)은 v3.0 부터 에어컨이 냉방 · 제습을 맡아 배기팬을 쓰지 않는다 — 비에 배기팬이 대신하는 것은 X8(P-core).
 같은 '창문을 못 쓴다'는 제약이라도 원인이 다르면 배기팬이 반대로 움직인다 — 비는 팬이 대신하고, 오염 외기는 팬도 막는다.
 """
@@ -31,7 +31,7 @@ def load(sid: str) -> pd.DataFrame:
 
 def main() -> None:
     c1, c8 = load("X8"), load("C8")
-    fig, ax = plt.subplots(2, 2, figsize=(13, 7), sharey="row")
+    fig, ax = plt.subplots(2, 2, figsize=(16, 9), sharey="row")   # 발표 1920 × 1080 (W13 T13.5b)
     for col, (d, title) in enumerate(((c1, "X8 · 고온다습 + 우천 · 에어컨 없음"), (c8, "C8 · 고온 + 외기 미세먼지 (보통 → 나쁨 → 매우나쁨)"))):
         t = d["time_s"] / 60
         ax[0, col].plot(t, d["act.exhaust_fan_rpm"], color="#4d7c0f", lw=2, label="배기팬")

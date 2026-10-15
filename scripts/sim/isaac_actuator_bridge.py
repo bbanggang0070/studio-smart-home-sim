@@ -331,6 +331,9 @@ def main() -> None:
         if args.record_sun > 0:
             from pxr import UsdLux
             UsdLux.DistantLight(stage.GetPrimAtPath("/World/lighting_module/sun")).GetIntensityAttr().Set(args.record_sun)
+        for path in L.get("render_visible", []):              # GUI 기본 숨김(천장) — 녹화는 천장 반사광까지 보이게
+            if stage.GetPrimAtPath(path).IsValid():
+                UsdGeom.Imageable(stage.GetPrimAtPath(path)).GetVisibilityAttr().Set("inherited")
         for path in filter(None, args.record_hide.split(",")):
             UsdGeom.Imageable(stage.GetPrimAtPath(path)).MakeInvisible()
         if ":" in args.record_camera:

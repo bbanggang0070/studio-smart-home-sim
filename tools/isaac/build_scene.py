@@ -495,6 +495,9 @@ def main() -> None:
     for name, c in L["cameras"].items():
         look_at(f"/World/cameras/{name}", c["pos"], c["target"])
 
+    for path in L.get("gui_hidden", []):                     # v0.3 — GUI 에서 위가 트이게 (렌더 도구는 다시 보이게 한다)
+        UsdGeom.Imageable(stage.GetPrimAtPath(path)).CreateVisibilityAttr("invisible")
+
     stage.GetRootLayer().customLayerData = {"generated_by": "tools/isaac/build_scene.py", "version": "0.3"}
     stage.GetRootLayer().Save()
     n_prims = len(list(stage.Traverse()))

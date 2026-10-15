@@ -126,6 +126,11 @@ def main() -> None:
     # ---- 2–3. 원룸 암실 스윕 ----
     omni.usd.get_context().open_stage(str(REPO / L["usd_path"]))
     st = omni.usd.get_context().get_stage()
+    from pxr import UsdGeom
+    for _p in L.get("render_visible", []):              # GUI 기본 숨김(천장) — 렌더 값(천장 반사광)이 캘리브레이션과 같도록 다시 보이게
+        _pr = st.GetPrimAtPath(_p)
+        if _pr.IsValid():
+            UsdGeom.Imageable(_pr).GetVisibilityAttr().Set("inherited")
     mat = white_material(st)
     cl, dl = L["ceiling_light"], L["desk_lamp"]
     phi_c = env_l["ceiling_light_w"] * LUMINOUS_EFFICACY_LM_PER_W

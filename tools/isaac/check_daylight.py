@@ -73,6 +73,11 @@ def main() -> None:
         """장면을 새로 열어 조명 끔 · 하늘 · 블라인드 각도를 맞춘 뒤 한 번 잰다 (렌더 제품을 만들면 장면이 다시 구성돼 이후 수정이 안 먹는다)."""
         omni.usd.get_context().open_stage(str(REPO / L["usd_path"]))
         st = omni.usd.get_context().get_stage()
+        from pxr import UsdGeom
+        for _p in L.get("render_visible", []):              # GUI 기본 숨김(천장) — 렌더 값(천장 반사광)이 캘리브레이션과 같도록 다시 보이게
+            _pr = st.GetPrimAtPath(_p)
+            if _pr.IsValid():
+                UsdGeom.Imageable(_pr).GetVisibilityAttr().Set("inherited")
         m = UsdShade.Material.Define(st, "/World/Looks/day_white")
         sh = UsdShade.Shader.Define(st, "/World/Looks/day_white/shader")
         sh.CreateIdAttr("UsdPreviewSurface")

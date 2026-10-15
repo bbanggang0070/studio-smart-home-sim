@@ -27,6 +27,11 @@ def main() -> None:
     L = yaml.safe_load((REPO / "config" / "scene_layout.yaml").read_text(encoding="utf-8"))
     omni.usd.get_context().open_stage(str(REPO / L["usd_path"]))
     stage = omni.usd.get_context().get_stage()
+    from pxr import UsdGeom
+    for _p in L.get("render_visible", []):              # GUI 기본 숨김(천장) — 렌더 값(천장 반사광)이 캘리브레이션과 같도록 다시 보이게
+        _pr = stage.GetPrimAtPath(_p)
+        if _pr.IsValid():
+            UsdGeom.Imageable(_pr).GetVisibilityAttr().Set("inherited")
     out = REPO / "results" / "screenshots"
     out.mkdir(parents=True, exist_ok=True)
     # 낮은 주변광 — 조명 효과가 보이게 (실내 조명만으로는 벽이 거의 검다)
@@ -75,6 +80,13 @@ def main() -> None:
     ceiling.GetIntensityAttr().Set(L["ceiling_light"]["intensity"] * 0.3)
     for cam in ("kitchen", "bedside"):
         shot(cam, f"w03_{cam}_on")
+    # 화장실 천장등 — 꺼짐 / 켜짐 비교 (천장등 외 조명 끔 · 주변광 낮춤)
+    if blight:
+        ceiling.GetIntensityAttr().Set(0.0)
+        dome.GetIntensityAttr().Set(20.0)
+        for k, v in (("off", 0.0), ("on", 20000.0)):
+            blight.GetIntensityAttr().Set(v)
+            shot("bathroom", f"w03_bathroom_light_{k}")
 
 
 try:

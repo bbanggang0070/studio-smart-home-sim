@@ -56,7 +56,12 @@ def main() -> None:
             print(f"    {c.status:<7} {c.text}  {c.detail}", flush=True)
     out = REPO / "results" / "physics" / "summary.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
+    old = pd.read_csv(out) if out.exists() else None
     write_summary(results, out)
+    if old is not None:                                   # 이번에 채점한 실행만 바꾸고 나머지는 남긴다 (일부 시나리오만 재실행해도 요약이 줄지 않게)
+        new = pd.read_csv(out)
+        merged = pd.concat([old[~old.run_id.isin(new.run_id)], new], ignore_index=True).sort_values("run_id")
+        merged.to_csv(out, index=False)
 
 
 if __name__ == "__main__":

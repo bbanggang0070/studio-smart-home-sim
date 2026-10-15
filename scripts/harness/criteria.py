@@ -243,6 +243,24 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
     if hr[1] is not None:
         ok &= df["truth.humidity_pct"] <= hr[1]
     out["comfort_ratio"] = float(ok[occ_mask].mean()) if occ_mask.any() else math.nan
+    # 목표 이탈 적분 (W13 · Tier 2 우위 제시) — 유지율은 0 · 1 에 붙어 차이가 안 보이므로 '얼마나 크게 · 오래 벗어났나'를 재실 중에 적분
+    #   온도 °C·h = ∫ max(0, 체감온도 − (냉방 목표 + margin)) · 습도 %RH·h = 모드 범위 밖 거리 · PM µg/m³·h = ∫ max(0, PM − 35)
+    occ_v = occ_mask.to_numpy(dtype=bool)
+    h = dt_s / 3600.0
+    if sp_c is not None:
+        dev_t = np.clip(df["truth.operative_temp_c"].to_numpy() - (sp_c + cfg_metrics["overheat_margin_c"]), 0.0, None)
+        out["temp_excess_ch"] = float(dev_t[occ_v].sum() * h)
+    else:
+        out["temp_excess_ch"] = math.nan
+    rh = df["truth.humidity_pct"].to_numpy()
+    dev_h = np.zeros_like(rh)
+    if hr[1] is not None:
+        dev_h += np.clip(rh - hr[1], 0.0, None)
+    if hr[0] is not None:
+        dev_h += np.clip(hr[0] - rh, 0.0, None)
+    out["rh_excess_pcth"] = float(dev_h[occ_v].sum() * h)
+    dev_pm = np.clip(df["truth.pm25_ugm3"].to_numpy() - cfg_metrics["pm25_recovery_ugm3"], 0.0, None)
+    out["pm_excess_ugh"] = float(dev_pm[occ_v].sum() * h)
     # 물리 모드 전용 (#3 추종 오차 · #4 끼임 · #5 접촉 반력 · #6 리플 위치 오차) — 열이 없으면 NaN
     # #2 · #3 은 안전 계층이 처음 개입(끼임 반전 · 정지 유지 · 잠금)하기 전까지만 — 그 뒤 지령 ≠ 실제는 의도된 동작이다
     if T.T_SAFETY_STATE in df.columns:

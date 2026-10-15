@@ -205,6 +205,12 @@ analysis:
   window_safety: results/window_safety_test.json
   out_dir: results/tables
   tier2_compare: [comfort_ratio, energy_wh, actuation_count, pm25_peak, rule_violation_count]
+  headline_scenarios: [C1, C2, C3, C4, C5, C6, C7, C8]   # W13 DoD 'Tier 2 8개' — 본문 표 · 그림 (나머지 Tier 2 는 부록)
+  deviation_metrics:               # 목표 이탈 적분 — 쾌적-에너지 2축 그림 (tools/analysis/tier2_advantage.py)
+    - { col: temp_excess_ch, label: '온도 초과 [°C·h]' }
+    - { col: rh_excess_pcth, label: '습도 범위 이탈 [%RH·h]' }
+    - { col: pm_excess_ugh,  label: 'PM2.5 35 초과 [µg/m³·h]' }
+  energy_col: energy_compare_wh    # 조명 제외 (지표 #7 같은 목표 비교와 같은 열)
   metrics:
     - { num: 1,  col: comfort_ratio,            name: 환경 목표 유지율,     kind: better, ref: A,           scale: 100.0, mode: all }
     - { num: 2,  col: response_ceiling_light_s, name: 응답 시간 (조명),     kind: max, target: light_response_time_s,   mode: physics }

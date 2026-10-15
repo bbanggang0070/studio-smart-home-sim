@@ -4,6 +4,7 @@
 #  배치 근거: mmWave(LD2410)를 현관 벽 위에 달아 안쪽을 본다 — 0.75 m 구간
 #             주방 0–1.5 m (0–1번) · 책상 1.5–3.0 m (2–3번) · 침대 3.75–5.25 m (5–6번)  (thresholds occupancy.zone_gates)
 #  [v0.1 · 2026-10-12] 치수는 가정 A1 · A2 · 국내 원룸 가구 표준 크기 — draft 표시 값은 W05 캘리브레이션에서 확정
+#  [v0.2 · 2026-10-15] 가습기 추가 · 시각 모델(실제 기기 모양) · 가전 표시등 · 카메라 2종 추가
 # ============================================================================
 version: 1
 usd_path: worlds/lowcost_studio_room.usd
@@ -59,7 +60,8 @@ window:
 
 # ---- 끼임 시험 물체 3종 (T3.4c) — 레일 경로(창 개구부 안)에 놓는다 ----
 obstacles:
-  park_x_m: 2.6                     # 시험하지 않을 때 놓아 두는 곳 (창턱 오른쪽 밖) — 시험 스크립트가 옮긴다
+  # 시험하지 않을 때 놓아 두는 곳 — [v0.2] 침대 위 → 방 밖(오른쪽 벽 바깥) 숨은 받침대 (화면에 안 보이게) · 시험 스크립트가 창틀로 옮긴다
+  park: { pos_m: [4.10, 4.50], spacing_m: 0.25, shelf: { min: [3.95, 4.30, 0.0], size: [0.90, 0.40, 0.45] } }
   # [2026-10-12] 강체도 '시험봉' 강성으로 — 강체끼리 충돌하면 접촉력이 1스텝 스파이크(패널 관성)로 나와 반력 지표가 측정 방식에 좌우된다
   #   끼임 반력 시험 장치처럼 스프링 상수 65 N/mm(draft)의 컴플라이언스를 준다 (사용자 결정 1번 · docs/04 §3.7)
   rigid_pot:    { size_m: [0.10, 0.10, 0.18], mass_kg: 1.5, friction: 0.6, compliance: { stiffness: 65000.0, damping: 300.0 } }
@@ -91,6 +93,7 @@ ceiling_fan:     { pos: [1.75, 2.75, 2.15], blade_span_m: 1.0 }
 air_conditioner: { min: [3.25, 2.60, 1.95], size: [0.25, 0.85, 0.28] }
 dehumidifier:    { min: [0.75, 4.40, 0.0], size: [0.30, 0.25, 0.55] }
 purifier:        { min: [2.60, 2.10, 0.0], size: [0.30, 0.30, 0.60] }
+humidifier:      { min: [3.10, 3.50, 0.0], size: [0.22, 0.22, 0.38] }   # [v0.2 · 2026-10-15] 바닥형 초음파 가습기 — 침대 머리맡 (docs/06 §8 · 장면에 빠져 있었다)
 ceiling_light:   { pos: [1.75, 2.40, 2.38], size_m: 0.60, intensity: 30000.0 }   # draft — W05 lux 매핑 (ceiling_lux_at_full)
 desk_lamp:       { pos: [0.20, 2.95, 1.15], radius_m: 0.04, intensity: 30000.0, cct_k: 4000.0, cone_deg: 60.0 }   # 갓 — 아래로 원뿔 배광   # draft — 책상면 520 lux @100 %
 # [2026-10-12] 해 — 창밖(+Y)에서 방 안(−Y)으로 내리쬐게 (기존 (−50, 0, 180) 은 방 안 → 창밖으로 비춰 햇빛이 들지 않았다)
@@ -100,6 +103,20 @@ mmwave_sensor:   { pos: [1.75, 0.05, 2.30], facing: +Y }
 temp_humidity_sensor: { pos: [1.75, 2.40, 2.35] }
 illuminance_sensor:   { pos: [2.30, 2.40, 2.38] }           # 천장 BH1750 (lighting_model 기준점) — 실링팬 날개 반경 밖 (팬 하우징이 가리지 않게 · T5.7)
 pm25_sensor:     { pos: [0.05, 3.40, 1.20] }
+
+# ---- 시각 모델 · 가전 표시등 (v0.2 · 2026-10-15 · tools/isaac/scene_props.py · scripts/sim/appliance_visuals.py) ----
+#  가구 · 가전 · 센서 · 팬은 충돌체(위 상자 크기 그대로 · 보이지 않음) + 실제 기기를 닮은 시각 모델(충돌 없음)로 나눈다 — 물리 결과는 그대로
+#  표시등은 렌더 전용 — 브릿지가 가전 상태 토픽(/studio/state/ac · dehumidifier · humidifier · purifier_level · range_hood_level)으로 바꾼다
+indicators:
+  led_emissive_scale: 2.5           # 발광색 × 배율 (RTX 에서 작은 LED 가 보이되 색이 하얗게 날지 않는 밝기)
+  off_rgb: [0.02, 0.02, 0.02]
+  ac:
+    mode_rgb: { cool: [0.15, 0.45, 1.0], dry: [0.15, 0.85, 0.35], fan: [0.9, 0.9, 0.9], heat: [1.0, 0.4, 0.1] }
+    louver_open_deg: -45.0          # 루버 회전 (Y 축 · 음수 = 앞쪽 끝이 내려간다) — 꺼지면 0 (닫힘)
+  dehumidifier: { on_rgb: [0.15, 0.85, 0.35] }
+  humidifier:   { on_rgb: [0.3, 0.6, 1.0] }          # 켜지면 분무(반투명 원뿔)도 보인다
+  purifier:     { on_rgb: [0.2, 0.45, 1.0] }         # 단 수 / 3 배 밝기
+  range_hood:   { on_rgb: [1.0, 0.75, 0.4], lamp_rgb: [1.0, 0.95, 0.85], lamp_intensity: 60000.0 }   # 후드 등 (조리면 비춤 · 화면용)
 
 # ---- 재실 영역 (트리거 볼륨 — mmWave 구간과 같은 거리) ----
 zones:
@@ -111,6 +128,15 @@ person_proxy:
   start: room                       # 시작 자리 — 카메라 시야를 가리지 않게
   radius_m: 0.20
   height_m: 1.70
+  # [v0.2] 화면용 캐릭터 — Isaac Sim 에셋 서버(assets root 기준 경로) · 서 있는 자세로 베이크 · 연결 안 되면 마네킹(scene_props)
+  character:
+    usd: /Isaac/People/Characters/F_Business_02/F_Business_02.usd
+    yaw_deg: 0.0
+    pose:                            # T 자세 → 서 있는 자세 (위팔을 몸 쪽으로 · 관절 이름은 캐릭터 골격)
+      hip_joint: Hip
+      chest_joint: Spine02
+      arms: [[L_Upperarm, L_Forearm], [R_Upperarm, R_Forearm]]
+      arm_out_deg: 10.0              # 아래 방향에서 바깥으로 벌린 각도
   positions:                        # 사람 프록시가 갈 수 있는 자리 (중심 x, y)
     entrance: [0.65, 0.60]
     kitchen:  [2.60, 0.80]
@@ -122,6 +148,8 @@ cameras:
   overview: { pos: [2.55, 0.20, 2.25], target: [1.2, 3.8, 0.5] }   # 현관 위 (실내 · 후드 왼쪽)
   window:   { pos: [1.3, 3.3, 1.5],  target: [0.85, 5.0, 1.3] }
   desk:     { pos: [1.9, 1.5, 1.7],  target: [0.3, 2.7, 0.8] }
+  kitchen:  { pos: [1.7, 1.9, 1.8],  target: [3.3, 0.6, 1.1] }    # [v0.2] 후드 · 쿡탑 · 주방 · 에어컨
+  bedside:  { pos: [1.0, 1.4, 1.9],  target: [2.9, 3.9, 0.5] }    # [v0.2] 청정기 · 가습기 · 침대 · 제습기
 
 physics:
   steps_per_second: 120              # 접촉 반력 해상도 — 끼임 판정 50 Hz 보다 충분히 빠르게

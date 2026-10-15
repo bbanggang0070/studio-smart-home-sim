@@ -32,6 +32,8 @@ def main() -> None:
     # 낮은 주변광 — 조명 효과가 보이게 (실내 조명만으로는 벽이 거의 검다)
     dome = UsdLux.DomeLight.Define(stage, "/World/lighting_module/ambient_preview")
     dome.CreateIntensityAttr(150.0)
+    import omni.timeline
+    omni.timeline.get_timeline_interface().set_current_time(1.0)   # 사람 캐릭터 대기 애니메이션 — 시간 샘플이 있는 시각에서 찍는다
     for _ in range(10):
         app.update()
 
@@ -59,6 +61,17 @@ def main() -> None:
     for k in (2700.0, 6500.0):
         lamp.GetColorTemperatureAttr().Set(k)
         shot("desk", f"w04_desk_cct_{int(k)}")
+    # v0.2 — 가전을 켠 모습 (표시등 · 루버 · 분무 · 후드 등) — 브릿지와 같은 코드로 상태를 넣는다
+    sys.path.insert(0, str(REPO / "scripts"))
+    from interfaces import topics as T
+    from sim.appliance_visuals import ApplianceVisuals
+    vis = ApplianceVisuals(stage, L)
+    for tp, v in ((T.T_AC, '{"power": true, "mode": "cool"}'), (T.T_DEHUMIDIFIER, True), (T.T_HUMIDIFIER, True),
+                  (T.T_PURIFIER_LEVEL, 3), (T.T_RANGE_HOOD_LEVEL, 2)):
+        vis.on_state(tp, v)
+    ceiling.GetIntensityAttr().Set(L["ceiling_light"]["intensity"] * 0.3)
+    for cam in ("kitchen", "bedside"):
+        shot(cam, f"w03_{cam}_on")
 
 
 try:

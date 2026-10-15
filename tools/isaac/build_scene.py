@@ -1,4 +1,6 @@
-"""원룸 Scene v0.1 생성 — worlds/lowcost_studio_room.usd (W03 T3.1–T3.9 · W04 T4.1–T4.5).
+"""원룸 Scene v0.2 생성 (v0.1 + 실제 기기 모양 · 가습기 · 가전 표시등 — tools/isaac/scene_props.py)
+
+원룸 Scene v0.1 생성 — worlds/lowcost_studio_room.usd (W03 T3.1–T3.9 · W04 T4.1–T4.5).
 
 입력: config/scene_layout.yaml (치수 · 좌표) · config/actuator_limits.yaml (조인트 제한 · 드라이브)
 실행: tools/isaac/run.sh python tools/isaac/build_scene.py
@@ -28,6 +30,9 @@ REPO = Path(__file__).resolve().parents[2]
 def main() -> None:
     from pxr import Gf, PhysxSchema, Sdf, Usd, UsdGeom, UsdLux, UsdPhysics, UsdShade
 
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from scene_props import Props                      # v0.2 — 실제 기기를 닮은 시각 모델 (충돌 없음)
+
     L = yaml.safe_load((REPO / "config" / "scene_layout.yaml").read_text(encoding="utf-8"))
     A = yaml.safe_load((REPO / "config" / "actuator_limits.yaml").read_text(encoding="utf-8"))
     out = REPO / L["usd_path"]
@@ -41,6 +46,7 @@ def main() -> None:
     R = L["room"]
     W, D, H, T = R["width_m"], R["depth_m"], R["height_m"], R["wall_thickness_m"]
     ph = L["physics"]
+    props = Props(stage, L)
 
     # ---- 도우미 ----
 
@@ -197,7 +203,9 @@ def main() -> None:
           tuple(hinge[i] - door_c[i] for i in range(3)), lim=dl["range_deg"],
           drive={"stiffness": dl["drive"]["stiffness"], "damping": dl["drive"]["damping"], "max": dl["max_torque_nm"]},
           drive_kind="angular")
-    xform("/World/entrance_door/door_contact_sensor", (dx1 - 0.05, -0.02, dh - 0.1))
+    dcs = (dx1 - 0.05, -0.02, dh - 0.1)
+    xform("/World/entrance_door/door_contact_sensor", dcs)
+    props.door_contact("/World/entrance_door/door_contact_sensor", "/World/entrance_door/door_leaf", door_c, dcs)
 
     # ---- 창문 모듈 (T3.3 · T3.4 · T3.4b · T4.3 · T4.3b) ----
     wl = A["window_prismatic_joint"]
@@ -247,8 +255,8 @@ def main() -> None:
     PhysxSchema.PhysxContactReportAPI.Apply(wp).CreateThresholdAttr(0.0)
     cube("/World/window/window_panel/panel_glass", (0, 0, 0), (pw, pt, ph_), rgb=(0.7, 0.85, 0.95), opacity=0.35)
     no_shadow(stage.GetPrimAtPath("/World/window/window_panel/panel_glass"))
-    cube("/World/window/window_panel/motor_unit", (pw / 2 - 0.08, pt / 2 + 0.02, -ph_ / 2 + 0.04),
-         (0.10, 0.04, 0.07), rgb=(0.2, 0.2, 0.2), collide=False)
+    xform("/World/window/window_panel/motor_unit", (pw / 2 - 0.08, pt / 2 + 0.02, -ph_ / 2 + 0.04))
+    props.window_motor("/World/window/window_panel/motor_unit")
     # 스프링식 레일 씰 (T5.8 — Zone A · B · C 의 물리적 근거): 패드 + Z 스프링 조인트 + 레일 띠 + 엔드존 경사로
     ws_, er = wd["weatherstrip"], wd["endzone_ramp"]   # noqa: F841
     psx, psy, psz = ws_["pad_size_m"]
@@ -295,11 +303,13 @@ def main() -> None:
     # ---- 끼임 시험 물체 3종 (T3.4c) — 침대 위에 대기 ----
     ob = L["obstacles"]
     xform("/World/obstacles")
+    pk = ob["park"]                                             # v0.2 — 방 밖 숨은 받침대 (보이지 않는 충돌체)
+    box_min("/World/obstacles/park_shelf", pk["shelf"]["min"], pk["shelf"]["size"], visible=False)
+    shelf_top = pk["shelf"]["min"][2] + pk["shelf"]["size"][2]
     for k, name in enumerate(("rigid_pot", "soft_cushion", "elastic_sponge")):
         o = ob[name]
         sx, sy, sz = o["size_m"]
-        bed = L["furniture"]["bed"]
-        pos = (ob["park_x_m"] + 0.25 * k, bed["min"][1] + 0.5, bed["size"][2] + sz / 2 + 0.002)
+        pos = (pk["pos_m"][0] + pk["spacing_m"] * k, pk["pos_m"][1], shelf_top + sz / 2 + 0.002)
         body = rigid(f"/World/obstacles/{name}", pos, mass=o["mass_kg"])
         g = cube(f"/World/obstacles/{name}/geom", (0, 0, 0), (sx, sy, sz),
                  rgb={"rigid_pot": (0.6, 0.3, 0.2), "soft_cushion": (0.8, 0.5, 0.6), "elastic_sponge": (0.9, 0.85, 0.3)}[name])
@@ -328,10 +338,11 @@ def main() -> None:
     def fan(name, pos, diameter, axis, lim_key, blades=4):
         fl = A[lim_key]
         m = articulation(f"/World/{name}", pos)
-        cube(f"/World/{name}/mount/housing", (0, 0, 0),
-             (0.05, diameter + 0.06, diameter + 0.06) if axis == "X" else
-             (diameter + 0.06, 0.05, diameter + 0.06) if axis == "Y" else (0.15, 0.15, 0.08),
-             rgb=(0.85, 0.85, 0.85), collide=False)
+        xform(f"/World/{name}/mount/housing")
+        if axis == "Z":
+            props.ceiling_fan_housing(f"/World/{name}/mount/housing", pos)
+        else:
+            props.wall_fan_housing(f"/World/{name}/mount/housing", diameter, axis, intake=name == "intake_fan")
         rotor = rigid(f"/World/{name}/rotor", pos, mass=0.3 if axis != "Z" else 3.0,
                       inertia=(0.002, 0.002, 0.002) if axis != "Z" else (0.3, 0.3, 0.5))   # 벽 팬 날개 ≈ 0.3 kg · 반경 0.1 m
         # PhysX 기본 각속도 상한이 최대 rpm 보다 낮다 — 날개 강체 · 조인트 상한을 최대 rpm 의 1.2 배로
@@ -357,17 +368,21 @@ def main() -> None:
     fan("intake_fan", L["intake_fan"]["pos"], L["intake_fan"]["diameter_m"], L["intake_fan"]["axis"], "intake_fan_joint")
     fan("ceiling_fan", L["ceiling_fan"]["pos"], L["ceiling_fan"]["blade_span_m"], "Z", "ceiling_fan_joint", blades=3)
 
-    # ---- 가구 · 가전 프록시 (T3.2) ----
+    # ---- 가구 · 가전 (T3.2 · v0.2) — 충돌체(레이아웃 상자 그대로 · 보이지 않음) + 시각 모델(scene_props) ----
     xform("/World/furniture")
-    rgb = {"bed": (0.75, 0.78, 0.9), "desk": (0.6, 0.45, 0.3), "chair": (0.3, 0.3, 0.35),
-           "kitchen_counter": (0.85, 0.85, 0.85), "cooktop": (0.1, 0.1, 0.1)}
     for name, f in L["furniture"].items():
-        box_min(f"/World/furniture/{name}", f["min"], f["size"], rgb=rgb.get(name, (0.7, 0.7, 0.7)))
+        xform(f"/World/furniture/{name}")
+        box_min(f"/World/furniture/{name}/collider", f["min"], f["size"], visible=False)
+        xform(f"/World/furniture/{name}/visual")
+        getattr(props, name)(f"/World/furniture/{name}/visual")
     xform("/World/appliances")
-    for name in ("range_hood", "air_conditioner", "dehumidifier", "purifier"):
+    for name in ("range_hood", "air_conditioner", "dehumidifier", "purifier", "humidifier"):
         f = L[name]
-        box_min(f"/World/appliances/{name}", f["min"], f["size"], rgb=(0.92, 0.92, 0.94),
-                collide=name in ("dehumidifier", "purifier"))
+        xform(f"/World/appliances/{name}")
+        if name in ("dehumidifier", "purifier", "humidifier"):            # 바닥에 놓인 것만 충돌 (벽걸이 · 후드는 손이 닿지 않는다)
+            box_min(f"/World/appliances/{name}/collider", f["min"], f["size"], visible=False)
+        xform(f"/World/appliances/{name}/visual")
+        getattr(props, name)(f"/World/appliances/{name}/visual")
 
     # ---- 조명 2종 (T3.7 · T4.1 · T4.1b) ----
     cl, dl_ = L["ceiling_light"], L["desk_lamp"]
@@ -390,17 +405,17 @@ def main() -> None:
     sl.CreateEnableColorTemperatureAttr(True)      # 기본값 False — 빼면 색온도가 무시된다 (W04 함정)
     sl.CreateColorTemperatureAttr(dl_["cct_k"])
     UsdLux.ShapingAPI.Apply(sl.GetPrim()).CreateShapingConeAngleAttr(dl_["cone_deg"])   # 갓 — 아래(−Z)로만
-    cube("/World/lighting_module/desk_lamp/shade", (0, 0, 0.06), (0.16, 0.16, 0.08), rgb=(0.95, 0.95, 0.9), collide=False)
-    cube("/World/lighting_module/desk_lamp/stand", (-0.06, 0, -0.2), (0.02, 0.02, 0.4), rgb=(0.2, 0.2, 0.2), collide=False)
+    xform("/World/lighting_module/desk_lamp/fixture")
+    props.desk_lamp("/World/lighting_module/desk_lamp/fixture")
     sun = UsdLux.DistantLight.Define(stage, "/World/lighting_module/sun")
     sun.CreateIntensityAttr(0.0)                   # 일사 — 브릿지가 시각 · 날씨로 켠다
     UsdGeom.Xformable(sun).AddRotateXYZOp().Set(Gf.Vec3f(*L["sun"]["rotate_xyz_deg"]))   # 창밖 → 방 안
 
-    # ---- 센서 위치 (표시용 작은 상자) ----
+    # ---- 센서 (실제 모듈 · 하우징 모양 — v0.2) ----
     xform("/World/sensors")
     for name in ("mmwave_sensor", "temp_humidity_sensor", "illuminance_sensor", "pm25_sensor", "hood_temperature_sensor"):
         xform(f"/World/sensors/{name}", L[name]["pos"])
-        cube(f"/World/sensors/{name}/body", (0, 0, 0), (0.05, 0.05, 0.02), rgb=(0.1, 0.5, 0.9), collide=False)
+        props.sensor(f"/World/sensors/{name}", name)
 
     # ---- 재실 영역 (T3.5) — guide 상자 ----
     xform("/World/zones")
@@ -417,6 +432,10 @@ def main() -> None:
     cap.CreateHeightAttr(pp["height_m"] - 2 * pp["radius_m"])
     cap.CreateAxisAttr("Z")
     color(cap.GetPrim(), (0.95, 0.7, 0.5))
+    cap.CreateVisibilityAttr("invisible")                  # v0.2 — 위치 판정용 캡슐은 숨기고 사람 모습을 보인다
+    if not props.character("/World/occupancy_object/character", pp):
+        xform("/World/occupancy_object/mannequin")
+        props.mannequin("/World/occupancy_object/mannequin", pp["height_m"])
     del person
 
     # ---- 카메라 3종 (T3.8) ----
@@ -424,7 +443,7 @@ def main() -> None:
     for name, c in L["cameras"].items():
         look_at(f"/World/cameras/{name}", c["pos"], c["target"])
 
-    stage.GetRootLayer().customLayerData = {"generated_by": "tools/isaac/build_scene.py", "version": "0.1"}
+    stage.GetRootLayer().customLayerData = {"generated_by": "tools/isaac/build_scene.py", "version": "0.2"}
     stage.GetRootLayer().Save()
     n_prims = len(list(stage.Traverse()))
     print(f"Scene 저장: {out.relative_to(REPO)} · 프림 {n_prims}개", flush=True)

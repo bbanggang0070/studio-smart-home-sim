@@ -63,6 +63,7 @@ def main() -> None:
     from actuators.l0_protect import FanDirectionGuard
     from sensors.sensor_models import RippleCounter
     from sim.window_local import LocalCutoff, motor_current, window_zone
+    from sim.appliance_visuals import ApplianceVisuals
 
     L = yaml.safe_load((REPO / "config" / "scene_layout.yaml").read_text(encoding="utf-8"))
     A = yaml.safe_load((REPO / "config" / "actuator_limits.yaml").read_text(encoding="utf-8"))
@@ -97,7 +98,7 @@ def main() -> None:
     i_noise = ws["ripple_estimation"]["current_noise_sigma_a"]
     ddrive = UsdPhysics.DriveAPI(stage.GetPrimAtPath("/World/entrance_door/entrance_door_joint"), "angular")
     sim_in = {"door_open": False, "person": None}
-    obstacles = {n: SingleRigidPrim(f"/World/obstacles/{n}", name=n) for n in L["obstacles"] if n != "park_x_m"}
+    obstacles = {n: SingleRigidPrim(f"/World/obstacles/{n}", name=n) for n, v in L["obstacles"].items() if "size_m" in v}
     for o in obstacles.values():
         o.initialize()
     park = {n: o.get_world_pose()[0].copy() for n, o in obstacles.items()}
@@ -178,6 +179,9 @@ def main() -> None:
     for tp in (T.C_WINDOW_OPEN_RATIO, T.C_BLIND_ANGLE, T.C_FAN_RPM, T.C_INTAKE_FAN_RPM, T.C_CEILING_FAN,
                T.C_CEILING_LIGHT, T.C_DESK_LIGHT, T.C_DESK_LIGHT_CCT):
         ros_io.subscribe(node, tp, on_cmd)
+    vis = ApplianceVisuals(stage, L)                          # v0.2 — 가전 표시등 · 에어컨 루버 · 가습 분무 (렌더 전용)
+    for tp in ApplianceVisuals.TOPICS:
+        ros_io.subscribe(node, tp, vis.on_state)
     node.create_subscription(ros_io.MSG[T.F32], T.I_WINDOW_TORQUE_PCT,
                              lambda m: on_cmd(T.I_WINDOW_TORQUE_PCT, m.data), ros_io.qos(T.C_WINDOW_OPEN_RATIO))
     node.create_subscription(ros_io.MSG[T.STR], T.I_SIM_OBSTACLE, lambda m: pending_obstacle.append(m.data),

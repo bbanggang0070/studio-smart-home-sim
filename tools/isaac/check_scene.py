@@ -54,7 +54,11 @@ def main() -> None:
                 "/World/ceiling_fan/ceiling_fan_joint", "/World/occupancy_object",
                 "/World/obstacles/rigid_pot", "/World/obstacles/soft_cushion", "/World/obstacles/elastic_sponge",
                 "/World/zones/desk_zone", "/World/zones/bed_zone", "/World/zones/kitchen_zone",
-                "/World/cameras/overview", "/World/cameras/window", "/World/cameras/desk"]
+                "/World/cameras/overview", "/World/cameras/window", "/World/cameras/desk",
+                # v0.2 — 가습기 · 시각 모델 · 가전 표시 프림 (scene_props · appliance_visuals)
+                "/World/appliances/humidifier/collider", "/World/appliances/humidifier/visual/mist",
+                "/World/appliances/air_conditioner/visual/louver", "/World/appliances/range_hood/visual/lamp",
+                "/World/Looks/led_ac", "/World/furniture/bed/collider", "/World/cameras/kitchen", "/World/cameras/bedside"]
     missing = [p for p in required if not stage.GetPrimAtPath(p).IsValid()]
     record("프림 계층 (창문 모듈 구조 · 액추에이터 · 영역 · 카메라)", not missing,
            f"필수 {len(required)}개 중 누락 {missing or '없음'}")

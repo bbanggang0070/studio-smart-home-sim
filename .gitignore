@@ -17,6 +17,8 @@ logs/
 
 # Isaac Sim · USD 임시 파일
 *.usd.bak
+# 사람 캐릭터 베이크 (NVIDIA 에셋 파생 · build_scene 이 다시 만든다)
+worlds/cache/
 .thumbs/
 
 # 편집기 · OS

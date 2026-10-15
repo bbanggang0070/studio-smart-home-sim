@@ -494,6 +494,11 @@ v2.1의 *가동 시간* 을 **추정 소비전력량(Wh) = Σ 정격전력 × �
 
 ## 8. Isaac Sim Scene 추가
 
+> **2026-10-15 구현 (Scene v0.2 · `tools/isaac/build_scene.py` · `scene_props.py`)과의 차이:** 천장 조명은 실링팬 일체형이 아니라 **별도 천장 LED 패널**
+> (`/World/lighting_module/ceiling_led_light` — 조도 캘리브레이션 기준점이 이 위치라 그대로 둔다) · 흡기팬은 `/World/intake_fan`(필터 카세트 포함) ·
+> 가전은 `/World/appliances/{air_conditioner, dehumidifier, humidifier, purifier, range_hood}` (충돌체 + 시각 모델 · 루버는 회전 표시만, 물리 조인트 아님) ·
+> **CO₂ 센서는 없다**(v3.4 — CO₂ 는 참값으로만) · 센서 7종 = mmWave · 온습도 · 조도 · PM2.5 · 후드 아래 온도(`/World/sensors`) + 문 열림(`/World/entrance_door`) + 창문 모터 전류(브릿지)
+
 ```text
 LowCostStudioRoom
 ├── ... (v2.1 구성 유지)
@@ -542,3 +547,4 @@ LowCostStudioRoom
 | 2026-10-13 | v2.0 | §5.6 블라인드 × 창문 상호작용 — 창 안쪽 블라인드 유량 계수(0.5 @ 75°, draft) · 일사열 계수를 빛 투과율과 분리(0.55 @ 75°, draft) · 에어컨 써모오프 재기동 폭 +0.5 °C (압축기 짧은 순환 수정) |
 | 2026-10-14 | v2.1 | W12 T12.5 주광 렌더 대조(`results/validation/daylight_check.csv`) — 주광률 맑음 0.084 · 흐림 0.012 vs 모델 0.017 · 블라인드 45/75° 투과 비 맑음 0.13/0.05 · 흐림 0.71/0.28 vs 모델 0.49/0.14 · 센서/작업면 비 0.40(맑음 · 열림) → 1.2–1.3(닫힘) · 0.8–0.9(흐림) vs 모델 0.38 고정 — **개정 검토 대기** |
 | 2026-10-14 | v2.2 | §5.6 **주광 모델 개정** — 직사광 · 확산광 분리(하늘 상태별 직사광 비율) · 블라인드 각도 표(투과 비 · 센서/작업면 비, 렌더 값) · 참값 · 제어용 모델 모두 적용 · `daylight_factor` · `daylight_sensor_ratio` · `blind_transmittance_*` · `outdoor_transmittance_*` 삭제 |
+| 2026-10-15 | v2.3 | §8 Scene 구성을 구현(v0.2)에 맞춰 정정 — 천장 LED 패널 별도(실링팬 일체형 아님) · 가습기 추가 · CO₂ 센서 없음 · 가전 표시등 · 루버 · 분무는 상태 토픽으로 표시(렌더 전용) · 실제 기기 모양 시각 모델 |

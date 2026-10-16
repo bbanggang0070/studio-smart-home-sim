@@ -41,6 +41,7 @@
 | [07_modes_rules_events.md](07_modes_rules_events.md) | **규칙 + 모드 + 이벤트** · 사용자 모드 6종 · 이벤트 13종 · 6계층 중재 · 허용 손실 예산 | v1.1 |
 | [09_signal_actuator_map.md](09_signal_actuator_map.md) | 🆕 **센서 → 판단 → 액추에이터 한눈에 보기** (이해용 요약) | v1.0 |
 | [10_energy_control_comparison_study.md](10_energy_control_comparison_study.md) | 🆕 **논문용 비교 연구** — 질문별 모델 vs LSTM vs 강화학습 · 벤치마킹 문헌 18편 · EXP-5 초안 | v1.0 |
+| [11_paper_credibility_review.md](11_paper_credibility_review.md) | 🆕 **논문 신뢰성 교차 검증** — 데이터셋 구성 검증 수준 · 문헌 원문 대조 · 공통점 · 차이점 · 문헌 한계 대비 강행 항목 · 조치 계획 | v1.0 |
 | [08_multisignal_energy.md](08_multisignal_energy.md) | 🆕 **다중 신호 판단 · 전력 상태 · 우선 목표 · 에너지 예측** | v1.0 |
 | [../config/thresholds.yaml](../config/thresholds.yaml) | 시스템 상수 — **사용자 변경 불가** (안전 · 결로 · 기기 보호) | **v3.0** |
 | [../config/user_modes.yaml](../config/user_modes.yaml) | 🆕 사용자 모드 · 소음 등급 · 스케줄 · 설정 범위 | v1.0 |

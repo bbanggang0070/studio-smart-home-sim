@@ -44,7 +44,7 @@
 | # | 문헌 | 핵심 | 우리 연구에 주는 것 |
 |---|---|---|---|
 | B1 | Vivian 외, *Journal of Building Engineering* 84, 2024 | 평균 예측 성능은 LSTM이 우수. 그러나 **설정온도가 학습 때와 달라지면 LSTM 성능이 크게 떨어지고** 회색상자는 안정적 | docs/08 §5.2가 LSTM을 뺀 이유("해 보지 않은 방법을 모른다")를 **실험으로 검증**할 근거 — 켜두기 vs 끄기가 바로 이 상황 |
-| B2 | ⚠️ Stoffel, Berktold, Müller, *Energy and Buildings* 305, 2024 | 실제 건물에서 여러 기계학습 모델을 MPC 예측 모델로 바꿔 끼우며 비교 | "LSTM + MPC" 조합 구성 방법 |
+| B2 | ⚠️ Stoffel, Berktold, Müller, *Energy and Buildings* 305, 2024 | 실제 건물에서 여러 기계학습 모델(ANN · GPR · 선형)을 MPC 예측 모델로 바꿔 끼우며 비교 — **LSTM 은 다루지 않는다** | 학습 모델을 MPC 예측기로 넣는 구성 방법 · 모델 종류 비교 축 (LSTM 근거는 아님) |
 | B3 | Esrafilian-Najafabadi, Haghighat, *Energy and Buildings* 252, 2021 | **주거용 · 미리 공조 시작 시각**을 딥러닝(LSTM 계열)으로 추정 | ② LSTM 방식의 귀가 예측 · 미리 냉방 구현 기준 |
 
 ### C. 재실 · 주거용 강화학습 (+ LSTM과의 결합)
@@ -164,3 +164,4 @@ EXP-5  에너지 제어 방식 비교 (고속 모드 · 논문용)
 | 날짜 | 버전 | 내용 |
 |---|---|---|
 | 2026-10-07 | v1.0 | 초판 — 비교 대상 3방식 · 벤치마킹 문헌 18편 · 비교 축 · 공정성 설계 · EXP-5 초안 · 연구 질문 |
+| 2026-10-19 | v1.1 | B2(Stoffel 2024) 서술 정정 — ANN · GPR · 선형 비교(LSTM 아님) (docs/11 §6.7) |

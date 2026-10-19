@@ -540,7 +540,7 @@ window_sensorless:
     delta_i_threshold_endzone_a: 0.45
     speed_drop_ratio:            0.35
     debounce_ms:                 30
-    max_contact_force_n:        100.0    # FMVSS 118 참조 기준
+    max_contact_force_n:        100.0    # FMVSS 118 의 100 N 기준 차용 (반전 거리 125 mm 요건은 미적용 — 우리 50 mm)
     reverse_distance_m:          0.050
     repeat_lock_count:           2
 
@@ -634,3 +634,4 @@ window_sensorless:
 | 2026-10-12 | v1.4 | §3.7 W10 구현 — 상위 계층을 `window_safety_node` 로 분리(제어기는 역할 재분배 · 알림만) · 내부 토픽 `window_local` · `window_override` · 로컬 차단도 상위가 끼임으로 받아 반전 · `SAFETY_HOLD` 30 s · 잠금 해제 `WINDOW_UNLOCK` · 정상 주행이 지나가면 반복 기록 삭제 · 반전 시간 초과(3 s) → SAFETY_HOLD · 감지/정지 지연 계측 · Baseline A 안전 계층 없음 |
 | 2026-10-12 | v1.5 | §3.7 반력 측정 방식 — 강체 시험 물체에 시험봉 강성 65 N/mm 컴플라이언스 (강체 충돌 1스텝 스파이크 116 N 제거 → 70.7 N) · 시험 물체 질량 지정 문법 `이름@위치:질량` (여는 방향 끼임은 뒤에 막는 것이 없어 무거운 화분) · 반력 최댓값에서 씰 구간 제외 · 정지 판정 = 진행 방향 속도 기준 · C2 · X4 PASS |
 | 2026-10-14 | v1.6 | W12 토크 스윕 · 강성 민감도 — 주행 끝 토크 25–75 % 에서 감지율 100 % · 최대 접촉력 일정(엔드존 44–53 N · 주행 구간 끝 40–41 N): 끼임 힘은 로컬 전류 차단 1.80 A 가 정한다 · 55 % 는 안전과 무관 · 탄성 물체 주행 구간 고정 시험은 접촉 모델 한계로 불가 · 주행 구간 중간(닫힘 56 %) 1회 84.7 N — 표본 추가 필요 |
+| 2026-10-19 | v1.7 | 접촉 반력 100 N 주석 — FMVSS 118 기준 차용 · 반전 거리(125 mm) 미적용 명시 |

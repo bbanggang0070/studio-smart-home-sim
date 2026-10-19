@@ -317,3 +317,8 @@ weather:
     train_windows_per_year: 1      # 학습 연도마다 뽑는 기간 수 (각각 식별)
     test_days: 7
     test_windows: 4                # 평가 연도 시험 기간 수
+
+# ---- 보류(held-out) 평가 (docs/11 필수 조치 4 · docs/12 §5 · tools/run_heldout.py) ---------------------
+heldout:
+  scenarios: config/heldout_scenarios.yaml   # 사전 등록 · 해시 동결 (freeze.yaml files)
+  out_dir: results/heldout

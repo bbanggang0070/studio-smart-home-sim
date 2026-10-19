@@ -243,6 +243,15 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
     if hr[1] is not None:
         ok &= df["truth.humidity_pct"] <= hr[1]
     out["comfort_ratio"] = float(ok[occ_mask].mean()) if occ_mask.any() else math.nan
+    # 개정 전 정의(v2.30 까지 · 공기 온도 기준) — 사후 재정의 전후를 함께 보고하기 위해 남긴다 (docs/11 §6.2)
+    ok_air = pd.Series(True, index=df.index)
+    if sp_c is not None:
+        ok_air &= df["truth.temperature_c"] <= sp_c + cfg_metrics["overheat_margin_c"]
+    if hr[0] is not None:
+        ok_air &= df["truth.humidity_pct"] >= hr[0]
+    if hr[1] is not None:
+        ok_air &= df["truth.humidity_pct"] <= hr[1]
+    out["comfort_ratio_air"] = float(ok_air[occ_mask].mean()) if occ_mask.any() else math.nan
     # 목표 이탈 적분 (W13 · Tier 2 우위 제시) — 유지율은 0 · 1 에 붙어 차이가 안 보이므로 '얼마나 크게 · 오래 벗어났나'를 재실 중에 적분
     #   온도 °C·h = ∫ max(0, 체감온도 − (냉방 목표 + margin)) · 습도 %RH·h = 모드 범위 밖 거리 · PM µg/m³·h = ∫ max(0, PM − 35)
     occ_v = occ_mask.to_numpy(dtype=bool)

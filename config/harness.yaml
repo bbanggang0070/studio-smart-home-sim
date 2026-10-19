@@ -250,3 +250,17 @@ sensitivity:
     - { key: appliances.range_hood.capture_efficiency, values: [0.4, 0.8] }   # 기본 0.6
     - { key: window.glazing_u_w_m2k,            values: [2.0, 3.5] }          # 기본 2.8
   metrics: [comfort_ratio, energy_wh, pm25_peak, humidity_recovery_time, condensation_exposure_s, co2_compliance]
+
+# ---- 판정 기준 사후 개정 감사 (docs/11 §6.1 · 필수 조치 1 · tools/analysis/rejudge_revisions.py) --------------------
+#  결과를 본 뒤 바꾼 판정 기준 — 개정 직전 커밋(base_rev)의 pass_criteria 로 지금 로그를 다시 판정해 개정 전후를 함께 보고한다
+#  base_rev = 개정 커밋의 부모 (git log -- config/scenario_profiles.yaml) · 개정 내용은 docs/03 변경 이력
+criteria_audit:
+  revisions:
+    - { scenarios: [C1, C13], base_rev: "afa88b2^", note: "v2.13 습도 판정 완화 (30분 내 ≤ 60 % → 60분 내 ≤ 72 % / ≤ 60 %)" }
+    - { scenarios: [C9], base_rev: "d61456f^", note: "v2.1x PM 피크 A 대비 −30 % → −15 % · 이후 v2.15 · v2.19 에너지 · 과열 판정 변경" }
+    - { scenarios: [C11], base_rev: "9999d2c^", note: "v2.15 에너지 B 이하 → 장치 전환 B 대비 50 % 감소" }
+    - { scenarios: [C15], base_rev: "7b7c499^", note: "v2.17 건조 ≤ 4 h → ≤ 6 h + Proposed−P 대비 단축" }
+    - { scenarios: [X5], base_rev: "85d7919^", note: "v2.19 흡기 원복 기준 · RH 회복 30 → 90분" }
+    - { scenarios: [B6], base_rev: "9019f1c^", note: "B6 판정 시간 300 s / 30분" }
+    - { scenarios: [B1, B2], base_rev: "ee85627^", note: "v2.27 기본 환기 창문 틈 허용 · 부분 차광" }
+    - { scenarios: [B3, C3], base_rev: "d7795b2^", note: "v2.29 '열원 먼저' 판정 폐지 · 블라인드 판정 변경 · C3 입력 개정" }

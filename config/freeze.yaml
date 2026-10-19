@@ -1,0 +1,20 @@
+# ============================================================================
+#  판정 · 지표 동결 목록 (docs/11 필수 조치 1 · docs/12 동결 기록) — tools/check_freeze.py 가 해시를 비교한다
+#  최종 실험(EXP-5 · 논문 결과) 전에 동결한다. 동결 뒤 바꾸려면 --write 로 다시 쓰고 docs/12 에 '동결 개정'으로 이유 · 전후 결과를 남긴다
+#  대상: 시나리오 입력 · 판정 기준 / 지표 계산 · 판정 문법 / 지표 정의 상수 / 지표 → 목표 매핑 · 제외 사유 / 목표값
+# ============================================================================
+frozen_at: '2026-10-19'
+files:
+- path: config/scenario_profiles.yaml
+  sha256: cfa453b8af902c6886f4632a3ec176aeb2d9633106d2e7b9592854b49cc7ee86
+- path: scripts/harness/criteria.py
+  sha256: 9bda8df8ae1643fe53a2397f8594cb7adba4d737a5623dfe30186b8707591c68
+- path: config/harness.yaml
+  yaml_key: metrics
+  sha256: 87fe39e6d7a8a7416abad47dbac5a4c313f1bc1d931d41f9c028fda1a85caf8e
+- path: config/harness.yaml
+  yaml_key: analysis
+  sha256: 1907b3fe5d2fff4c2e17845253315cde8f8a5a2b7ff8c3fc81cffd0f06d1b7f8
+- path: config/thresholds.yaml
+  yaml_key: smart_home_controller.ros__parameters.targets
+  sha256: bc14124d332054ef6ed678bd2659c91e3e85090a9203cca2b860166366f6f56d

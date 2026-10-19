@@ -2,6 +2,8 @@
 #  판정 · 지표 동결 목록 (docs/11 필수 조치 1 · docs/12 동결 기록) — tools/check_freeze.py 가 해시를 비교한다
 #  최종 실험(EXP-5 · 논문 결과) 전에 동결한다. 동결 뒤 바꾸려면 --write 로 다시 쓰고 docs/12 에 '동결 개정'으로 이유 · 전후 결과를 남긴다
 #  대상: 시나리오 입력 · 판정 기준 / 지표 계산 · 판정 문법 / 지표 정의 상수 / 지표 → 목표 매핑 · 제외 사유 / 목표값
+#        + 보류 시나리오(config/heldout_scenarios.yaml · 실행 전 사전 등록 · 2026-10-19 추가)
+#  controller: 보류 평가(필수 조치 4) 전에 동결한 제어기 — 제어 코드 · 계수 · 학습 산출물. 고치면 새 보류 묶음으로 다시 평가한다
 # ============================================================================
 frozen_at: '2026-10-19'
 files:
@@ -18,3 +20,19 @@ files:
 - path: config/thresholds.yaml
   yaml_key: smart_home_controller.ros__parameters.targets
   sha256: bc14124d332054ef6ed678bd2659c91e3e85090a9203cca2b860166366f6f56d
+- path: config/heldout_scenarios.yaml
+  sha256: 7e16eb4ce43425399d38226b96ee71a70065ebc2b0d576c1da4274c24a611519
+controller_frozen_at: '2026-10-19'
+controller:
+- glob: scripts/controller/*.py
+  sha256: c06cc303134fc9ccf36d0384c40d4e2713afdf5b9fa7e5819a81cdcf10748174
+- glob: scripts/sensors/*.py
+  sha256: 36ead42c9cc6e8a014a8c1bd22b67204903991f4c65bcd88a714755409388ca8
+- glob: scripts/actuators/*.py
+  sha256: 482ddf1c448b77b123eb9a0189422b5a6f633320948f0cec937ca38fe520c731
+- path: scripts/harness/controllers.py
+  sha256: 3d6446ab3b07ebd7a257f66d7dd5eb05470984dd7e05b858daa4003f9a7a7a5c
+- path: config/thresholds.yaml
+  sha256: 104380bdc8aeb717216190206a395ac237756060f868dd5f4095994e9281d3ef
+- glob: models/*
+  sha256: 543c1aef8870d243f1be861ef90390c94f9a9d271b26ae74cefcde13d1e54bce

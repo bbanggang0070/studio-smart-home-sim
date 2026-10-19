@@ -1,0 +1,526 @@
+# ============================================================================
+#  보류(held-out) 시나리오 묶음 — docs/11 필수 조치 4 · docs/12 §5
+#  - 제어기 동결(config/freeze.yaml controller) 뒤 처음 만든 묶음이다. 개발 · 조정에 쓰지 않았다
+#  - 규칙(docs/07 I1–I10 · E1–E15)과 판정 문구는 기존 시나리오(괄호 안 출처)와 같다 — 조합만 새롭다
+#  - 이 파일은 실행 전에 커밋하고 해시를 동결한다(사전 등록). 실행 뒤 판정 · 입력을 고치지 않는다
+#  - 결과가 나빠도 시나리오나 판정을 바꾸지 않는다. 제어기를 고치면 새 보류 묶음(H2xx)을 다시 만든다
+#  문법 = config/scenario_profiles.yaml 과 같다 (scripts/harness/scenario.py · criteria.py 머리말)
+# ============================================================================
+
+scenarios:
+
+  # ---- H1 · 샤워 + 외기 미세먼지 나쁨 (B6 · C8 · C19) ------------------------------------
+  - id: H1
+    tier: 2
+    name: "여름밤 샤워 + 외기 미세먼지 나쁨"
+    duration_s: 3600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261101
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 26.0
+      humidity_pct: 58.0
+      co2_ppm: 650.0
+      pm25_ugm3: 15.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: none
+      time_of_day: "21:30"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances: { ac: { power: false }, purifier_level: 0, range_hood_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 80.0        # 나쁨 (E6)
+      outdoor_temp_c: 24.0
+      outdoor_rh_pct: 55.0           # 바깥 이슬점 14 °C < 실내 17 °C − 2 — I10 상 배기 허용
+      outdoor_illuminance_lux: 0.0
+    injections:
+      - { at_s: 0, radar: silent, duration_s: 1200 }
+      - { at_s: 600, source: shower, label: shower, moisture_g: 250, duration_s: 600 }
+    pass_criteria:
+      - "event_entered('SHOWER') within 300 after shower_start"                                   # B6
+      - "humidity <= value_at('humidity', shower_start) + 5 by 1800 after shower_start"           # B6
+      - "window_open_ratio <= 0.01 when t >= 15"                                                 # C8 (E6 창문 상한)
+      - "q_net >= 0 when t >= 15"                                                                # C8 (I7 양압)
+      - "pm25 <= 35 for all t"                                                                   # C8 · C19
+    metrics: [humidity_recovery_time, energy_wh, rule_violation_count]
+
+  # ---- H2 · 플러그형 인덕션 2 kW + 냉방 + 전력 한도 2.5 kW (C17 · C4) -----------------------
+  - id: H2
+    tier: 2
+    name: "저녁 요리 + 냉방 + 낮은 전력 한도"
+    duration_s: 3600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261102
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 2500
+    initial:
+      user_mode: NORMAL
+      temperature_c: 28.0
+      humidity_pct: 55.0
+      co2_ppm: 700.0
+      pm25_ugm3: 12.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: kitchen
+      time_of_day: "18:30"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances: { ac: { power: false }, purifier_level: 0, range_hood_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: 31.0
+      outdoor_rh_pct: 55.0
+      outdoor_illuminance_lux: 10000.0
+    injections:
+      - { at_s: 300, source: cooking, label: cook, stove: induction_plug, pm_mg_per_min: 0.8, moisture_g_per_h: 300, heat_w: 2000, duration_s: 900 }
+    pass_criteria:
+      - "event_entered('COOKING') within 90 after cook_start"                                    # B7 · C9
+      - "total_power <= 2500 when t >= cook_start + 60"                                          # C17 (I8)
+      - "range_hood_level >= 1 during cook settle 30"                                            # C17 (I8 후드 차단 금지)
+      - "temperature <= 28 when t >= 1800"                                                       # C4
+    metrics: [energy_wh, rule_violation_count]
+
+  # ---- H3 · 겨울 요리 + 결로 위험 (B7 · C10 · C19 · C9) ------------------------------------
+  - id: H3
+    tier: 2
+    name: "겨울 저녁 요리 + 결로 위험"
+    duration_s: 3600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261103
+    run_mode: fast
+    appliance_profile: full
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 62.0
+      co2_ppm: 700.0
+      pm25_ugm3: 12.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: kitchen
+      time_of_day: "19:30"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances: { ac: { power: false }, purifier_level: 0, range_hood_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -3.0
+      outdoor_rh_pct: 70.0
+      outdoor_illuminance_lux: 0.0
+      heating_setpoint_c: 21.0
+    injections:
+      - { at_s: 300, source: cooking, label: cook, stove: gas, pm_mg_per_min: 1.5, moisture_g_per_h: 400, heat_w: 800, duration_s: 900 }
+    pass_criteria:
+      - "event_entered('COOKING') within 90 after cook_start"                                    # B7
+      - "humidifier == 0 when dew_margin < 2"                                                    # I4 (B9 결로 여유)
+      - "dew_margin >= 0 for all t"                                                              # C10 · C19
+      - "temperature >= 19.5 for all t"                                                          # C19
+      - "pm25 <= 35 within 1200 after cook_end"                                                  # C9
+    metrics: [pm25_peak, energy_wh, rule_violation_count]
+
+  # ---- H4 · 수면 + 비 + 더위 · 습기 (C5 · C12 · C18 · X1) -----------------------------------
+  - id: H4
+    tier: 2
+    name: "열대야 수면 + 비"
+    duration_s: 7200
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261104
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: SLEEP
+      temperature_c: 27.5
+      humidity_pct: 72.0
+      co2_ppm: 800.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 0.0
+      occupancy: true
+      occupant_zone: bed
+      motion: sleeping
+      time_of_day: "02:30"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: rain
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 25.0
+      outdoor_rh_pct: 95.0
+      outdoor_illuminance_lux: 0.0
+    pass_criteria:
+      - "window_open_ratio == 0 for all t"                                                       # C18 (E5)
+      - "exhaust_fan_rpm <= 600 for all t"                                                       # C12 (수면 소음)
+      - "intake_fan_rpm <= 700 for all t"                                                        # C12
+      - "exhaust_fan_rpm < 1 when outdoor_dew > dew_point"                                       # C18 (I10)
+      - "base_vent_compliance >= 0.95"                                                           # C12
+      - "humidity <= 70 when t >= 1800"                                                          # C15
+    metrics: [energy_wh, comfort_ratio, rule_violation_count]
+
+  # ---- H5 · 비 오는 날 귀가 + 바로 요리 (B12 · C9 · C18 · C19) -------------------------------
+  - id: H5
+    tier: 2
+    name: "비 오는 날 귀가 → 요리"
+    duration_s: 5400
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261105
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: AWAY
+      temperature_c: 27.0
+      humidity_pct: 66.0
+      co2_ppm: 450.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 100.0
+      occupancy: false
+      occupant_zone: none
+      time_of_day: "17:30"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances: { ac: { power: false }, purifier_level: 0, range_hood_level: 0 }
+    external:
+      weather: rain
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 25.0
+      outdoor_rh_pct: 95.0
+      outdoor_illuminance_lux: 3000.0
+    injections:
+      - { at_s: 1200, door: open_close, label: arrive, open_s: 8 }
+      - { at_s: 1800, source: cooking, label: cook, stove: induction_plug, pm_mg_per_min: 0.8, moisture_g_per_h: 300, heat_w: 1500, duration_s: 900 }
+    events:
+      - { at_s: 1200, set: { occupancy: true, occupant_zone: room } }
+      - { at_s: 1790, set: { occupant_zone: kitchen } }
+      - { at_s: 2700, set: { occupant_zone: desk } }
+    pass_criteria:
+      - "occupied == 1 within 2 after arrive_start"                                              # B12 (E7)
+      - "event_entered('COOKING') within 90 after cook_start"                                    # B7
+      - "window_open_ratio == 0 for all t"                                                       # C18 (E5)
+      - "range_hood_level >= 1 during cook settle 90"                                            # C9
+      - "q_net >= -1 during cook settle 120"                                                     # C19 (I3 급기 확보)
+      - "pm25 <= 35 within 1200 after cook_end"                                                  # C9
+    metrics: [pm25_peak, energy_wh, rule_violation_count]
+
+  # ---- H6 · 강한 일사 + 실내 더위 + 외기 미세먼지 (B8 · C8) -----------------------------------
+  - id: H6
+    tier: 2
+    name: "한낮 일사 + 외기 미세먼지 나쁨"
+    duration_s: 3600
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261106
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 29.0
+      humidity_pct: 50.0
+      co2_ppm: 650.0
+      pm25_ugm3: 15.0
+      illuminance_lux: 800.0
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "13:30"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 60.0        # 나쁨
+      outdoor_temp_c: 27.0
+      outdoor_rh_pct: 50.0
+      outdoor_illuminance_lux: 55000.0
+    pass_criteria:
+      - "window_open_ratio <= 0.01 when t >= 15"                                                 # C8 (E6)
+      - "q_net >= 0 when t >= 15"                                                                # C8 (I7)
+      - "pm25 <= 35 for all t"                                                                   # C8
+      - "operative_temperature <= 27 by 1800 after 0"                                            # B8
+    metrics: [energy_wh, comfort_ratio, pm25_peak, rule_violation_count]
+
+  # ---- H7 · 에어컨 IR 간헐 누락 50 % + 더위 (B8 · X7) --------------------------------------
+  - id: H7
+    tier: 2
+    name: "에어컨 IR 간헐 누락 + 더위"
+    duration_s: 3600
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261107
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 30.0
+      humidity_pct: 50.0
+      co2_ppm: 650.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 600.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "15:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 32.0
+      outdoor_rh_pct: 50.0
+      outdoor_illuminance_lux: 50000.0
+    injections:
+      - { at_s: 0, fault: ir_miss, probability: 0.5, label: ir_flaky }
+    pass_criteria:
+      - "window_open_ratio <= 0.1 for all t"                                                     # B8 (I2)
+      - "ac_cool within 120 after 0"                                                             # B8 (재송신 허용)
+      - "ceiling_fan > 0 within 60 after 0"                                                      # B8
+      - "operative_temperature <= 27 by 1800 after 0"                                            # B8
+    metrics: [energy_wh, rule_violation_count]
+
+  # ---- H8 · 겨울 빨래 건조 · 바깥 건조 (C15 · C19 · C10) ------------------------------------
+  - id: H8
+    tier: 2
+    name: "겨울 빨래 건조 — 바깥이 건조"
+    duration_s: 28800
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261108
+    run_mode: fast
+    appliance_profile: full
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 20.5
+      humidity_pct: 45.0
+      co2_ppm: 600.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 400.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "10:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: 3.0
+      outdoor_rh_pct: 55.0
+      outdoor_illuminance_lux: 15000.0
+      heating_setpoint_c: 21.0
+    injections:
+      - { at_s: 0, appliance: washer, label: washer, power_w: 450, duration_s: 600, laundry_moisture_g: 2000 }
+    pass_criteria:
+      - "event_entered('LAUNDRY_DRYING') within 3600 after washer_end"                           # C15 (E10)
+      - "laundry_dry_time_s <= 21600"                                                            # C15
+      - "humidifier + dehumidifier <= 1 for all t"                                               # C10 (I1)
+      - "dew_margin >= 0 for all t"                                                              # C19
+      - "temperature >= 19.5 for all t"                                                          # C19
+    metrics: [laundry_dry_time_s, energy_wh, rule_violation_count]
+
+  # ---- H9 · 한겨울 수면 + 건조 — 가습과 결로 상한 (B9 · C12 · C10) ----------------------------
+  - id: H9
+    tier: 2
+    name: "한겨울 수면 + 건조"
+    duration_s: 7200
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261109
+    run_mode: fast
+    appliance_profile: full
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: SLEEP
+      temperature_c: 20.0
+      humidity_pct: 30.0
+      co2_ppm: 700.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 0.0
+      occupancy: true
+      occupant_zone: bed
+      motion: sleeping
+      time_of_day: "01:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -8.0
+      outdoor_rh_pct: 60.0
+      outdoor_illuminance_lux: 0.0
+      heating_setpoint_c: 20.0
+    pass_criteria:
+      - "humidity >= 40 within 7200 after 0"                                                     # B9
+      - "humidifier == 0 when dew_margin < 2"                                                    # I4
+      - "dew_margin >= 0 for all t"                                                              # C10
+      - "humidifier + dehumidifier <= 1 for all t"                                               # B9 (I1)
+      - "exhaust_fan_rpm <= 600 for all t"                                                       # C12
+      - "intake_fan_rpm <= 700 for all t"                                                        # C12
+    metrics: [energy_wh, rule_violation_count]
+
+  # ---- H10 · 장마철 요리 → 샤워 (B7 · B6 · C18) ---------------------------------------------
+  - id: H10
+    tier: 2
+    name: "장마철 요리 뒤 샤워"
+    duration_s: 5400
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20261110
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 26.0
+      humidity_pct: 63.0
+      co2_ppm: 700.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: kitchen
+      time_of_day: "19:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances: { ac: { power: false }, purifier_level: 0, range_hood_level: 0 }
+    external:
+      weather: rain
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 25.0
+      outdoor_rh_pct: 95.0
+      outdoor_illuminance_lux: 0.0
+    injections:
+      - { at_s: 300, source: cooking, label: cook, stove: gas, pm_mg_per_min: 1.5, moisture_g_per_h: 400, heat_w: 800, duration_s: 900 }
+      - { at_s: 2400, radar: silent, duration_s: 900 }
+      - { at_s: 2700, source: shower, label: shower, moisture_g: 250, duration_s: 600 }
+    events:
+      - { at_s: 1500, set: { occupant_zone: desk } }
+      - { at_s: 2400, set: { occupant_zone: none } }
+      - { at_s: 3300, set: { occupant_zone: room } }
+    pass_criteria:
+      - "event_entered('COOKING') within 90 after cook_start"                                    # B7
+      - "event_entered('SHOWER') within 300 after shower_start"                                  # B6
+      - "window_open_ratio == 0 for all t"                                                       # C18
+      - "exhaust_fan_rpm < 1 when outdoor_dew > dew_point"                                       # C18 (I10)
+      - "humidity <= 60 within 1800 after shower_end"                                            # C18
+    metrics: [humidity_recovery_time, energy_wh, rule_violation_count]
+
+  # ---- H11 · 쿡탑 켠 채 외출 + 외기 미세먼지 (X9 ⑩ · C8) -------------------------------------
+  - id: H11
+    tier: 2
+    name: "쿡탑 켠 채 외출 + 외기 미세먼지"
+    duration_s: 2400
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261111
+    run_mode: fast
+    appliance_profile: full
+    season: mid
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: NORMAL
+      temperature_c: 24.0
+      humidity_pct: 50.0
+      co2_ppm: 650.0
+      pm25_ugm3: 12.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: kitchen
+      time_of_day: "18:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 30.0
+      appliances: { ac: { power: false }, purifier_level: 0, range_hood_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 60.0
+      outdoor_temp_c: 20.0
+      outdoor_rh_pct: 55.0
+      outdoor_illuminance_lux: 2000.0
+    injections:
+      - { at_s: 120, source: cooking, label: cook, stove: induction_plug, pm_mg_per_min: 0.5, moisture_g_per_h: 200, heat_w: 1500, duration_s: 1800 }
+      - { at_s: 600, door: open_close, label: leave, open_s: 8 }
+    events:
+      - { at_s: 604, set: { occupancy: false, occupant_zone: none } }
+    pass_criteria:
+      - "event_entered('UNATTENDED_COOKING') within 190 after leave_end"                         # X9
+      - "alert_raised('E15') within 190 after leave_end"                                         # X9
+      - "cooktop_power == 0 within 191 after leave_end"                                          # X9
+      - "window_open_ratio <= 0.01 when t >= 15"                                                 # C8
+      - "q_net >= 0 when t >= 15"                                                                # C8
+    metrics: [pm25_peak, energy_wh, rule_violation_count]
+
+  # ---- H12 · 공부 중 수동으로 에어컨 끔 + 더위 (B11 · B8) ------------------------------------
+  - id: H12
+    tier: 2
+    name: "공부 중 에어컨 수동 끔"
+    duration_s: 3600
+    repeat: 3
+    baselines: [proposed]
+    seed: 20261112
+    run_mode: fast
+    appliance_profile: full
+    season: summer
+    persona: commuter
+    power_limit_w: 3000
+    initial:
+      user_mode: STUDY
+      temperature_c: 29.0
+      humidity_pct: 50.0
+      co2_ppm: 700.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 500.0
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "16:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { ac: { power: false }, purifier_level: 0 }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 31.0
+      outdoor_rh_pct: 50.0
+      outdoor_illuminance_lux: 40000.0
+    injections:
+      - { at_s: 900, manual: { device: ac, action: "off" }, label: manual_off }
+    pass_criteria:
+      - "ac_cool within 120 after 0"                                                             # B8
+      - "event_entered('MANUAL_OVERRIDE') within 30 after manual_off_start"                      # B11 (E12)
+      - "ac_sent == 0 when t >= manual_off_start + 30 and t < manual_off_start + 1790"           # B11 (I9 보류 30분)
+    metrics: [energy_wh, rule_violation_count]

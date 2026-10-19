@@ -44,7 +44,8 @@ def arrival_history(cfg: dict) -> list[float]:
     return sorted(float(round(x)) for x in base + late * cfg["late_shift_min"] * 60.0)
 
 
-def generate_trace(tc: dict, env_cfg, p) -> dict[str, np.ndarray]:
+def generate_trace(tc: dict, env_cfg, p, weather=None) -> dict[str, np.ndarray]:
+    """weather: 시각[s] → {outdoor_temp_c, outdoor_rh_pct, outdoor_illuminance_lux} (실측 기상 · 없으면 합성 일교차 · 일사)."""
     rng = np.random.default_rng(tc["seed"])
     dt = float(tc["dt_s"])
     steps = int(tc["days"] * 86400 / dt)
@@ -72,8 +73,14 @@ def generate_trace(tc: dict, env_cfg, p) -> dict[str, np.ndarray]:
             occ = int(rng.random() < tc["occupied_probability"])
             occ_end = ts + rng.uniform(1.0, 4.0) * 3600.0
         act = ActuatorCommands(ac=AcCommand(power=ac_on, mode="cool", setpoint_c=sp))
-        ext = ExternalConditions(outdoor_temp_c=to, outdoor_rh_pct=tc["outdoor_rh_pct"],
-                                 outdoor_illuminance_lux=sun_peak * sun)
+        if weather is None:
+            ext = ExternalConditions(outdoor_temp_c=to, outdoor_rh_pct=tc["outdoor_rh_pct"],
+                                     outdoor_illuminance_lux=sun_peak * sun)
+        else:
+            w = weather(ts)
+            to = w["outdoor_temp_c"]
+            ext = ExternalConditions(outdoor_temp_c=to, outdoor_rh_pct=w["outdoor_rh_pct"],
+                                     outdoor_illuminance_lux=w["outdoor_illuminance_lux"])
         obs = room.step(dt, act, ext, occ=Occupancy(count=occ))
         rec["t"][i] = obs["temperature_c"]
         rec["to"][i] = to

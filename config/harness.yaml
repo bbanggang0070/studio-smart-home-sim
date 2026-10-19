@@ -288,3 +288,32 @@ randomization:
     outdoor_temp_c: { offset: [-1.0, 1.0] }
     outdoor_rh_pct: { offset: [-5.0, 5.0], clip: [5.0, 100.0] }
     outdoor_illuminance_lux: { scale: [0.8, 1.2] }
+
+# ---- 실측 기상 시계열 (docs/11 필수 조치 3 · tools/weather/fetch_weather.py · scripts/harness/weather.py) ------------
+#  자료: Open-Meteo 과거 기상 API (ERA5 · ERA5-Land 재분석 · CC BY 4.0) — 관측을 동화한 재분석이다(지점 관측 아님).
+#        기상청 ASOS(서울 108)로 바꿀 때는 같은 열 이름의 CSV 를 data_dir 에 두면 된다 (인증키 필요)
+#  학습 / 평가 연도 분리: 학습 도구(2R2C 식별 · EXP-5)는 train 연도만, 평가(시나리오 · 순위)는 eval 연도만 읽는다
+#  시나리오 대입: 시작 시각(time_of_day) 같은 날 중 시작 때 외기가 시나리오 전제(기온 · 습도 · 비 여부)와 가까운 날을 고른다
+#                 시나리오 events 가 바꾸는 외기 키(자극)는 시나리오 값을 그대로 쓴다 · PM2.5 · 난방 경계는 시나리오 값
+weather:
+  source: open_meteo_era5
+  api: https://archive-api.open-meteo.com/v1/archive
+  site: { name: seoul, latitude: 37.5714, longitude: 126.9658, timezone: Asia/Seoul }   # 기상청 서울 지점(108) 좌표
+  data_dir: data/weather
+  years: { train: [2021, 2022, 2023], eval: [2024] }
+  hourly: [temperature_2m, relative_humidity_2m, shortwave_radiation, precipitation, cloud_cover, wind_speed_10m]
+  radiation_lag_h: 0.5             # 일사는 앞 1시간 평균 값 — 30분 앞 시각에 놓는다
+  rain_mm_per_h: 0.1               # 이 이상이면 비
+  sky_cloud_pct: { clear: 30.0, cloudy: 70.0 }   # 운량 이하 → 그 하늘 · 넘으면 overcast
+  event_step_s: 600                # 시간별 값을 선형 보간해 이 간격으로 외기 이벤트를 넣는다
+  match: { temp_c: 2.0, rh_pct: 10.0, widen: 2.0, max_widen: 3 }   # 시작 때 허용 차이 · 후보가 모자라면 widen 배씩 넓힌다
+  samples: 5                       # 시나리오마다 고르는 날 수 (같은 날은 모든 기준선 공통)
+  seed: 20261019
+  workers: 16
+  out_dir: results/measured_weather
+  crossyear:                       # 2R2C 식별 연도 분리 점검 — tools/energy/weather_crossyear.py
+    months: [6, 7, 8, 9]           # 냉방철 (2R2C 는 냉방 예측용)
+    train_days: 14                 # 학습 연도에서 뽑는 연속 기간
+    train_windows_per_year: 1      # 학습 연도마다 뽑는 기간 수 (각각 식별)
+    test_days: 7
+    test_windows: 4                # 평가 연도 시험 기간 수

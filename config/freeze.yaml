@@ -6,6 +6,7 @@
 #  controller: 보류 평가(필수 조치 4) 전에 동결한 제어기 — 제어 코드 · 계수 · 학습 산출물. 고치면 새 보류 묶음으로 다시 평가한다
 #  2026-10-24 동결 개정 — controller 다시 씀(규칙 공백 · B8 · C4 수정) + 2차 보류 config/heldout_scenarios_r2.yaml 등록 (docs/12 §4 · §7)
 #  2026-10-24 동결 개정 2 — controller 다시 씀(겨울 후드 · IR 반복 · 수동 외출 해제) + user_modes.yaml · 고속 하네스 브릿지 모델 추가 + 3차 보류 등록 (docs/12 §4 · §9)
+#  2026-10-24 동결 개정 3 — controller 다시 씀(수동 외출 해제 재실 확정 · 레이더 두절 위치) + 4차 보류 등록 (docs/12 §4 · §11)
 # ============================================================================
 frozen_at: '2026-10-19'
 files:
@@ -24,6 +25,8 @@ files:
   sha256: bc14124d332054ef6ed678bd2659c91e3e85090a9203cca2b860166366f6f56d
 - path: config/heldout_scenarios.yaml
   sha256: 7e16eb4ce43425399d38226b96ee71a70065ebc2b0d576c1da4274c24a611519
+- path: config/heldout_scenarios_r4.yaml
+  sha256: 184ad0acabd830023ee1fa6ad57e1686cd26855fd5eb3a3fdadf0652a19d2aca
 - path: config/heldout_scenarios_r3.yaml
   sha256: 0e8973bd44e618c95f683381f316722294f80af62abfb4fabf18d5d33e1cf016
 - path: config/heldout_scenarios_r2.yaml
@@ -31,9 +34,9 @@ files:
 controller_frozen_at: '2026-10-24'
 controller:
 - glob: scripts/controller/*.py
-  sha256: 83169ec928245a3a87ed1a146c56b6f23082303b77a7084ca7839e7bd6cad6cb
+  sha256: 51c0c609b4fd6d972fb26cd5cda58e486a7621d4d282d6406f5a748fd7e145a6
 - glob: scripts/sensors/*.py
-  sha256: 36ead42c9cc6e8a014a8c1bd22b67204903991f4c65bcd88a714755409388ca8
+  sha256: 7b47516eac54ab4d938047958b93b3d56207e3fc9e7864aa07c37b9bda1e9f66
 - glob: scripts/actuators/*.py
   sha256: 482ddf1c448b77b123eb9a0189422b5a6f633320948f0cec937ca38fe520c731
 - path: scripts/harness/controllers.py

@@ -180,7 +180,8 @@ class OccupancyJudge:
                 alerts.append("문 센서 이상 의심 — 빈방 고정 중 실내 사람 신호 + 기기 조작 · 24시간 융합으로 전환")
         # LATCHED_OCCUPIED 는 다음 문 열림까지 유지 — 시간 기준 없음
 
-        zone = "unknown" if (self.mmwave_lost and self.occupied) else self._zone(moving, static)
+        # 레이더 두절이면 빈방이어도 위치를 모른다 — 'none' 으로 두면 두절 경보(S_MMWAVE)가 사람이 올 때까지 안 난다 (3차 보류 H311)
+        zone = "unknown" if self.mmwave_lost else self._zone(moving, static)
         return OccupancyOutput(self.occupied, zone, self.state, alerts, self.fault)
 
     def _fusion(self, now: float, strong_move: bool, edge: bool, wifi: bool) -> None:

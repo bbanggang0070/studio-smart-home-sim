@@ -1,0 +1,663 @@
+# ============================================================================
+#  보류(held-out) 시나리오 묶음 4차 — H401–H412 (docs/12 §11)
+#  - 3차 묶음 결과로 수동 외출 해제 판단(재실 확정 기준) · 레이더 두절 경보를 고친 뒤(v3.4.26) 새로 만든 묶음.
+#    수정 제어기로 돌려 보기 전에 썼다. 판정 문구는 기존 · 1–3차 묶음과 같다 — 조합만 새롭다 (각 판정 출처는 docs/12 §11 표)
+#  - 실행 전에 커밋하고 해시를 동결한다(사전 등록). 결과가 나빠도 입력 · 판정을 고치지 않는다
+#  - 작성 점검표: ① 판정이 규칙과 충돌하지 않는다 — 모드별 습도 범위(NORMAL · STUDY 40–60 · SLEEP 45–60 · AWAY 상한 70)를
+#    확인했다 (H307) ② 시작 user_mode = 사용자가 계속 고른 모드 (H209) ③ 시작 결로 여유 > 0 (H3) — 환경 모델 초기 관측
+# ============================================================================
+
+scenarios:
+- id: H401
+  tier: 2
+  name: 겨울 수면 중 레이더 두절
+  duration_s: 5400
+  repeat: 3
+  baselines:
+  - proposed
+  seed: 20261401
+  run_mode: fast
+  appliance_profile: full
+  season: winter
+  persona: commuter
+  power_limit_w: 3000
+  initial:
+    co2_ppm: 600.0
+    pm25_ugm3: 10.0
+    illuminance_lux: 0.0
+    window_open_ratio: 0.0
+    blind_angle_deg: 30.0
+    appliances:
+      ac:
+        power: false
+      purifier_level: 0
+      range_hood_level: 0
+    user_mode: SLEEP
+    temperature_c: 20.0
+    humidity_pct: 50.0
+    occupancy: true
+    occupant_zone: bed
+    motion: sleeping
+    time_of_day: 02:00
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 10.0
+    outdoor_illuminance_lux: 0.0
+    outdoor_temp_c: -3.0
+    outdoor_rh_pct: 65.0
+    heating_setpoint_c: 20.0
+  injections:
+  - at_s: 600
+    fault: mmwave_lost
+    label: radar_lost
+  pass_criteria:
+  - alert_raised('S_MMWAVE') within 10 after radar_lost_start
+  - exhaust_fan_rpm <= 600 for all t
+  - intake_fan_rpm <= 700 for all t
+  - dew_margin >= 0 for all t
+  - humidifier + dehumidifier <= 1 for all t
+  metrics:
+  - energy_wh
+  - rule_violation_count
+- id: H402
+  tier: 2
+  name: 외출 모드 중 택배 — 문만 열고 닫음
+  duration_s: 2400
+  repeat: 3
+  baselines:
+  - proposed
+  seed: 20261402
+  run_mode: fast
+  appliance_profile: full
+  season: summer
+  persona: commuter
+  power_limit_w: 3000
+  initial:
+    co2_ppm: 600.0
+    pm25_ugm3: 10.0
+    illuminance_lux: 300.0
+    window_open_ratio: 0.0
+    blind_angle_deg: 30.0
+    appliances:
+      ac:
+        power: false
+      purifier_level: 0
+      range_hood_level: 0
+    user_mode: AWAY
+    temperature_c: 29.0
+    humidity_pct: 55.0
+    occupancy: false
+    occupant_zone: none
+    time_of_day: '14:00'
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 10.0
+    outdoor_illuminance_lux: 50000.0
+    outdoor_temp_c: 32.0
+    outdoor_rh_pct: 55.0
+  injections:
+  - at_s: 900
+    door: open_close
+    label: parcel
+    open_s: 8
+  pass_criteria:
+  - mode_is('AWAY') for all t
+  - window_open_ratio == 0 for all t
+  - ac_power == 0 for all t
+  metrics:
+  - energy_wh
+  - rule_violation_count
+- id: H403
+  tier: 2
+  name: 외출 모드 중 비 오는 날 귀가
+  duration_s: 4800
+  repeat: 3
+  baselines:
+  - proposed
+  seed: 20261403
+  run_mode: fast
+  appliance_profile: full
+  season: summer
+  persona: commuter
+  power_limit_w: 3000
+  initial:
+    co2_ppm: 600.0
+    pm25_ugm3: 10.0
+    illuminance_lux: 300.0
+    window_open_ratio: 0.0
+    blind_angle_deg: 30.0
+    appliances:
+      ac:
+        power: false
+      purifier_level: 0
+      range_hood_level: 0
+    user_mode: AWAY
+    temperature_c: 27.0
+    humidity_pct: 65.0
+    occupancy: false
+    occupant_zone: none
+    time_of_day: '19:00'
+  external:
+    weather: rain
+    outdoor_pm25_ugm3: 10.0
+    outdoor_illuminance_lux: 0.0
+    outdoor_temp_c: 25.0
+    outdoor_rh_pct: 92.0
+  injections:
+  - at_s: 900
+    door: open_close
+    label: arrive
+    open_s: 8
+  events:
+  - at_s: 900
+    set:
+      occupancy: true
+      occupant_zone: room
+  pass_criteria:
+  - mode_is('AWAY') when t < arrive_start
+  - mode_is('NORMAL') within 120 after arrive_start
+  - window_open_ratio == 0 for all t
+  - ratio(humidity <= 70) >= 0.95
+  metrics:
+  - energy_wh
+  - rule_violation_count
+- id: H404
+  tier: 2
+  name: 여름 저녁 요리 + 비
+  duration_s: 3600
+  repeat: 3
+  baselines:
+  - A
+  - B
+  - proposed
+  seed: 20261404
+  run_mode: fast
+  appliance_profile: full
+  season: summer
+  persona: commuter
+  power_limit_w: 3000
+  initial:
+    co2_ppm: 600.0
+    pm25_ugm3: 10.0
+    illuminance_lux: 300.0
+    window_open_ratio: 0.0
+    blind_angle_deg: 30.0
+    appliances:
+      ac:
+        power: false
+      purifier_level: 0
+      range_hood_level: 0
+    user_mode: NORMAL
+    temperature_c: 27.5
+    humidity_pct: 60.0
+    occupancy: true
+    occupant_zone: kitchen
+    time_of_day: '18:30'
+  external:
+    weather: rain
+    outdoor_pm25_ugm3: 10.0
+    outdoor_illuminance_lux: 0.0
+    outdoor_temp_c: 27.0
+    outdoor_rh_pct: 90.0
+  injections:
+  - at_s: 120
+    source: cooking
+    label: cook
+    stove: gas
+    pm_mg_per_min: 1.5
+    moisture_g_per_h: 400
+    heat_w: 800
+    duration_s: 900
+  pass_criteria:
+  - event_entered('COOKING') within 90 after cook_start
+  - window_open_ratio == 0 for all t
+  - pm25 <= 35 within 1200 after cook_end
+  - temperature <= 28 when t >= cook_end + 600
+  metrics:
+  - energy_wh
+  - rule_violation_count
+- id: H405
+  tier: 2
+  name: 겨울 공부 + 건조
+  duration_s: 7200
+  repeat: 3
+  baselines:
+  - A
+  - B
+  - proposed
+  seed: 20261405
+  run_mode: fast
+  appliance_profile: full
+  season: winter
+  persona: commuter
+  power_limit_w: 3000
+  initial:
+    co2_ppm: 600.0
+    pm25_ugm3: 10.0
+    illuminance_lux: 500.0
+    window_open_ratio: 0.0
+    blind_angle_deg: 30.0
+    appliances:
+      ac:
+        power: false
+      purifier_level: 0
+      range_hood_level: 0
+    user_mode: STUDY
+    temperature_c: 21.0
+    humidity_pct: 30.0
+    occupancy: true
+    occupant_zone: desk
+    time_of_day: '20:00'
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 10.0
+    outdoor_illuminance_lux: 0.0
+    outdoor_temp_c: 0.0
+    outdoor_rh_pct: 55.0
+    heating_setpoint_c: 21.0
+  pass_criteria:
+  - humidity >= 40 within 7200 after 0
+  - humidifier == 0 when dew_margin < 2
+  - temperature >= 19.5 for all t
+  metrics:
+  - energy_wh
+  - rule_violation_count
+- id: H406
+  tier: 2
+  name: 간절기 저녁 촛불 — 열 없는 미세먼지
+  duration_s: 3600
+  repeat: 3
+  baselines:
+  - proposed
+  seed: 20261406
+  run_mode: fast
+  appliance_profile: full
+  season: mid
+  persona: commuter
+  power_limit_w: 3000
+  initial:
+    co2_ppm: 600.0
+    pm25_ugm3: 10.0
+    illuminance_lux: 300.0
+    window_open_ratio: 0.0
+    blind_angle_deg: 30.0
+    appliances:
+      ac:
+        power: false
+      purifier_level: 0
+      range_hood_level: 0
+    user_mode: NORMAL
+    temperature_c: 23.0
+    humidity_pct: 50.0
+    occupancy: true
+    occupant_zone: room
+    time_of_day: '20:00'
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 10.0
+    outdoor_illuminance_lux: 0.0
+    outdoor_temp_c: 17.0
+    outdoor_rh_pct: 55.0
+  injections:
+  - at_s: 300
+    source: pm_no_heat
+    label: candle
+    pm_mg_per_min: 0.3
+    duration_s: 1200
+  pass_criteria:
+  - range_hood_level == 0 during candle
+  - pm25 <= 35 within 1200 after candle_end
+  metrics:
+  - energy_wh
+  - rule_violation_count
+- id: H407
+  tier: 2
+  name: 열대야 수면 — 전력 한도 1.2 kW
+  duration_s: 3600
+  repeat: 3
+  baselines:
+  - A
+  - B
+  - proposed
+  seed: 20261407
+  run_mode: fast
+  appliance_profile: full
+  season: summer
+  persona: commuter
+  power_limit_w: 1200
+  initial:
+    co2_ppm: 600.0
+    pm25_ugm3: 10.0
+    illuminance_lux: 0.0
+    window_open_ratio: 0.0
+    blind_angle_deg: 30.0
+    appliances:
+      ac:
+        power: false
+      purifier_level: 0
+      range_hood_level: 0
+    user_mode: SLEEP
+    temperature_c: 28.5
+    humidity_pct: 58.0
+    occupancy: true
+    occupant_zone: bed
+    motion: sleeping
+    time_of_day: 01:00
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 10.0
+    outdoor_illuminance_lux: 0.0
+    outdoor_temp_c: 27.0
+    outdoor_rh_pct: 75.0
+  pass_criteria:
+  - total_power <= 1200 when t >= 60
+  - exhaust_fan_rpm <= 600 for all t
+  - intake_fan_rpm <= 700 for all t
+  - temperature <= 28 within 3600 after 0
+  metrics:
+  - energy_wh
+  - rule_violation_count
+- id: H408
+  tier: 2
+  name: 귀가 직후 요리 + 외기 미세먼지 매우나쁨
+  duration_s: 4200
+  repeat: 3
+  baselines:
+  - proposed
+  seed: 20261408
+  run_mode: fast
+  appliance_profile: full
+  season: mid
+  persona: commuter
+  power_limit_w: 3000
+  initial:
+    co2_ppm: 600.0
+    pm25_ugm3: 10.0
+    illuminance_lux: 300.0
+    window_open_ratio: 0.0
+    blind_angle_deg: 30.0
+    appliances:
+      ac:
+        power: false
+      purifier_level: 0
+      range_hood_level: 0
+    user_mode: NORMAL
+    temperature_c: 23.0
+    humidity_pct: 50.0
+    occupancy: false
+    occupant_zone: none
+    time_of_day: '18:00'
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 120.0
+    outdoor_illuminance_lux: 0.0
+    outdoor_temp_c: 16.0
+    outdoor_rh_pct: 50.0
+  injections:
+  - at_s: 600
+    door: open_close
+    label: arrive
+    open_s: 8
+  - at_s: 900
+    source: cooking
+    label: cook
+    stove: induction_plug
+    pm_mg_per_min: 0.8
+    moisture_g_per_h: 300
+    heat_w: 1500
+    duration_s: 900
+  events:
+  - at_s: 600
+    set:
+      occupancy: true
+      occupant_zone: room
+  - at_s: 890
+    set:
+      occupant_zone: kitchen
+  pass_criteria:
+  - occupied == 1 within 2 after arrive_start
+  - event_entered('COOKING') within 90 after cook_start
+  - window_open_ratio <= 0.01 when t >= 15
+  - pm25 <= 35 within 1200 after cook_end
+  metrics:
+  - energy_wh
+  - rule_violation_count
+- id: H409
+  tier: 2
+  name: 장마철 샤워 뒤 수면
+  duration_s: 5400
+  repeat: 3
+  baselines:
+  - proposed
+  seed: 20261409
+  run_mode: fast
+  appliance_profile: full
+  season: summer
+  persona: commuter
+  power_limit_w: 3000
+  initial:
+    co2_ppm: 600.0
+    pm25_ugm3: 10.0
+    illuminance_lux: 300.0
+    window_open_ratio: 0.0
+    blind_angle_deg: 30.0
+    appliances:
+      ac:
+        power: false
+      purifier_level: 0
+      range_hood_level: 0
+    user_mode: NORMAL
+    temperature_c: 26.0
+    humidity_pct: 62.0
+    occupancy: true
+    occupant_zone: room
+    time_of_day: '22:00'
+  external:
+    weather: rain
+    outdoor_pm25_ugm3: 10.0
+    outdoor_illuminance_lux: 0.0
+    outdoor_temp_c: 24.0
+    outdoor_rh_pct: 95.0
+  injections:
+  - at_s: 300
+    radar: silent
+    duration_s: 900
+  - at_s: 600
+    source: shower
+    label: shower
+    moisture_g: 250
+    duration_s: 600
+  events:
+  - at_s: 300
+    set:
+      occupant_zone: none
+  - at_s: 1200
+    set:
+      occupant_zone: room
+  - at_s: 3000
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  pass_criteria:
+  - event_entered('SHOWER') within 300 after shower_start
+  - window_open_ratio == 0 for all t
+  - humidity <= 60 within 1800 after shower_end
+  - mode_is('SLEEP') within 2 after 3000
+  metrics:
+  - energy_wh
+  - rule_violation_count
+- id: H410
+  tier: 2
+  name: 한낮 더위 + 외기 미세먼지 나쁨 + IR 누락 30 %
+  duration_s: 3600
+  repeat: 3
+  baselines:
+  - proposed
+  seed: 20261410
+  run_mode: fast
+  appliance_profile: full
+  season: summer
+  persona: commuter
+  power_limit_w: 3000
+  initial:
+    co2_ppm: 600.0
+    pm25_ugm3: 10.0
+    illuminance_lux: 300.0
+    window_open_ratio: 0.0
+    blind_angle_deg: 0.0
+    appliances:
+      ac:
+        power: false
+      purifier_level: 0
+      range_hood_level: 0
+    user_mode: NORMAL
+    temperature_c: 30.0
+    humidity_pct: 50.0
+    occupancy: true
+    occupant_zone: room
+    time_of_day: '13:30'
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 60.0
+    outdoor_illuminance_lux: 55000.0
+    outdoor_temp_c: 32.0
+    outdoor_rh_pct: 50.0
+  injections:
+  - at_s: 0
+    fault: ir_miss
+    probability: 0.3
+    label: ir_flaky
+  pass_criteria:
+  - window_open_ratio <= 0.01 when t >= 15
+  - operative_temperature <= 27 by 1800 after 0
+  - pm25 <= 35 for all t
+  metrics:
+  - energy_wh
+  - rule_violation_count
+- id: H411
+  tier: 2
+  name: 간절기 빨래 넌 뒤 외출 → 귀가
+  duration_s: 21600
+  repeat: 3
+  baselines:
+  - A
+  - B
+  - proposed
+  seed: 20261411
+  run_mode: fast
+  appliance_profile: full
+  season: mid
+  persona: commuter
+  power_limit_w: 3000
+  initial:
+    co2_ppm: 600.0
+    pm25_ugm3: 10.0
+    illuminance_lux: 300.0
+    window_open_ratio: 0.0
+    blind_angle_deg: 30.0
+    appliances:
+      ac:
+        power: false
+      purifier_level: 0
+      range_hood_level: 0
+    user_mode: NORMAL
+    temperature_c: 22.0
+    humidity_pct: 55.0
+    occupancy: true
+    occupant_zone: room
+    time_of_day: 09:00
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 10.0
+    outdoor_illuminance_lux: 15000.0
+    outdoor_temp_c: 18.0
+    outdoor_rh_pct: 70.0
+  injections:
+  - at_s: 0
+    appliance: washer
+    label: washer
+    power_w: 450
+    duration_s: 600
+    laundry_moisture_g: 1500
+  - at_s: 3000
+    door: open_close
+    label: leave
+    open_s: 8
+  - at_s: 14400
+    door: open_close
+    label: arrive
+    open_s: 8
+  events:
+  - at_s: 3004
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 14400
+    set:
+      occupancy: true
+      occupant_zone: room
+  pass_criteria:
+  - event_entered('LAUNDRY_DRYING') within 3600 after washer_end
+  - laundry_dry_time_s <= 21600
+  - occupied == 1 within 2 after arrive_start
+  metrics:
+  - energy_wh
+  - rule_violation_count
+- id: H412
+  tier: 2
+  name: 겨울 아침 외출 + 결로 경계
+  duration_s: 3600
+  repeat: 3
+  baselines:
+  - A
+  - B
+  - proposed
+  seed: 20261412
+  run_mode: fast
+  appliance_profile: full
+  season: winter
+  persona: commuter
+  power_limit_w: 3000
+  initial:
+    co2_ppm: 600.0
+    pm25_ugm3: 10.0
+    illuminance_lux: 300.0
+    window_open_ratio: 0.0
+    blind_angle_deg: 30.0
+    appliances:
+      ac:
+        power: false
+      purifier_level: 0
+      range_hood_level: 0
+    user_mode: NORMAL
+    temperature_c: 20.0
+    humidity_pct: 48.0
+    occupancy: true
+    occupant_zone: room
+    time_of_day: 08:00
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 10.0
+    outdoor_illuminance_lux: 5000.0
+    outdoor_temp_c: -5.0
+    outdoor_rh_pct: 70.0
+    heating_setpoint_c: 20.0
+  injections:
+  - at_s: 300
+    door: open_close
+    label: leave
+    open_s: 8
+  events:
+  - at_s: 304
+    set:
+      occupancy: false
+      occupant_zone: none
+  pass_criteria:
+  - occupied == 0 within 200 after leave_end
+  - dew_margin >= 0 for all t
+  - window_open_ratio == 0 when t >= leave_end + 200
+  - humidifier == 0 when t >= leave_end + 200
+  metrics:
+  - energy_wh
+  - rule_violation_count

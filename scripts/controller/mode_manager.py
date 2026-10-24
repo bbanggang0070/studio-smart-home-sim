@@ -5,7 +5,9 @@
 - 외출(E8): 재실이 false 이고 away_auto_enabled 이면 AWAY — 재실 판정(문 이벤트 · 판정 창)은 재실 노드의 몫이다
 - 귀가(E7): AWAY 중 재실 true → 직전 모드로 복귀
 - 수동 외출(사용자가 AWAY 선택): 사람이 잠시 남아 있어도 유지. 문이 열린(출입) 뒤 manual_away_release_after_door_s 시점에
-  실내에 사람이 감지되면(레이더 위치 · 레이더 두절이면 재실 판정) 외출 모드를 끝내고 AWAY 를 고르기 전 모드로 돌아간다.
+  실내에 사람이 감지되면 외출 모드를 끝내고 AWAY 를 고르기 전 모드로 돌아간다. '감지' = 재실 노드가 문 이벤트 뒤 판정 창에서
+  강한 증거(레이더 움직임 · 정지 신호 · 기기 조작 — 레이더 두절이면 Wi-Fi)로 재실을 확정(LATCHED_OCCUPIED)한 것.
+  판정 창 동안 위치(zone)는 증거 없이도 'room' 으로 나오므로 쓰지 않는다 (3차 보류 H302).
   같은 선택(같은 설정 시각)이 계속 들어와도 다시 AWAY 로 가지 않는다 — 사용자가 다른 모드를 고르거나 AWAY 를 새로 고를 때까지
 - 스케줄(schedule.enabled): 우선순위 수동 > 스케줄 > AUTO. 수동 선택은 다음 스케줄 경계까지 유지된다
   (switching.manual_hold_until). 요일(days)은 시뮬레이션 시각에 없어 v1 은 무시한다
@@ -93,7 +95,7 @@ class ModeManager:
         if o.door_open or o.now_s - self._door_at < self.away_release_s:
             return False
         self._door_at = None                                  # 이 출입은 판단 끝
-        return o.zone not in ("none", "unknown") or (o.zone == "unknown" and o.occupied)
+        return o.occupancy_basis == "LATCHED_OCCUPIED"
 
     def update(self, o: Observation) -> tuple[str, str]:
         """→ (유효 모드, 결정 경로 manual | auto | away)."""

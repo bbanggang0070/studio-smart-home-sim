@@ -72,9 +72,9 @@ def test_manual_away_kept_until_door_then_presence(params):
     assert mm.update(o(10))[0] == "AWAY"                         # 직접 고른 외출 — 사람이 아직 있어도 유지
     assert mm.update(o(100))[0] == "AWAY"
     mm.update(o(200, **{T.S_DOOR_CONTACT: True}))                # 출입
-    mm.update(o(208, **{T.S_DOOR_CONTACT: False}))
-    assert mm.update(o(250))[0] == "AWAY"                        # 60 s 전 — 아직 판단하지 않는다
-    assert mm.update(o(261)) == ("STUDY", "away_release")        # 60 s 뒤에도 실내에 있음 → 고르기 전 모드로
+    mm.update(o(208, **{T.S_DOOR_CONTACT: False, T.T_OCCUPANCY_BASIS: "JUDGING"}))
+    assert mm.update(o(250, **{T.T_OCCUPANCY_BASIS: "LATCHED_OCCUPIED"}))[0] == "AWAY"   # 60 s 전 — 아직 판단하지 않는다
+    assert mm.update(o(261, **{T.T_OCCUPANCY_BASIS: "LATCHED_OCCUPIED"})) == ("STUDY", "away_release")   # 재실 확정 → 고르기 전 모드로
     assert mm.update(o(400))[0] == "STUDY"                       # 같은 선택이 계속 들어와도 다시 외출로 가지 않는다
     mm.update(parse_inbox(500, inbox(**{T.C_MODE: "NORMAL"})))
     assert mm.update(o(510))[0] == "AWAY"                        # 새로 고르면 다시 외출
@@ -86,8 +86,8 @@ def test_manual_away_stays_when_person_left(params):
     o = lambda t, **kw: parse_inbox(t, inbox(**{T.C_MODE: "AWAY", **kw}))
     mm.update(o(0))
     mm.update(o(100, **{T.S_DOOR_CONTACT: True}))
-    mm.update(o(108, **{T.S_DOOR_CONTACT: False, T.S_OCCUPANT_ZONE: "none", T.S_OCCUPANCY: False}))
-    assert mm.update(o(170, **{T.S_OCCUPANT_ZONE: "none", T.S_OCCUPANCY: False}))[0] == "AWAY"   # 나갔다 — 유지
+    mm.update(o(108, **{T.S_DOOR_CONTACT: False, T.T_OCCUPANCY_BASIS: "JUDGING"}))
+    assert mm.update(o(170, **{T.S_OCCUPANT_ZONE: "room", T.T_OCCUPANCY_BASIS: "JUDGING"}))[0] == "AWAY"   # 판정 창 — 위치는 'room' 이어도 증거 없음 → 유지 (H302)
     assert mm.update(o(400, **{T.S_OCCUPANT_ZONE: "room"}))[0] == "AWAY"   # 출입 없이 감지만 — 해제하지 않는다
 
 

@@ -69,8 +69,13 @@ class HoodPredictor:
             peak = max(peak, pm)
         return peak
 
-    def choose(self, plans: list[Plan], pm0: float, pm_out: float, source_ug_h: float) -> tuple[Plan, dict[int, float]]:
+    def choose(self, plans: list[Plan], pm0: float, pm_out: float, source_ug_h: float,
+               peak_cap: float | None = None) -> tuple[Plan, dict[int, float]]:
+        """peak_cap — 주면 최선안 대비 허용 범위 밖이라도 예측 피크가 이 이하인 안을 허용한다 (급기 불가 시 낮은 단 우선)."""
         peaks = {pl.hood_level: self.predict_peak(pl, pm0, pm_out, source_ug_h) for pl in plans}
         best = min(peaks.values())
-        ok = [pl for pl in plans if peaks[pl.hood_level] <= best * (1.0 + self.tolerance)]
+        lim = best * (1.0 + self.tolerance)
+        if peak_cap is not None:
+            lim = max(lim, peak_cap)
+        ok = [pl for pl in plans if peaks[pl.hood_level] <= lim]
         return min(ok, key=lambda pl: pl.hood_level), peaks

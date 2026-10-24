@@ -197,11 +197,16 @@ class EventDetector:
             if rh_5min is None:
                 return
             hood_normal = (o.hood_temp_c - o.temp_c) < g("events.cooking.hood_temp_delta_vs_room_c")
-            ok = (o.rh_pct - rh_5min >= g(s + "rh_rise_pct_in_5min")
+            need = g(s + "rh_rise_pct_in_5min")
+            if o.dehumidifier_on and g(s + "compensate_dehumidifier_removal"):
+                # 제습기가 5분 동안 빼는 습기만큼 상승이 가려진다 — %p 로 환산해 기준에서 뺀다 (보류 H10)
+                removed_g_m3 = g("appliances.dehumidifier.rated_g_per_h") * 300.0 / 3600.0 / g("air_balance.room_volume_m3")
+                need -= 100.0 * removed_g_m3 / self.psy.abs_humidity(o.temp_c, 100.0)
+            ok = (o.rh_pct - rh_5min >= need
                   and (hood_normal or not g(s + "require_no_hood_heat"))
                   and (not o.humidifier_on or not g(s + "require_humidifier_off"))
                   and (o.occupied or not g(s + "require_occupied"))
-                  and "COOKING" not in self.active)
+                  and "COOKING" not in self.active and "HOOD_POST_RUN" not in self.active)   # 잔류 운전 중 습기도 요리 몫 (v3.4.24)
             if ok:
                 pre_dew = self.dew_hist.ago(o.now_s, 300.0)
                 self._enter("SHOWER", o.now_s, pre_dew=pre_dew)

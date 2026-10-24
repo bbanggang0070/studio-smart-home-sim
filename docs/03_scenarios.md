@@ -827,7 +827,7 @@ scenarios:
     appliance_profile: full      # [v2.0] core | std | full
     season: summer               # [v2.0] summer | winter | mid — I6 제습 수단 선택
     persona: commuter            # [v2.1] commuter | irregular | home — Wi-Fi · 귀가 패턴 생성
-    power_limit_w: 3000          # [v2.1] 원룸 전력 한도 (C17)
+    power_limit_w: 3000          # [v2.1] 원룸 전력 한도 (C17) · [v2.37] 제어기에 사용자 설정(user_modes energy.power_limit_w)으로 전달 — 이전엔 전달되지 않아 늘 3000 W 로 판단
 
     initial:
       user_mode: NORMAL          # [v2.0] NORMAL|STUDY|NIGHT|SLEEP|AWAY|AUTO
@@ -1013,3 +1013,4 @@ scenarios:
 | 2026-10-15 | v2.34 | **지표 #7 재정의 (사용자 결정)** — 같은 목표 달성 기준: A · 제안이 모두 판정을 통과한 실행끼리 · 조명 에너지 제외(`energy_compare_wh`) — A 는 목표를 못 지키며 덜 써서(C15 빨래 · C8 · C5) 전체 비교는 공정하지 않다 · 전체 비교는 참고로 함께 낸다 |
 | 2026-10-15 | v2.35 | §7 보조 지표 목표 이탈 적분(온도 °C·h · 습도 %RH·h · PM µg/m³·h) · Tier 2 우위 제시 = 판정 기준 스코어카드 + 쾌적-에너지 2축 (W13 DoD) |
 | 2026-10-19 | v2.36 | docs/11 필수 6 — 명칭 정정만(판정 · 정의 불변): 체감온도 → **실링팬 보정 온도** · 지표 #5 'FMVSS 118 참조' → '100 N 기준 차용 · 반전 거리 미적용' |
+| 2026-10-24 | v2.37 | 하네스 결함 수정 — 시나리오 `power_limit_w` 가 제어기에 전달되지 않던 문제 (개발 시나리오는 모두 3000 W = 기본값이라 영향 없음 · 보류 H2 2500 W 에서 드러남) |

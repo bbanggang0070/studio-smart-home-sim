@@ -230,6 +230,7 @@ class RuleEngine:
         self._base_ventilation(o, mode, blocked, add)
         saving = not o.occupied and mode != "AWAY"
         self.info["saving"] = saving
+        self.ladders.moisture_event = "COOKING" in ev or "HOOD_POST_RUN" in ev or "SHOWER" in ev
         self.info.update(self.ladders.apply(o, mode, blocked, noise, add, saving=saving))
         # -- L6 조도 · 조명 --
         if "ceiling_light" in self.devices or "desk_lamp" in self.devices:
@@ -282,10 +283,22 @@ class RuleEngine:
             add("window", "need", g("setpoints.window_pulse_ratio_pct") / 100.0, L2, "E2 결로 위험 간헐 환기")
             add("exhaust", "need", g("setpoints.fan_low_rpm"), L2, "E2 결로 위험 간헐 환기 (배기 저속)")
 
+    def supply_blocked(self, o: Observation, blocked: list[str]) -> list[str]:
+        """I3 보상 급기에 창문을 못 쓰는 이유 — 창문 불가 사유 + 외기온이 기본 환기 창문 범위 밖 (v3.4.24 · 보류 H3)."""
+        g = self.p.get
+        if not g("interaction_rules.I3_exhaust_requires_supply.window_requires_outdoor_temp_range"):
+            return blocked
+        lo, hi = g("base_ventilation.window_outdoor_temp_range_c")
+        if math.isnan(o.outdoor_temp_c) or not lo <= o.outdoor_temp_c <= hi:
+            return [*blocked, "outdoor_temp"]
+        return blocked
+
     def _supply_for(self, exhaust_m3h: float, o: Observation, blocked: list[str], window_ratio: float,
                     add, why: str) -> None:
-        """I3 · I7 — 기계 배기에 맞춰 급기. 창문을 쓸 수 있으면 창문, 아니면 흡기팬(필터)."""
+        """I3 · I7 — 기계 배기에 맞춰 급기. 창문을 쓸 수 있으면 창문, 아니면 흡기팬(필터).
+        흡기팬 최대(60 m³/h)는 후드 유량보다 훨씬 작다 — 창문을 못 쓰면 급기는 최선일 뿐 양압은 보장하지 못한다 (장비 한계)."""
         g = self.p.get
+        blocked = self.supply_blocked(o, blocked)
         if not blocked:
             add("window", "need", window_ratio, L2, f"{why} I3 보상 급기 (창문)")
         else:
@@ -315,7 +328,7 @@ class RuleEngine:
             cook.info["hood_level"] = lv
             add("hood", "need", lv, L2, "E1 수증기 (열만) 후드 약")
         else:
-            lv = self._choose_hood(o, cook, blocked, noise, outdoor_polluted="OUTDOOR_PM" in ev)
+            lv = self._choose_hood(o, cook, self.supply_blocked(o, blocked), noise, outdoor_polluted="OUTDOOR_PM" in ev)
             add("hood", "need", lv, L2, f"E1 요리 후드 예측 선택 {cook.info.get('peaks', {})}")
             add("purifier", "need", g(c + ("purifier_level_outdoor_bad" if bad_out else "purifier_level")), L2,
                 "E1 요리 청정기")
@@ -369,7 +382,9 @@ class RuleEngine:
             # 끄기 직전 PM 이 꺾이는 순간의 추정으로 후드를 꺼 버리는 것을 막는다
             if not cook.info.get("heat_ended"):
                 source = max(source, self.pred.nominal_ug_h)
-        plan, peaks = self.pred.choose(plans, o.pm25, pm_out, source)
+        # 창문 급기 불가 — 후드 음압을 흡기팬이 못 메운다(장비 한계). PM 목표를 지키는 가장 낮은 단까지 허용 (v3.4.24 · 보류 H5 · H10)
+        cap = g(hp + "blocked_supply_peak_cap_ugm3") if blocked else None
+        plan, peaks = self.pred.choose(plans, o.pm25, pm_out, source, peak_cap=cap)
         cook.info.update(hood_level=plan.hood_level, peaks={k: round(v) for k, v in peaks.items()},
                          source_ug_h=round(source))
         self._hood_next_eval = o.now_s + g(hp + "reevaluate_s")
@@ -482,6 +497,18 @@ class RuleEngine:
                 self.info["ac_fan_force"] = "low"
             elif item in ("humidifier", "dehumidifier"):
                 add(item, "cap", 0, L1, f"E11 전력 한도 — {item} 차단 (I8)")
+            elif item == "ac_pause":
+                # 마지막 단계 — 실제 한도를 넘을 때만 들어가고, 들어가면 E11 이 풀릴 때까지 유지 (보류 H2)
+                # 에어컨이 (다시) 정격으로 돌 때의 합계 — 넘을 것 같으면 미리 멈추고, 여유가 생기면 E11 해제 대기 없이 재개 (보류 H2)
+                limit = float(self.p.modes["energy"]["power_limit_w"])
+                projected = (float(pev.info.get("total_w", 0.0)) - float(o.power_w.get("ac", 0.0))
+                             + float(self.p.get("appliances.ac.power_w")))
+                if not pev.info.get("ac_paused") and projected > limit:
+                    pev.info["ac_paused"] = True
+                elif pev.info.get("ac_paused") and projected < self.p.get("events.power_limit.release_ratio") * limit:
+                    pev.info["ac_paused"] = False
+                if pev.info.get("ac_paused"):
+                    add("ac", "cap", 0, L1, "E11 전력 한도 — 에어컨 일시 정지 (I8 마지막 · 끌 수 없는 부하)")
         self.info["power_shed_stage"] = int(pev.info["stage"])
 
     def _base_ventilation(self, o: Observation, mode: str, blocked: list[str], add) -> None:

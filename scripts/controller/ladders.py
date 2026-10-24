@@ -34,6 +34,10 @@ class ComfortLadders:
         self._outdoor_cooler = False
         self._shade_useful = False
         self._blind_choice = None                    # CoolingBlind — 조명 모듈이 필요해 처음 쓸 때 만든다
+        self._ac_mode_since = -math.inf              # 냉방 ↔ 제습 모드를 바꾼 시각 (최소 유지 · B8)
+        self._escalated_since = -math.inf            # 에어컨 승격 시각 (최소 유지 · C4)
+        self.moisture_event = False                  # 요리 · 샤워 진행 중 (규칙 엔진이 알려 준다 — I6 회복 보조)
+        self._moisture_recovery = False
 
     def _dry_sp(self, sp: float) -> float:
         """에어컨 제습 운전 설정 — 냉방 목표보다 낮춰 둔다. 제습 운전도 실내가 설정 아래로 내려가면 압축기가 멈춰
@@ -129,8 +133,10 @@ class ComfortLadders:
             unreachable = o.outdoor_temp_c > sp_reach - g(cl + "free_cool_reach_margin_c")
             if (not self._escalated and o.temp_c > over_at
                     and (unreachable or o.now_s - self._free_cool_since >= g(cl + "escalate_to_ac_after_s"))):
-                self._escalated = True
-            elif self._escalated and o.temp_c <= over_at - self._band("escalate_release_band_c"):
+                self._escalated, self._escalated_since = True, o.now_s
+            elif (self._escalated and o.temp_c <= over_at - self._band("escalate_release_band_c")
+                  and (not self.hyst or o.now_s - self._escalated_since >= g(cl + "escalate_min_hold_s"))):
+                # 승격 최소 유지 — 풀리자마자 창문으로 돌아가 다시 더워지는 왕복을 막는다 (실측 기상 C4)
                 self._escalated = False
         window_cool = free_cool and not blocked and not self._escalated   # 창문을 냉방에 쓰나
         if self._blind_choice is None:
@@ -186,13 +192,21 @@ class ComfortLadders:
                 self._ac_on = o.temp_c > sp_ac + g("comfort_ladders.cooling_on_above_setpoint_c")
             if ((not free_cool and self._ac_on) or escalate) and ac_allowed:
                 # 냉방 + 제습이 함께 필요하면 설정 근처에서는 제습 모드 — 저부하 냉방은 습기를 거의 못 뺀다 (C1)
+                prev = self._ac_dry
+                # 더 많이 벗어난 쪽 우선 — 습도가 조금만 넘으면 온도가 먼저 (B8), 크게 넘으면 제습을 오래 끈다 (C1 · C13)
+                humid_first = hi is not None and o.rh_pct - hi >= g(cl + "humid_priority_excess_pct")
+                resume = g(cl + "ac_cool_resume_above_c") if humid_first else g(cl + "ac_cool_resume_above_mild_c")
+                dwell_ok = (humid_first or not self.hyst
+                            or o.now_s - self._ac_mode_since >= g(cl + "ac_mode_min_dwell_s"))
                 if self.dehumidifying and season == "summer":
-                    if o.temp_c <= sp_ac + g(cl + "ac_dry_within_setpoint_c"):
+                    if not self._ac_dry and dwell_ok and o.temp_c <= sp_ac + g(cl + "ac_dry_within_setpoint_c"):
                         self._ac_dry = True
-                    elif o.temp_c > sp_ac + g(cl + "ac_cool_resume_above_c"):
+                    elif self._ac_dry and o.temp_c > sp_ac + resume:
                         self._ac_dry = False
                 else:
                     self._ac_dry = False
+                if self._ac_dry != prev:
+                    self._ac_mode_since = o.now_s
                 why = "냉방 ⑤ 에어컨" + (" (승격 — 무료 냉방 부족)" if escalate else "") + (f" (I5 +{relax:g} °C)" if relax else "")
                 ac_cmd = ("dry", self._dry_sp(sp_ac), why + " → 제습 모드 (냉방 + 제습)") if self._ac_dry else ("cool", sp_ac, why)
         info["cooling"] = self.cooling
@@ -214,6 +228,14 @@ class ComfortLadders:
                     ac_cmd = ("dry", self._dry_sp(sp), "제습 ③ 에어컨 제습 (I6 여름)")
             else:
                 add("dehumidifier", "need", 1, L5, f"제습 ③ 제습기 (I6 {season})")
+        # I6 해제 확장 — 요리 · 샤워가 들인 습기: 이벤트 중 RH 가 상한을 넘으면 상한 − 해제 폭까지 제습기 보조 (보류 H10)
+        if hi is not None and g("comfort_ladders.moisture_recovery_dehumidifier") and "dehumidifier" in self.rules.devices:
+            if self.moisture_event and o.rh_pct > hi:
+                self._moisture_recovery = True
+            elif o.rh_pct < hi - self._band("dehumidify_off_band_pct") or not self.dehumidifying:
+                self._moisture_recovery = False
+            if self._moisture_recovery and not (i10 and not blocked):
+                add("dehumidifier", "need", 1, L5, "제습 — 요리 · 샤워 습기 회복 보조 (I6 해제 확장)")
         info["dehumidifying"] = self.dehumidifying
         # 목표별 '쓸모 있는 수단' — 제어 가능성 판정(feasibility)이 소진 여부를 볼 때 쓴다 (외기가 더 더우면 환기는 냉방 수단이 아니다)
         info["useful_means"] = {
@@ -226,7 +248,9 @@ class ComfortLadders:
         lo = (m.get("humidity_range_pct") or [None, None])[0]
         r_si = self.psy.surface_resistance(o.blind_deg, o.ceiling_fan)
         cap = self._humidify_cap(o, r_si)
-        target = min(hi - g("comfort_ladders.humidify_target_below_hi_pct") if hi is not None else 100.0, cap)
+        # 결로 상한에 딱 붙으면 끄는 지연 동안 여유가 상한 아래로 내려간다 — 상한 − guard 에서 멈춘다 (보류 H9)
+        target = min(hi - g("comfort_ladders.humidify_target_below_hi_pct") if hi is not None else 100.0,
+                     cap - g("comfort_ladders.humidify_cap_guard_pct"))
         info["humidify_cap_pct"] = round(cap, 1)
         if lo is None:
             self.humidifying = False

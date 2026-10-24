@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import copy
+
 import json
 from typing import Any
 
@@ -54,6 +56,13 @@ class SmartHomeController:
 
     def reset(self, params: dict[str, Any]) -> None:
         self.baseline = params.get("baseline", "proposed")
+        # 전력 한도는 집마다 다른 사용자 설정(user_modes energy.power_limit_w) — 시나리오가 주면 그 값 (v3.4.24 · 보류 H2:
+        # 이전엔 시나리오의 power_limit_w 가 제어기에 전달되지 않아 늘 기본 3000 W 로 판단했다)
+        limit = (params.get("scenario") or {}).get("power_limit_w")
+        if limit is not None:
+            modes = copy.deepcopy(self.p.modes)
+            modes.setdefault("energy", {})["power_limit_w"] = float(limit)
+            self.p = ControllerParams(self.p.th, modes)
         # Baseline B = 협조는 하되 히스테리시스 · 최소 유지 시간 없음 (docs/03 §6)
         self.hysteresis = self.baseline != "B"
         self.psy = Psychro(self.p)

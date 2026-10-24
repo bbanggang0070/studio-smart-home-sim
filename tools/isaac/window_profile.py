@@ -140,23 +140,10 @@ def main() -> None:
     print(f"판정: {checks} · 왕복 반복성 σ {summary['trip_repeatability_n']} N", flush=True)
     print(f"=== 기준 프로파일 → {prof.relative_to(REPO)} ({len(rows)}개 구간) ===", flush=True)
 
-    try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        fig, ax = plt.subplots(figsize=(10, 4))
-        for d, col in (("close", "tab:red"), ("open", "tab:blue")):
-            rr = [r for r in rows if r["direction"] == d]
-            ax.plot([(r["bin_lo_m"] + r["bin_hi_m"]) / 2 * 1000 for r in rr], [r["force_mean_n"] for r in rr], "o-",
-                    color=col, label=d)
-        for x in (0.03, 0.15, 0.95):                 # 폐쇄 기준 Zone 경계 (D | C | B | A)
-            ax.axvline(x * travel * 1000, ls=":", c="gray")
-        ax.set_xlabel("panel position q [mm] (0 = closed)")
-        ax.set_ylabel("|joint force| [N]")
-        ax.legend()
-        ax.grid(alpha=0.3)
-        fig.tight_layout()
-        fig.savefig(out / "window_profile.png", dpi=120)
+    try:                                           # 그래프 = tools/analysis/plot_window_profile.py (CSV 로 다시 그릴 수 있게)
+        sys.path.insert(0, str(REPO / "tools" / "analysis"))
+        from plot_window_profile import plot_profile
+        plot_profile(rows, travel, out / "window_profile.png")
     except Exception as exc:                       # 그래프는 선택
         print(f"(그래프 생략: {exc})", flush=True)
 

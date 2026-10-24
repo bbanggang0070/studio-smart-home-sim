@@ -29,7 +29,7 @@ def main() -> None:
     out_t = REPO / "results" / "tables"
     out_t.mkdir(parents=True, exist_ok=True)
     g.round(2).to_csv(out_t / "torque_sweep.csv", index=False)
-    fig, ax = plt.subplots(1, 2, figsize=(12, 4.5))
+    fig, ax = plt.subplots(1, 2, figsize=(16, 9))          # 1920 × 1080 (슬라이드)
     for obj, gg in g.groupby("object"):
         ax[0].plot(gg.torque_pct, gg.detect * 100, "o-", color=COLORS[obj], label=NAMES[obj])
         ax[1].errorbar(gg.torque_pct, gg.peak_mean, yerr=[gg.peak_mean - gg.peak_mean, gg.peak_max - gg.peak_mean],

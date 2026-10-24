@@ -77,7 +77,7 @@ def load(raw: Path, rid: str) -> pd.DataFrame:
 def c10(raw: Path) -> None:
     d = load(raw, "C10_proposed_1")
     t = d["time_s"] / 60
-    fig, ax = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
+    fig, ax = plt.subplots(2, 1, figsize=(16, 9), sharex=True)          # 1920 × 1080 (슬라이드)
     ax[0].plot(t, d["truth.humidity_pct"], color="#4d7c0f", lw=2, label="실내 습도")
     ax[0].plot(t, d["act.humidifier"].astype(float) * 5 + 35, color="#ca8a04", lw=1, label="가습기 (켜짐 = 40)")
     ax[0].set_ylabel("%")

@@ -25,6 +25,8 @@ switching:
   away_auto_enabled: true          # 무재실 지속 시 AWAY 자동 전환 (E8)
   away_after_vacancy_min: 15.0    # [v3.2] 폴백 전용 — 정상일 때는 문 닫힘 후 판정 창(3분)에서 외출 확정 (thresholds occupancy.door_gating)
   return_to_previous_on_arrival: true   # 귀가(E7) 시 직전 모드로 복귀
+  manual_away_release_after_door_s: 60.0   # [2026-10-24 사용자 결정] 사용자가 직접 고른 외출 모드는 사람이 잠시 남아 있어도 유지한다.
+                                           # 문(도어락)이 열려 출입이 감지되고 이 시간 뒤에도 실내에 사람이 감지되면 외출 모드를 끝내고 고르기 전 모드로 돌아간다
   precool_before_arrival_min: 30.0      # 귀가 예약 시 프리쿨링 (AWAY)
   arrival_schedule: null                # 예: "18:30" (시뮬레이션에서는 시나리오 입력)
 

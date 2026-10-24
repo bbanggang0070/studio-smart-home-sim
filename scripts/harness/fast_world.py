@@ -154,6 +154,11 @@ class FastActuators:
         # 가전 브릿지 (L0 자리) — IR 기기는 명령이 바뀔 때만 송신 · 수신 실패 확률 · 송신 횟수
         self.ir_devices = {"ac": T.C_AC, "purifier": T.C_PURIFIER_LEVEL}
         self.ir_last: dict[str, Any] = {}
+        self.ir_sent_at: dict[str, float] = {}
+        self.ir_refresh_s = -1.0                      # 브릿지 주기 재송신 (thresholds appliances.ir — 러너가 채운다)
+        self.ir_refresh_devices: set[str] = set()
+        self.ir_repeat = (0, 0.0)                     # (횟수, 간격 s) — 바뀐 명령 반복 송신 (피드백 없는 IR 기기)
+        self.ir_repeats_left: dict[str, int] = {}
         self.ir_tx: dict[str, int] = {"ac": 0, "purifier": 0}
         self.ir_miss_p = 0.0
         self.rng = None
@@ -167,9 +172,21 @@ class FastActuators:
                 continue
             dev = next((d for d, tp in self.ir_devices.items() if tp == topic), None)
             if dev is not None:                       # IR — 바뀐 명령만 송신, 수신 실패면 기기는 모른다
-                if self.ir_last.get(dev) == value:
-                    continue
+                same = self.ir_last.get(dev) == value
+                if dev in self.ir_refresh_devices:
+                    since = now - self.ir_sent_at.get(dev, now)
+                    repeat = same and self.ir_repeats_left.get(dev, 0) > 0 and since >= self.ir_repeat[1]
+                    due = repeat or (same and self.ir_refresh_s > 0 and since >= self.ir_refresh_s)
+                    if not same:
+                        self.ir_repeats_left[dev] = int(self.ir_repeat[0])
+                    elif repeat:
+                        self.ir_repeats_left[dev] -= 1
+                else:
+                    due = False
+                if same and not due:
+                    continue                          # 같은 명령 — 반복 · 재송신 주기 전이면 쏘지 않는다
                 self.ir_last[dev] = value
+                self.ir_sent_at[dev] = now
                 self.ir_tx[dev] += 1
                 self.cmd_log.append((dev, now))
                 if self.rng is not None and self.rng.random() < self.ir_miss_p:

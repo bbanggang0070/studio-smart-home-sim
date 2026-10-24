@@ -64,6 +64,33 @@ def test_auto_mode_with_hysteresis(params):
     assert mm.update(room(ten + 60 + 600))[0] == "NORMAL"
 
 
+def test_manual_away_kept_until_door_then_presence(params):
+    """수동 외출 — 사람이 잠시 남아 있어도 유지 · 문 출입 뒤 60 s 에 실내에 사람이 있으면 해제 (2026-10-24 사용자 결정)."""
+    mm = ModeManager(params)
+    o = lambda t, **kw: parse_inbox(t, inbox(**{T.C_MODE: "AWAY", **kw}))
+    assert mm.update(parse_inbox(0, inbox(**{T.C_MODE: "STUDY"})))[0] == "STUDY"
+    assert mm.update(o(10))[0] == "AWAY"                         # 직접 고른 외출 — 사람이 아직 있어도 유지
+    assert mm.update(o(100))[0] == "AWAY"
+    mm.update(o(200, **{T.S_DOOR_CONTACT: True}))                # 출입
+    mm.update(o(208, **{T.S_DOOR_CONTACT: False}))
+    assert mm.update(o(250))[0] == "AWAY"                        # 60 s 전 — 아직 판단하지 않는다
+    assert mm.update(o(261)) == ("STUDY", "away_release")        # 60 s 뒤에도 실내에 있음 → 고르기 전 모드로
+    assert mm.update(o(400))[0] == "STUDY"                       # 같은 선택이 계속 들어와도 다시 외출로 가지 않는다
+    mm.update(parse_inbox(500, inbox(**{T.C_MODE: "NORMAL"})))
+    assert mm.update(o(510))[0] == "AWAY"                        # 새로 고르면 다시 외출
+
+
+def test_manual_away_stays_when_person_left(params):
+    mm = ModeManager(params)
+    mm.away_auto = False                                         # 자동 외출 경로와 분리해 수동 경로만 본다
+    o = lambda t, **kw: parse_inbox(t, inbox(**{T.C_MODE: "AWAY", **kw}))
+    mm.update(o(0))
+    mm.update(o(100, **{T.S_DOOR_CONTACT: True}))
+    mm.update(o(108, **{T.S_DOOR_CONTACT: False, T.S_OCCUPANT_ZONE: "none", T.S_OCCUPANCY: False}))
+    assert mm.update(o(170, **{T.S_OCCUPANT_ZONE: "none", T.S_OCCUPANCY: False}))[0] == "AWAY"   # 나갔다 — 유지
+    assert mm.update(o(400, **{T.S_OCCUPANT_ZONE: "room"}))[0] == "AWAY"   # 출입 없이 감지만 — 해제하지 않는다
+
+
 def test_manual_mode_and_away_arrival(params):
     mm = ModeManager(params)
     assert mm.update(parse_inbox(0, inbox(**{T.C_MODE: "SLEEP"}))) == ("SLEEP", "manual")

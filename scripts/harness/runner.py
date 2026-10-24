@@ -95,6 +95,10 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
     # 한 번의 우연(2 %)이 모든 기준선의 첫 명령을 함께 지워 비교가 왜곡된다 (C1). 시드로 재현은 그대로.
     acts.rng = np.random.default_rng([run.seed, 104729, zlib.crc32(run.baseline.encode())])
     base_miss = th["appliances"]["ir"]["sim_miss_probability"]
+    acts.ir_refresh_s = float(th["appliances"]["ir"]["state_refresh_s"])
+    acts.ir_refresh_devices = set(th["appliances"]["ir"].get("bridge_refresh_devices") or [])
+    rep = th["appliances"]["ir"].get("bridge_blind_repeat") or {}
+    acts.ir_repeat = (int(rep.get("count", 0)), float(rep.get("interval_s", 0.0)))
     pmon = PowerMonitor(th["power_monitor"], th["events"]["appliance_no_response"]["power_confirm_s"])
     logged_cmds = 0
 

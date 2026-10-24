@@ -207,3 +207,14 @@ def test_response_time_and_budget_violation_metrics():
     assert _budget_violations(df, b, [], 15) == 1.0                    # 소음은 15 샘플 미만 — 온도만
     b["LAUNDRY_DRYING"]["indoor_temp_rise_c"] = 2.0
     assert _budget_violations(df, b, [], 15) == 0.0
+
+
+def test_bridge_blind_repeat_and_refresh_for_purifier():
+    """피드백 없는 IR 기기(청정기) — 바뀐 명령은 60 s 간격 3번 더 · 그 뒤엔 state_refresh_s 마다 다시 쏜다 (H210)."""
+    from harness.fast_world import FastActuators, initial_actuators
+    acts = FastActuators(initial_actuators({"initial": {}}), {}, ["purifier"])
+    acts.ir_refresh_s, acts.ir_refresh_devices, acts.ir_repeat = 600.0, {"purifier"}, (3, 60.0)
+    for t in range(0, 1300):
+        acts.command({T.C_PURIFIER_LEVEL: 2}, float(t))
+    assert acts.ir_tx["purifier"] == 1 + 3 + 1                  # 첫 송신 + 반복 3 (60 · 120 · 180 s) + 주기 1 (180 + 600 = 780 s)
+

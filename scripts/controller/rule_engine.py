@@ -330,8 +330,9 @@ class RuleEngine:
         else:
             lv = self._choose_hood(o, cook, self.supply_blocked(o, blocked), noise, outdoor_polluted="OUTDOOR_PM" in ev)
             add("hood", "need", lv, L2, f"E1 요리 후드 예측 선택 {cook.info.get('peaks', {})}")
-            add("purifier", "need", g(c + ("purifier_level_outdoor_bad" if bad_out else "purifier_level")), L2,
-                "E1 요리 청정기")
+            winter = self.ladders.season(o) == "winter"           # 후드를 낮춘 만큼 청정기로 PM 보완 (v3.4.25)
+            add("purifier", "need", g(c + ("purifier_level_outdoor_bad" if bad_out or winter else "purifier_level")), L2,
+                "E1 요리 청정기" + (" (겨울 — 후드 제한 보완)" if winter and not bad_out else ""))
         # R4 — 비 오는 날 요리: 보상 급기가 습한 외기를 들이므로 요리 시작과 함께 에어컨 제습을 앞당긴다 (X5 · docs/07 §3.5)
         sp = self.p.mode(self._mode).get("cooling_setpoint_c")
         if ("RAIN" in ev and g("recovery.precondition_on_event_start") and "ac" in self.devices and sp is not None
@@ -350,7 +351,9 @@ class RuleEngine:
         # 열이 꺼진 뒤 — 외기가 깨끗하면 마지막 단수를 유지해 해제 · 잔류 운전까지 간다 (docs/07 §5.4 추적표).
         # 외기 오염(E6) 중이면 '발생원 없음'으로 한 번 더 예측해 고른다 — 후드 음압이 오염 외기를 끌어들이는 것을 막는다
         # (docs/09 §5: 외기 오염 시 약 · 강 · 끔 중 실내 PM 이 가장 낮을 단수)
-        if "hood_level" in cook.info:
+        over_winter = (self.ladders.season(o) == "winter" and "hood_level" in cook.info
+                       and cook.info["hood_level"] > int(g("events.cooking.winter_hood_max_level")))
+        if "hood_level" in cook.info and not over_winter:        # 겨울 상한을 넘는 단은 유지하지 않고 다시 고른다
             if heat_ended and not outdoor_polluted:
                 return cook.info["hood_level"]
             if heat_ended and cook.info.get("post_heat_chosen"):
@@ -361,7 +364,11 @@ class RuleEngine:
         purifier = g("events.cooking." + ("purifier_level_outdoor_bad" if "outdoor_pm_bad" in blocked
                                           else "purifier_level"))
         plans = []
-        for lv in range(0, int(noise["range_hood_max_level"]) + 1):
+        top = int(noise["range_hood_max_level"])
+        if self.ladders.season(o) == "winter":
+            # 겨울 — 후드 강의 침기 냉기가 난방을 넘는다 (v3.4.25 · 보류 H3 · H208). 요리 중 끄지는 않는다(I8)
+            top = min(top, int(g("events.cooking.winter_hood_max_level")))
+        for lv in range(0, top + 1):
             q_hood = g("appliances.range_hood.flow_m3h")[f"l{lv}"] if lv > 0 else 0.0
             if blocked:
                 plans.append(Plan(lv, self.intake_max_m3h if lv > 0 else 0.0, 0.0, purifier))

@@ -4,6 +4,9 @@
 - AUTO: user_modes.yaml 의 rules 를 위에서부터 평가. 자동 전환에만 히스테리시스(auto_hysteresis_min)
 - 외출(E8): 재실이 false 이고 away_auto_enabled 이면 AWAY — 재실 판정(문 이벤트 · 판정 창)은 재실 노드의 몫이다
 - 귀가(E7): AWAY 중 재실 true → 직전 모드로 복귀
+- 수동 외출(사용자가 AWAY 선택): 사람이 잠시 남아 있어도 유지. 문이 열린(출입) 뒤 manual_away_release_after_door_s 시점에
+  실내에 사람이 감지되면(레이더 위치 · 레이더 두절이면 재실 판정) 외출 모드를 끝내고 AWAY 를 고르기 전 모드로 돌아간다.
+  같은 선택(같은 설정 시각)이 계속 들어와도 다시 AWAY 로 가지 않는다 — 사용자가 다른 모드를 고르거나 AWAY 를 새로 고를 때까지
 - 스케줄(schedule.enabled): 우선순위 수동 > 스케줄 > AUTO. 수동 선택은 다음 스케줄 경계까지 유지된다
   (switching.manual_hold_until). 요일(days)은 시뮬레이션 시각에 없어 v1 은 무시한다
 """
@@ -42,6 +45,11 @@ class ModeManager:
         self.schedule = sorted(((_hhmm(e["at"]), e["mode"]) for e in sch.get("entries") or []), key=lambda x: x[0]) \
             if sch.get("enabled") else []
         self._manual = None                     # (모드, 설정 시각)
+        self.away_release_s = float(sw.get("manual_away_release_after_door_s", -1.0))
+        self._pre_manual_away = "NORMAL"        # 수동 AWAY 를 고르기 전 모드
+        self._door_prev = False
+        self._door_at: float | None = None      # 마지막 출입(문 열림) 시각 — 수동 AWAY 해제 판단
+        self._away_released: float | None = None   # 해제한 수동 AWAY 의 설정 시각
 
     def _auto_select(self, o: Observation) -> str:
         for rule in self.p.mode("AUTO")["rules"]:
@@ -78,6 +86,15 @@ class ModeManager:
                 return True
         return False
 
+    def _manual_away_release(self, o: Observation) -> bool:
+        """수동 AWAY 중 출입 뒤 release 시간이 지난 첫 관측에서 실내에 사람이 있나 (한 번만 본다)."""
+        if self.away_release_s < 0 or self._door_at is None or self._door_at < self._manual[1]:
+            return False
+        if o.door_open or o.now_s - self._door_at < self.away_release_s:
+            return False
+        self._door_at = None                                  # 이 출입은 판단 끝
+        return o.zone not in ("none", "unknown") or (o.zone == "unknown" and o.occupied)
+
     def update(self, o: Observation) -> tuple[str, str]:
         """→ (유효 모드, 결정 경로 manual | auto | away)."""
         if self.away_auto and not o.occupied:
@@ -88,11 +105,23 @@ class ModeManager:
         if self.mode == "AWAY" and self.path == "away":       # 귀가 (E7)
             self.mode, self.path = self._before_away, "arrival"
 
-        if o.user_mode != "AUTO":
+        if o.door_open and not self._door_prev:
+            self._door_at = o.now_s                           # 출입 — 도어락 · 문 접점 열림
+        self._door_prev = o.door_open
+        user_mode = o.user_mode
+        if user_mode == "AWAY":
+            if self._manual is None or self._manual[0] != "AWAY":
+                self._pre_manual_away = self.mode if self.mode != "AWAY" else self._pre_manual_away
+            elif self._away_released == self._manual[1]:
+                user_mode = self._pre_manual_away             # 이미 해제한 같은 선택 — 고르기 전 모드로
+            elif self._manual_away_release(o):
+                self._away_released = self._manual[1]
+                user_mode = self._pre_manual_away
+        if user_mode != "AUTO":
             if self._manual is None or self._manual[0] != o.user_mode:
                 self._manual = (o.user_mode, o.now_s)
             if not (self.schedule and self._boundary_since(self._manual[1], o.now_s)):
-                self.mode, self.path = o.user_mode, "manual"
+                self.mode, self.path = user_mode, ("manual" if user_mode == o.user_mode else "away_release")
                 return self.mode, self.path
         else:
             self._manual = None

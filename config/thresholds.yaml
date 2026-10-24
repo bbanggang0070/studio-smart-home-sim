@@ -546,6 +546,8 @@ smart_home_controller:
         purifier_level: 2                # 요리 중 청정기 (외기 양호)
         purifier_level_outdoor_bad: 3    # 요리 중 청정기 (외기 나쁨 이상)
         compensating_window_ratio: 0.2   # I3 보상 급기 창문 (good_air_window_pct 상한)
+        winter_hood_max_level: 1         # [v3.4.25] 겨울(I6 계절 — 외기 ≤ 10 °C)엔 요리 중 후드 최대 1단 · 청정기는 purifier_level_outdoor_bad 로 PM 보완.
+                                         #  후드 2단 450 m³/h 의 침기 냉기 ≈ 0.335 × 450 × 22 K ≈ 3.3 kW — 난방을 넘어 실내가 19.5 °C 아래로 (보류 H3 · H208)
       condensation: { layer_warn: 5, layer_critical: 2 }   # E2 — 수치는 condensation 블록
       shower:                          # E3 [v3.4] — docs/07 §3.4
         rh_rise_pct_in_5min: 8.0
@@ -673,6 +675,9 @@ smart_home_controller:
         shared_emitter: [ac, purifier] # IR 송신부 1개 공유
         sim_miss_probability: 0.02     # 시뮬레이션 주입 (X7에서 1.0)
         state_refresh_s: 600.0         # [v3.4.6] draft — 같은 명령이라도 이 주기로 전체 상태 프레임 재송신 (모드는 전력으로 확인 불가)
+        bridge_refresh_devices: ['purifier']   # [v3.4.25] 브릿지가 state_refresh_s 마다 같은 명령을 다시 쏘는 IR 기기 — 청정기는 전력 확인 수단이 없어
+                                               #  첫 송신이 누락되면 1시간 내내 꺼져 있었다 (보류 H210). 에어컨은 제어기가 seq 로 직접 재송신 (ApplianceGuard)
+        bridge_blind_repeat: { count: 3, interval_s: 60.0 }   # [v3.4.25] draft — 위 기기는 명령이 바뀌면 이 간격으로 몇 번 더 쏜다 (IR 프레임 = 절대 상태라 반복해도 무해 · 누락 50 % 에서 4번 모두 놓칠 확률 6 %)
 
     # ---- 상호작용 규칙 I1-I7 — [신설 v3.0] · docs/07 §4.2 -------------------------
     interaction_rules:

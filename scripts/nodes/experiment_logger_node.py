@@ -98,6 +98,9 @@ def main() -> None:
         row["sim.local_tripped"] = wl.get("tripped")
         row["sim.pinch_detect_ms"] = wl.get("detect_ms")                  # 접촉 시작 → 감지 (브릿지 물리 콜백 계측)
         row["sim.pinch_stop_ms"] = wl.get("stop_ms")                      # 감지 → 정지 (C2 ≤ 200 ms)
+        row["sim.obstacle"] = wl.get("obstacle")                          # 시험 물체 배치 확인 (2026-10-26 — 화분 없이 완주한 실행 진단)
+        row["sim.obstacle_dev_mm"] = wl.get("obstacle_dev_mm")
+        row["sim.obstacle_replaced"] = wl.get("obstacle_replaced")
         for tp in T.ALL_TOPICS:
             if tp in last:
                 row[tp] = last[tp]

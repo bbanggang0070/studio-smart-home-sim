@@ -47,4 +47,6 @@ bridge:                              # isaac_actuator_bridge (W06)
   state_hz: 20.0                     # 액추에이터 상태 토픽 (명령→반응 지연 측정 해상도 50 ms)
   current_hz: 50.0                   # /studio/sensor/window_motor_current
   render_every_n_steps: 2            # GUI 일 때만
+  obstacle_tolerance_m: 0.01         # [2026-10-26] 시험 물체가 놓은 자리에서 이만큼 벗어나면(창문이 움직이기 전 · 접촉 전) 다시 놓는다
+  obstacle_check_until_ratio: 0.02   #   창문 열림이 이보다 작을 때까지만 확인 (그 뒤 움직임은 끼임 반응이라 건드리지 않는다)
 

@@ -103,6 +103,9 @@ def main() -> None:
         o.initialize()
     park = {n: o.get_world_pose()[0].copy() for n, o in obstacles.items()}
     pending_obstacle: list[str] = []
+    # 배치 확인 (2026-10-26) — 물리 39회 중 1–2회 화분이 경로에 없이 창문이 완주했다(접촉 0 N). 놓은 자리를 기억해 두고,
+    # 창문이 움직이기 전까지 매 스텝 확인해 벗어나 있으면 다시 놓는다. 벗어난 거리 · 재배치 횟수는 실험 로그에 남는다
+    placed = {"name": None, "spec": None, "target": None, "replaced": 0, "max_dev_m": 0.0}
     act = IsaacActuators(stage, L, A, calib)
     travel = L["window"]["travel_m"]
     wdrive = UsdPhysics.DriveAPI(stage.GetPrimAtPath("/World/window/window_prismatic_joint"), "linear")
@@ -229,10 +232,28 @@ def main() -> None:
             else:
                 pos = park[n]
             o.set_world_pose(position=pos)
+            if n == name:
+                placed["target"] = pos.copy()
             o.set_mass(float(mass) if (n == name and mass) else L["obstacles"][n]["mass_kg"])
             o.set_linear_velocity(np.zeros(3))
             o.set_angular_velocity(np.zeros(3))
+        if name in obstacles:
+            placed["name"], placed["spec"] = name, f"{name}{'@' + at if at else ''}{':' + mass if mass else ''}"
         log.info(f"시험 물체: {name}")
+
+    def check_obstacle() -> float:
+        """놓은 물체가 목표 자리에서 벗어난 거리 [m] — 창문이 거의 닫혀 있고 접촉 전이면 다시 놓는다."""
+        if placed["name"] is None or placed["target"] is None:
+            return 0.0
+        cur = np.array(obstacles[placed["name"]].get_world_pose()[0])
+        dev = float(np.linalg.norm(cur - placed["target"]))
+        placed["max_dev_m"] = max(placed["max_dev_m"], dev)
+        before_motion = window_q_to_ratio(st["q"], travel) < B["obstacle_check_until_ratio"] and peak["contact"] <= 0.0
+        if before_motion and dev > B["obstacle_tolerance_m"]:
+            placed["replaced"] += 1
+            log.warn(f"시험 물체가 자리에서 {dev * 1000:.0f} mm 벗어남 — 다시 놓는다 ({placed['replaced']}회)")
+            place_obstacle(placed["spec"])
+        return dev
 
     import json as _json
     from std_msgs.msg import Bool as _Bool
@@ -314,7 +335,10 @@ def main() -> None:
                                                                  "contact_peak_n": round(peak["contact"], 1),
                                                                  "detect_ms": _ms(lat.get("detect"), lat.get("onset")),
                                                                  "stop_ms": None if lat.get("stop_ms") is None
-                                                                 else round(lat["stop_ms"], 1)})))
+                                                                 else round(lat["stop_ms"], 1),
+                                                                 "obstacle": placed["name"],
+                                                                 "obstacle_dev_mm": round(1000 * obstacle_dev["v"], 1),
+                                                                 "obstacle_replaced": placed["replaced"]})))
         p(T.S_DOOR_CONTACT, door_contact())
 
     # ---- 발표 영상 녹화 (선택) — 실시간 제어 루프는 그대로, 일정 간격으로 렌더해 프레임 저장 ----
@@ -358,6 +382,7 @@ def main() -> None:
             last_tick[name] = n
             return True
         return False
+    obstacle_dev = {"v": 0.0}
     t0 = time.perf_counter()
     k = 0
     while app.is_running() and (args.duration <= 0 or k * dt < args.duration):
@@ -366,6 +391,7 @@ def main() -> None:
             apply_init(pending_init.pop(0))
         while pending_obstacle:
             place_obstacle(pending_obstacle.pop(0))
+        obstacle_dev["v"] = check_obstacle()
         apply_world()
         lvl = fan_guard.apply(fan_want["level"], k * dt)                     # L0 — 실링팬 방향 전환 대기
         act.set_fan_rpm("ceiling_fan", math.copysign(levels[abs(lvl)], lvl) if lvl else 0.0)

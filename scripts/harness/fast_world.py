@@ -164,7 +164,7 @@ class FastActuators:
         self.ir_tx: dict[str, int] = {"ac": 0, "purifier": 0}
         self.ir_miss_p = 0.0
         self.rng = None
-        self.cmd_log: list[tuple[str, float]] = []    # (기기, 시각) — 전력 감시 노드의 원인 판정용
+        self.cmd_log: list[tuple[str, float, bool | None]] = []   # (기기, 시각, 전원 방향) — 전력 감시 노드의 원인 판정용
         self.desk_cct = 0.0
         # L0 가전 보호 — 물리 모드 가전 브릿지(nodes/appliance_bridge_node.py)와 같은 계층 · 같은 클래스 (2026-10-24 · BOPTEST 점검에서 누락 발견)
         #  압축기 최소 ON/OFF (에어컨 · 제습기) · 제습 ⟂ 가습. 러너가 thresholds 값으로 l0_setup() 을 부른다 (없으면 보호 없음 — 단위 시험용)
@@ -204,13 +204,17 @@ class FastActuators:
                 self.ir_last[dev] = value
                 self.ir_sent_at[dev] = now
                 self.ir_tx[dev] += 1
-                self.cmd_log.append((dev, now))
+                want_on = None
+                if dev == "ac":
+                    d = json.loads(value) if isinstance(value, str) else dict(value)
+                    want_on = bool(d.get("power", False))
+                self.cmd_log.append((dev, now, want_on))
                 if self.rng is not None and self.rng.random() < self.ir_miss_p:
                     continue
             elif topic in (T.C_DEHUMIDIFIER, T.C_HUMIDIFIER):
                 name = "dehumidifier" if topic == T.C_DEHUMIDIFIER else "humidifier"
                 if bool(getattr(self.target, name)) != bool(value):
-                    self.cmd_log.append((name, now))
+                    self.cmd_log.append((name, now, bool(value)))
             if topic == T.C_COOKTOP_POWER:
                 if "cooktop_plug" in self.allowed_devices:
                     self.cooktop_relay = bool(value)
@@ -269,9 +273,9 @@ class FastActuators:
             # 보호로 미뤘던 명령을 지금 실행했다 — 전력 감시에 '명령 시각'으로 알린다. 안 알리면 늦게 생긴 전력 변화를
             # 수동 조작(E12)으로 판정해 30분 자동 제어를 멈춘다 (5차 보류 H501 · H510 · 2026-10-25)
             if ac_on != prev_ac and self.l0["ac"].since == self.t:
-                self.cmd_log.append(("ac", self.t))
+                self.cmd_log.append(("ac", self.t, ac_on))
             if dehum != prev_dh and self.l0["dehumidifier"].since == self.t:
-                self.cmd_log.append(("dehumidifier", self.t))
+                self.cmd_log.append(("dehumidifier", self.t, dehum))
             self.actual.ceiling_fan = self.fan_guard.apply(int(self.target.ceiling_fan), self.t)
 
     def state_topics(self) -> dict[str, Any]:

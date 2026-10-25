@@ -31,7 +31,12 @@ def main() -> None:
     def on_cmd(topic, v):
         if st["last_cmd"].get(topic) != v:                 # 바뀐 명령만 '명령 시각' (같은 값 반복 발행은 무시)
             st["last_cmd"][topic] = v
-            pm.note_command(CMD_DEVICE[topic], clock.elapsed())
+            want_on = None                                 # 명령의 전원 방향 (원인 판정 — 고속 하네스와 같다)
+            try:
+                want_on = bool(json.loads(v).get("power")) if topic == T.C_AC else bool(v)
+            except (ValueError, TypeError, AttributeError):
+                pass
+            pm.note_command(CMD_DEVICE[topic], clock.elapsed(), want_on)
 
     for tp in CMD_DEVICE:
         ros_io.subscribe(node, tp, on_cmd)
@@ -48,7 +53,7 @@ def main() -> None:
         else:
             on, dev = bool(v), ("dehumidifier" if topic == T.T_DEHUMIDIFIER else "humidifier")
         if st["last_state"].get(dev) is not None and st["last_state"][dev] != on:
-            pm.note_command(dev, clock.elapsed())
+            pm.note_command(dev, clock.elapsed(), on)
         st["last_state"][dev] = on
 
     for tp in (T.T_AC, T.T_DEHUMIDIFIER, T.T_HUMIDIFIER):

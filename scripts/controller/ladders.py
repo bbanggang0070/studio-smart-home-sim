@@ -112,8 +112,16 @@ class ComfortLadders:
         i10 = self._i10(o)
         # ---- 냉방 ----
         sp = m.get("cooling_setpoint_c")
-        if sp is None or season == "winter":
+        if sp is None:
             self.cooling = False
+        elif season == "winter":
+            # 겨울 과열(일사 · 요리 등) — 목표 + winter_overheat_above_setpoint_c 를 넘으면 냉방 사다리를 쓴다.
+            # 찬 외기가 가장 싼 냉방이라 창문 · 배기가 먼저, 그 수단이 없거나 부족할 때만 에어컨 (사용자 결정 2026-10-25 ·
+            # BOPTEST: 외기 6 °C · 일사로 재실 중 31 °C 인데 겨울이라 냉방 사다리 전체를 껐다)
+            if o.temp_c > sp + g("comfort_ladders.winter_overheat_above_setpoint_c"):
+                self.cooling = True
+            elif o.temp_c < sp - self._band("cooling_off_band_c"):
+                self.cooling = False
         elif o.temp_c > sp + g("comfort_ladders.cooling_on_above_setpoint_c"):
             self.cooling = True
         elif o.temp_c < sp - self._band("cooling_off_band_c"):

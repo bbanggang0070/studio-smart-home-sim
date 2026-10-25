@@ -122,7 +122,7 @@ def run(method: str, period: str, cli: Client, hcfg: dict, bc: dict) -> tuple[di
                     new = {"power": bool(d.get("power", False)), "mode": str(d.get("mode", "cool")),
                            "setpoint": float(d.get("setpoint", want["setpoint"]))}
                     if new != want:
-                        pmon.note_command("ac", now)
+                        pmon.note_command("ac", now, new["power"])
                     want = new
                 # L0 압축기 최소 ON/OFF — 고속 하네스 · 물리 모드 브릿지와 같다 (보류되면 직전 전원 상태 유지)
                 ac = {**want, "power": l0.apply(want["power"], now)}

@@ -382,3 +382,20 @@ def test_blind_fully_shades_when_window_cannot_cool():
                   T.S_WEATHER: json.dumps({"raining": False, "sky": "clear", "outdoor_temp_c": 32.0, "outdoor_rh_pct": 50.0})})
     out = c.step(50000.0, inbox(**hot, **{T.T_BLIND_ANGLE: 0.0}))
     assert out[T.C_BLIND_ANGLE] >= 70 and out.get(T.C_WINDOW_OPEN_RATIO, 0.0) <= 0.15
+
+
+def test_winter_overheat_uses_free_cooling_then_ac_only_without_it(params):
+    """겨울 과열 — 목표 + 1 °C 를 넘으면 냉방 사다리: 창문 · 배기가 있으면 찬 외기로, 없으면 에어컨 (사용자 결정 2026-10-25)."""
+    hot = inbox(**{T.S_TEMPERATURE: 28.0, T.S_HUMIDITY: 40.0, T.S_HOOD_TEMPERATURE: 28.0, T.S_WEATHER: _weather(5.0, 60.0)})
+    c = _ctrl(params)
+    out = c.step(13 * 3600, hot)
+    assert out[T.C_WINDOW_OPEN_RATIO] > 0 or out[T.C_FAN_RPM] > 0          # 무료 냉방 먼저
+    assert not json.loads(out[T.C_AC])["power"]
+    c2 = _ctrl(params)
+    c2.rules.devices = c2.devices = {"ac"}                                  # 에어컨만 있는 건물 (BOPTEST)
+    out2 = c2.step(13 * 3600, hot)
+    assert json.loads(out2[T.C_AC])["power"]
+    c3 = _ctrl(params)
+    mild = inbox(**{T.S_TEMPERATURE: 26.8, T.S_HUMIDITY: 40.0, T.S_HOOD_TEMPERATURE: 26.8, T.S_WEATHER: _weather(5.0, 60.0)})
+    out3 = c3.step(13 * 3600, mild)
+    assert not json.loads(out3[T.C_AC])["power"] and out3[T.C_WINDOW_OPEN_RATIO] == 0.0   # 목표 + 1 °C 아래 — 겨울엔 그대로

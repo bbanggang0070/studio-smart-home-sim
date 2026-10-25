@@ -6,6 +6,7 @@ ROS 비의존 순수 Python. 출력은 /studio/state/appliance_states (JSON {dev
           10 s 이동평균 · 새 상태가 enter_hold_s(꺼짐은 off_hold_s) 이어져야 확정 — 측정 잡음 · 기동 돌입에 흔들리지 않게
   원인    상태가 바뀌기 직전 power_confirm_s 안에 그 기기로 명령이 나갔으면 command, 아니면 manual (규칙 I9 · E12)
           송풍 ↔ 가동(써모오프 · 재기동)은 기기가 스스로 바꾸는 것이라 원인을 따지지 않는다 (B11 — OFF 오판 없음)
+          명령의 방향(켜기 · 끄기)을 알면 변화 방향이 맞을 때만 command — '켜라' 직후 꺼지면 manual (실측 기상 B11 · 2026-10-25)
 """
 
 from __future__ import annotations
@@ -38,6 +39,7 @@ class PowerMonitor:
         self.cur = {d: DeviceState() for d in self.devices}
         self._cand: dict[str, tuple[str, float]] = {}
         self.last_cmd_t: dict[str, float] = {}
+        self.last_cmd_on: dict[str, bool | None] = {}   # 마지막 명령의 전원 방향 (원인 판정 · 2026-10-25)
         self._initialized = False
 
     def _classify(self, dev: str, w: float) -> str:
@@ -56,9 +58,10 @@ class PowerMonitor:
             return "standby"
         return "standby"
 
-    def note_command(self, dev: str, t: float) -> None:
-        """그 기기로 명령(IR · 릴레이)이 나간 시각 — 하네스 · 브릿지가 알려 준다."""
+    def note_command(self, dev: str, t: float, want_on: bool | None = None) -> None:
+        """그 기기로 명령(IR · 릴레이)이 나간 시각 — 하네스 · 브릿지가 알려 준다. want_on = 명령의 전원 방향 (모르면 None)."""
         self.last_cmd_t[dev] = t
+        self.last_cmd_on[dev] = want_on
 
     def update(self, t: float, power_w: dict[str, float]) -> dict[str, dict[str, str]]:
         if not self._initialized:                     # 첫 측정은 초기 상태로 받아들인다 (켜진 채 시작한 기기를 수동 조작으로 보지 않게)
@@ -89,7 +92,10 @@ class PowerMonitor:
             else:
                 lc = self.last_cmd_t.get(dev)
                 # 이동평균 창만큼 상태 판정이 늦으므로 원인 창 = 확인 시간 + 평균 창
-                source = "command" if lc is not None and cand[1] - lc <= self.confirm_s + self.avg_s else "manual"
+                in_window = lc is not None and cand[1] - lc <= self.confirm_s + self.avg_s
+                want = self.last_cmd_on.get(dev)
+                same_dir = want is None or (new != "off") == want      # 명령 방향과 변화 방향이 맞나
+                source = "command" if in_window and same_dir else "manual"
             self.cur[dev] = DeviceState(new, f"{cs.state}→{new}", source, t)
             self._cand.pop(dev, None)
         return {d: {"state": s.state, "edge": s.edge, "source": s.source} for d, s in self.cur.items()}

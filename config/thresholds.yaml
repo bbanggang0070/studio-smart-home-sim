@@ -760,6 +760,7 @@ smart_home_controller:
       season_outdoor_temp_c: { summer_min: 20.0, winter_max: 10.0 }   # draft — 날짜 대신 외기온으로 I6 계절 판단
       cooling_on_above_setpoint_c: 0.5     # 냉방 사다리 진입: 실내 > 목표 + 0.5
       cooling_off_band_c: 1.0              # 해제: 실내 < 목표 − 1.0
+      winter_overheat_above_setpoint_c: 1.0  # [v3.4.28] draft — 겨울(외기 ≤ 10 °C)엔 실내 > 목표 + 이 값이면 냉방 사다리 (무료 냉방 먼저 · 없으면 에어컨) — 사용자 결정 2026-10-25
       ceiling_fan_high_above_setpoint_c: 2.0   # 목표 + 2 °C 초과면 실링팬 강 (소음 등급 허용 시)
       ceiling_fan_speed_band_c: 0.5        # 강 → 약 복귀는 목표 + 2 − 0.5 °C 아래 (I5 로 에어컨이 목표 + 1 근처에 머물 때 강/약 채터링 방지)
       dehumidify_off_band_pct: 5.0         # 제습: 상한 초과 진입 → 상한 − 5 %p 아래에서 해제

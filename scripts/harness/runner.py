@@ -161,8 +161,8 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
             acts.manual(iv.spec["manual"]["device"], iv.spec["manual"]["action"])
         miss = tl.active_kind(now, "ir_miss")
         acts.ir_miss_p = float(miss[0].spec.get("probability", 1.0)) if miss else base_miss
-        for dev, tcmd in acts.cmd_log[logged_cmds:]:
-            pmon.note_command(dev, tcmd)
+        for dev, tcmd, want_on in acts.cmd_log[logged_cmds:]:
+            pmon.note_command(dev, tcmd, want_on)
         logged_cmds = len(acts.cmd_log)
         # 계량 플러그 = 플러그가 달린 가전 + 발생원 (물리 모드와 같은 범위 — 팬 · 조명 등은 측정하지 않는다, docs/08 §3)
         plug_power = (sens.plug_power(obs, extra_power, dt) if sens else

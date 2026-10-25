@@ -37,6 +37,21 @@ def test_power_monitor_thermo_off_is_not_off_and_manual_detected(monitor):
     assert st["state"] == "off" and st["source"] == "manual"
 
 
+def test_manual_off_right_after_on_command_is_manual(monitor):
+    """'켜라' 명령 2 s 뒤 사용자가 끄면 명령 창 안이어도 manual — 방향이 반대 (실측 기상 B11 · 2026-10-25)."""
+    _feed(monitor, 0, 5, 0.0)
+    monitor.note_command("ac", 5.0, True)
+    assert _feed(monitor, 5, 40, 700.0)["ac"]["source"] == "command"
+    monitor.note_command("ac", 100.0, True)                     # 설정만 바뀐 '켜라' 프레임
+    _feed(monitor, 40, 102, 700.0)
+    st = _feed(monitor, 102, 140, 0.0)["ac"]                    # 2 s 뒤 리모컨으로 끔
+    assert st["state"] == "off" and st["source"] == "manual"
+    monitor.note_command("ac", 200.0, False)
+    _feed(monitor, 140, 200, 0.0)
+    monitor.note_command("ac", 210.0, True)
+    assert _feed(monitor, 200, 240, 700.0)["ac"]["source"] == "command"   # 방향이 맞으면 그대로 command
+
+
 def test_inverter_low_load_is_run(monitor):
     _feed(monitor, 0, 5, 0.0)
     monitor.note_command("ac", 5.0)

@@ -1,6 +1,6 @@
 """실측 기상 평가 (docs/11 필수 조치 3) — 평가 연도의 실측(재분석) 시간별 기상으로 고속 시나리오 전체를 돌린다.
 
-    uv run python tools/run_measured_weather.py [--samples 5] [--workers 16] [--ids C1,C8]
+    uv run python tools/run_measured_weather.py [--samples 5] [--workers 16] [--ids C1,C8] [--no-raw]
         → results/measured_weather/summary.csv (실행마다 지표 · 판정 · 고른 날 · 시작 외기) · raw/<run_id>.csv
 
 설정: config/harness.yaml weather. 평가 연도(years.eval)만 읽는다 — 학습 연도는 학습 도구 몫.
@@ -41,7 +41,7 @@ def series(cfg: dict) -> pd.DataFrame:
 
 
 def one(args):
-    sid, rep, start_iso, scale = args
+    sid, rep, start_iso, scale, keep_raw = args
     hcfg = load_harness_config()
     cfg = hcfg["weather"]
     env_cfg = load_config(REPO / hcfg["paths"]["environment_model"])
@@ -56,7 +56,7 @@ def one(args):
         run = Run(scenario=sc, baseline=bl, rep=rep, seed=int(sc["seed"]) + rep)
         spec = hcfg["controllers"][bl]
         r = run_fast(run, hcfg, env_cfg, make_controller(spec), spec)
-        if r.df is not None:
+        if keep_raw and r.df is not None:
             r.df.to_csv(out / f"{run.run_id}.csv", index=False)
         results.append(r)
     judge_group(results)
@@ -84,6 +84,7 @@ def main() -> None:
     ap.add_argument("--samples", type=int, default=cfg["samples"])
     ap.add_argument("--workers", type=int, default=cfg["workers"])
     ap.add_argument("--ids", default="")
+    ap.add_argument("--no-raw", action="store_true")   # 시계열을 저장하지 않는다 (디스크 절약 — 요약 · 판정만)
     a = ap.parse_args()
     chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py")], capture_output=True, text=True)
     print(chk.stdout.strip())
@@ -99,7 +100,7 @@ def main() -> None:
         starts, scale = W.match_starts(ser, s, cfg, a.samples, rng)
         widen = "" if scale == 1.0 else f" (허용 차이 ×{scale:g})"
         print(f"{s['id']}: {', '.join(t.strftime('%m-%d') for t in starts)}{widen}")
-        jobs += [(s["id"], k + 1, t.isoformat(), scale) for k, t in enumerate(starts)]
+        jobs += [(s["id"], k + 1, t.isoformat(), scale, not a.no_raw) for k, t in enumerate(starts)]
     print(f"시나리오 {len(scen)}개 × 날 {a.samples} = {len(jobs)}묶음 · 평가 연도 {cfg['years']['eval']} · 병렬 {a.workers}", flush=True)
     rows = []
     with ProcessPoolExecutor(max_workers=a.workers) as ex:

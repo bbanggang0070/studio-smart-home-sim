@@ -12,9 +12,9 @@
 | **대상** | 국내 원룸 3.5 × 5 m (약 17.5 m²) · 1인 가구 |
 | **구성** | 센서 **7종** (문 열림 · 후드 아래 온도 포함) + 비센서 신호(휴대폰 Wi-Fi · 기기 전력) · 액추에이터 **11종** (설치 5 + **보유 가전 연결 6**) · ROS 2 토픽 **55개** (계약 · docs/02 §6) + 내부 5 |
 | **제어** | **규칙 + 모드 + 이벤트** · 사용자 모드 6종 · 이벤트 15종 · 상호작용 규칙 10개 · 6계층 중재 + **우선 목표 · 허용 손실 예산** |
-| **검증** | 시나리오 **40개 × 234회** + 에너지 실험 2종 · 평가 지표 16종 |
+| **검증** | 시나리오 **41개 × 249회** (물리 8 · 고속 33) · 평가 지표 16종 · 무작위 반복 · 실측 기상 · **사전 등록 보류 평가 7차** · **BOPTEST** — 결과 [§9.4](#94-결과-요약-2026-10-25--제어기-v129) |
 | **부품비** | **~137,300원** (DIY 전력 측정) / ~168,300원 (계량 스마트 플러그 · 실물 권장) · 가전 구매 0원 |
-| **기획 버전** | **v3.1** (2026-10-05 · 가전 편입 재설계 + 피드백 2) |
+| **기획 버전** | **v3.4** (기획 확정) · 제어기 **v1.29** (2026-10-25 동결 · `config/freeze.yaml`) |
 
 ---
 
@@ -609,7 +609,7 @@ Light Prim의 `intensity`는 lux가 아니라 렌더러 상대 단위이므로 *
 | 🟢 Tier 1 | B1–B12 | 12 | 단일 조건 · 회귀 테스트 | Proposed (B5 는 + B) | 39회 |
 | 🟡 **Tier 2** | **C1–C19** | **19** | **2개 제약 충돌** | **A / B / Proposed** | **171회** |
 | 🔴 Tier 3 | X1–X9 | 9 | 3중 제약 · 예외 경계 · 실패 처리 · 일반화 | Proposed | 27회 |
-| | | **40** | | | **234회** |
+| | (+ C3b 물리 대조) | **41** | | | **249회** |
 
 **v3.1 신규:** B11 전력 상태 판정 · B12 다중 신호 재실 · **C15 장마철 빨래 건조(우선 목표)** · **C16 귀가 예측 · 셋백** · C17 전력 한도 · X9 재실 오판
 **별도 실험:** EXP-1 셋백 vs 끄기 T\* (45회) · EXP-2 귀가 예측 모델 비교 · EXP-3 기본 환기량 민감도
@@ -639,12 +639,12 @@ Light Prim의 `intensity`는 lux가 아니라 렌더러 상대 단위이므로 *
 **비교군:** Baseline A = **장치 · 가전 독립 동작**(에어컨 자체 온도조절, 제습기·가습기 자체 습도 설정, 사용자가 후드를 2분 늦게 강으로) /
 Baseline B = 협조 O · 히스테리시스 X / Proposed
 
-**실행 방식** — 249회(+ EXP-1 45회 · EXP-3 18회)를 약 15.6시간에 소화한다
+**실행 방식** — 249회(+ EXP-1 45회 · EXP-3 18회). 두 모드는 제어기 · 센서 특성 · 재실 판정 · 전력 감시 · 가전 보호(L0)가 같은 코드다 (2026-10-25 모드 대조)
 
 | 모드 | 대상 | 실행 | 소계 |
 |---|---|---:|---:|
 | **물리** (Isaac Sim 실시간) | 조인트 · 끼임 지표가 필요한 8개 | 39회 × 10분 | 6.5 h |
-| **고속** (환경 모델 + 제어기, 가속) | 나머지 30개 + EXP-1 | 183회 + 45회 × ~2분 | 7.6 h |
+| **고속** (환경 모델 + 제어기, 가속) | 나머지 33개 + EXP-1 | 210회 + 45회 | 병렬 약 10분 |
 
 > ⚠️ 고속 모드에서는 조인트 추종 · 끼임 지표를 산출하지 않는다. **B3 · C3는 두 모드로 실행해 결과 일치를 대조**한다.
 > 실험 자동화 하네스(`scenario_runner.py`)가 W10 필수 산출물이며 **크리티컬 패스**다.
@@ -677,16 +677,58 @@ Baseline B = 협조 O · 히스테리시스 X / Proposed
 7. **요리 감지 · 국소 배기 연동** *(B7·C9·X5)* · 8. **결로 노출 0** *(B9·C6·C10)* · 9. **사용자 모드 목표 준수** *(B10·C11·C12·X6)*
 10. **신호 조합 판단 · 전력 상태 확인** *(B11·B12·X9)* · 11. **우선 목표 trade-off를 예산 안에서** *(C15)* · 12. **귀가 전 쾌적 · 전력 한도** *(C16·C17·EXP-1·2)*
 
+### 9.4 결과 요약 (2026-10-25 · 제어기 v1.29)
+
+> 모든 결과는 시뮬레이션이다. 고속 모드는 센서 특성(지연 · 잡음 · 양자화) · 가전 보호(L0)를 켠 상태 · 상세는 [`docs/report_draft.md`](docs/report_draft.md)
+
+| 평가 | A (기기별 독립) | B (히스테리시스 없음) | **제안** |
+|---|---:|---:|---:|
+| 무작위 반복 (참값 계수 · 외기 · 33개 × 5) | 10.0 % | 78.9 % | **95.8 %** [91.5, 97.9] |
+| 실측 기상 (ERA5 서울 2024 · 33개 × 5일) | 13.3 % | 77.8 % | **93.9 %** [89.2, 96.7] |
+| 공유 계수 ±30 % (제어기가 아는 계수만 참값에서 흔듦) | 11.1 % | 82.2 % | **99.4 %** |
+| **보류 평가 7차 (마지막 · 사전 등록 · 결과 고치지 않음)** | 9/21 | 15/21 | **32/36 회 · 10/12 시나리오** |
+| BOPTEST BESTEST Air 열 불쾌 tdis (보통 · 더운 날, 에어컨만) | 265.9 · 259.2 | 291.7 · 281.5 | **266.5 · 259.0** |
+| 에너지 (같은 조건 짝 · 제안 / A 중앙값) | — | — | **1.21–1.26 배** (절감 아님) |
+| 물리 모드 8개 (Isaac Sim) | ⏳ v1.29 재실행 중 | | |
+| 센서리스 창문 | — | — | 끼임 감지 165/165 · 오검출 0/20 · 최대 52.9 N (스윕) |
+
+통과율 = 시나리오 판정 기준을 모두 지킨 실행 비율 · [ ] = Wilson 95 % 신뢰구간 · 보류 평가 1–7차 경과는 [`docs/12`](docs/12_freeze_record.md) §18
+
+### 9.5 실행 · 재현 방법
+
+환경 구성은 [`SETUP.md`](SETUP.md) (uv · Isaac Sim 5.1 컨테이너 · ROS 2 Jazzy 컨테이너). 결과는 `results/` (커밋하지 않는다).
+
+```bash
+uv sync                                                      # Python 3.12 환경 (pyproject.toml · uv.lock)
+uv run pytest                                                # 단위 테스트 (167)
+uv run python tools/check_freeze.py --group all              # 동결된 판정 · 지표 · 제어기 해시 점검
+
+# 고속 모드 — 개발 시나리오 33개 (A · B · 제안) → results/summary.csv · raw/
+uv run python scripts/scenario_runner.py --mode fast
+uv run python scripts/analyze_results.py                     # 지표 16종 → results/tables/w13_metrics.md
+
+# 물리 모드 — Isaac Sim + ROS 2 (8개 × 반복 3 · 실시간 약 6–7시간)
+FORCE=1 tools/run_physics_batch.sh B1 B2 B3 X2 C2 C3 X4 B5     # → results/physics/summary.csv
+tools/run_physics.sh B3 proposed 1                           # 1회만 (GUI=1 이면 Isaac 창으로 보기)
+
+# 신뢰성 평가 (docs/11 필수 조치 2–5)
+uv run python tools/run_randomized.py --no-raw               # 무작위 반복 350회
+uv run python tools/run_randomized.py --profile shared_copies --no-raw   # 공유 계수만 무작위
+uv run python tools/run_measured_weather.py --no-raw         # 실측 기상 (data/weather · tools/weather/fetch_weather.py)
+uv run python tools/run_heldout.py --scenarios config/heldout_scenarios_r7.yaml --tag r7   # 보류 7차
+tools/boptest/run_server.sh bestest_air 5000                 # BOPTEST 서버 (준비: 스크립트 머리말)
+uv run python tools/boptest/run_bestest_air.py               # 4방식 × 2기간 → results/tables/boptest_kpis.md
+```
+
 ---
 
 ## 10. 프로젝트 구조
 
 ```text
-actuator_workspace/
+studio-smart-home-sim/
 ├── README.md                          ← 이 문서 (프로젝트 개요)
 ├── SETUP.md                           ← 🖥️ RTX 5070 Ti PC 환경 구성 가이드 (clone 후 여기부터)
 ├── CLAUDE.md                          ← AI 코딩 도우미용 프로젝트 규칙 · 참고 순서
-├── requirements.txt                   # 고속 모드 · 분석용 Python 패키지
 ├── docs/
 │   ├── README.md                      # 문서 인덱스
 │   ├── 00_project_schedule.md         # 15주 마스터 일정 · 간트 · 리스크
@@ -703,35 +745,30 @@ actuator_workspace/
 │   ├── weekly/W01~W15_*.md
 │   └── presentation/
 ├── config/
-│   ├── thresholds.yaml                # 시스템 상수 (사용자 변경 불가)
-│   ├── user_modes.yaml                # [v3.0] 사용자 모드 · 소음 등급 · 스케줄
-│   ├── environment_model.yaml         # 환경 · 가전 효과 계수 (W08)
-│   ├── actuator_limits.yaml · lighting_calibration.yaml
-│   ├── baselines.yaml                 # 비교군 설정 (Baseline A 가전 내장 자동 · 사용자 후드 모델)
-│   ├── harness.yaml                   # 하네스 설정 (적분 · 로그 · 지표 상수 · baseline → 제어기)
-│   └── scenario_profiles.yaml         # 시나리오 40개 (현재 B6 · B7 · C9)
-├── worlds/lowcost_studio_room.usd
-├── assets/ furniture/ · actuator_models/ · appliance_models/ · obstacles/
+│   ├── thresholds.yaml                # 시스템 상수 · 제어 계수 (ROS 2 파라미터 파일)
+│   ├── user_modes.yaml                # 사용자 모드 · 소음 등급 · 스케줄 · 수동 외출 해제
+│   ├── environment_model.yaml         # 참값 환경 · 가전 효과 계수 (3R3C)
+│   ├── sensor_models.yaml             # 센서 특성 (지연 · 잡음 · 양자화) — 물리 · 고속 공통
+│   ├── baselines.yaml                 # 비교군 A (가전 내장 자동 · 사용자 행동 모델)
+│   ├── harness.yaml                   # 하네스 · 지표 상수 · 무작위화 · 실측 기상 · BOPTEST
+│   ├── scenario_profiles.yaml         # 시나리오 41개 (동결)
+│   ├── heldout_scenarios*.yaml        # 보류 평가 1–7차 (사전 등록 · 동결)
+│   ├── freeze.yaml                    # 동결 해시 (tools/check_freeze.py)
+│   └── actuator_limits.yaml · lighting_calibration.yaml · scene_layout.yaml
+├── worlds/ · assets/                  # Isaac Sim Scene (원룸 · 가구 · 장치 · 가전 · 장애물)
 ├── scripts/
-│   ├── isaac_actuator_bridge.py       # 토픽 ↔ 조인트 (+ 로컬 안전 계층)
-│   ├── appliance_bridge_node.py       # [v3.0] IR · 릴레이 추상화 · 가전 보호 · IR 역확인
-│   ├── environment_state_node.py      # 온도 · 절대습도 · PM · 결로 · 공기 수지 (CO₂는 검증용 참값)
-│   ├── occupancy_sensor_node.py       # 문 열림 + mmWave + 가전 전력 (호텔 로직 · 폴백 융합)
-│   ├── air_quality_sensor_node.py     # [v3.0] PM2.5 · [v3.3] 후드 아래 온도 (v3.4: CO₂ 삭제)
-│   ├── window_current_node.py         # 전류 합성 + 리플 카운팅
-│   ├── power_monitor_node.py          # [v3.1] 기기 전력 상태 머신 · 수동 조작
-│   ├── energy_predictor_node.py       # [v3.1] 귀가 분위수 · 열모델 식별 · 변화점 회귀 · 프리쿨링 최적화
-│   ├── smart_home_controller_node.py
-│   ├── controller/                    # 순수 Python 제어기 — smart_home · mode_manager · event_detector · rule_engine · predictor · arbiter · baseline_a
-│   ├── env_model/                     # 고속 모드 환경 참값 모델 (순수 Python · ROS 비의존)
-│   ├── interfaces/topics.py           # 토픽 계약 55개 상수 (docs/02 §6)
-│   ├── sensors/occupancy.py           # 재실 판정 노드 코어 — 문 이벤트 + 판정 창 · 폴백 융합 (순수 Python)
+│   ├── controller/                    # ⭐ 순수 Python 제어기 — smart_home · mode_manager · event_detector · rule_engine · ladders
+│   │                                  #    · lighting · cooling_blind · energy · arrival_gbm · appliance_guard · window_safety · arbiter · baseline_a
+│   ├── env_model/                     # 참값 환경 모델 (순수 Python · ROS 비의존)
+│   ├── sensors/                       # 센서 모델 · 재실 판정 · 전력 감시 코어 (두 모드 공통)
+│   ├── actuators/l0_protect.py        # L0 가전 보호 (압축기 · 제습 ⟂ 가습 · 실링팬 방향) — 두 모드 공통
+│   ├── interfaces/                    # 토픽 계약 55개 상수 · ROS 입출력
 │   ├── harness/                       # 하네스 — 시나리오 전개 · 주입 · 고속 세계 · 판정 · 집계
-│   ├── scenario_runner.py             # ⭐ 하네스 CLI (물리 / 고속)
-│   ├── experiment_logger_node.py
-│   └── analyze_results.py
-├── launch/studio_smart_home.launch.py
-├── tools/isaac/                       # Isaac Sim 5.1 전용 컨테이너 실행 · 검증 스크립트 (SETUP §4-A)
+│   ├── nodes/                         # 물리 모드 ROS 2 노드 (제어기 · 센서 · 재실 · 전력 · 가전 브릿지 · 창문 안전 · 월드 · 로거)
+│   ├── sim/                           # Isaac Sim 액추에이터 브릿지 · 로컬 창문 안전
+│   ├── scenario_runner.py             # 하네스 CLI (물리 / 고속)
+│   ├── physics_eval.py · analyze_results.py
+├── tools/                             # 물리 배치 · 보류 평가 · 무작위 · 실측 기상 · BOPTEST · 동결 점검 · 에너지 실험 · Isaac · ROS 컨테이너
 ├── tests/                             # pytest (uv run pytest)
 ├── pyproject.toml · uv.lock           # uv 환경 (Python 3.12)
 └── results/ raw/ · sweep/ · validation/ · figures/ · summary.csv
@@ -749,7 +786,7 @@ actuator_workspace/
 | ② 시뮬레이션 환경 | W03–W05 | Scene · 설치 장치 · 조도 캘리브레이션 · **가전 6종 배치** | ✅ Scene 완료 (10/11) |
 | ③ ROS 2 연동 | W06–W08 | 브릿지 · **가전 브릿지** · 센서 노드 · **환경 모델 확장** | 🎤 중간 점검 (10/23) |
 | ④ 제어 로직 | W09–W10 | **규칙 + 모드 + 이벤트 · 중재기** · 센서리스 · **하네스(2모드)** ⚠️ | ✅ 제어기 완성 (11/15) |
-| ⑤ 실험·분석 | W11–W13 | 시나리오 234회 · 에너지 실험 · 지표 16종 | 결과 분석 리포트 |
+| ⑤ 실험·분석 | W11–W13 | 시나리오 249회 · 에너지 실험 · 지표 16종 · 신뢰성 보강(동결 · 무작위 · 실측 기상 · 보류 · BOPTEST) | 결과 분석 리포트 |
 | ⑥ 마무리 | W14–W15 | 문서화 · 데모 영상 · 최종 발표 | 🏁 최종 발표 (12/17) |
 
 ### ⚠️ 최우선 리스크
@@ -769,7 +806,12 @@ actuator_workspace/
 | 전체 일정 · 간트 · 리스크 | [`docs/00_project_schedule.md`](docs/00_project_schedule.md) |
 | 1장 요약 · 차별점 | [`docs/01_project_brief.md`](docs/01_project_brief.md) |
 | **센서 · 액추에이터 · 토픽 · 비용 · 가정 · 제약** | [`docs/02_scope_definition.md`](docs/02_scope_definition.md) |
-| **시나리오 40개 상세 · 자동화 스키마** | [`docs/03_scenarios.md`](docs/03_scenarios.md) |
+| **시나리오 41개 상세 · 자동화 스키마** | [`docs/03_scenarios.md`](docs/03_scenarios.md) |
+| **최종 보고서 초안** | [`docs/report_draft.md`](docs/report_draft.md) |
+| 결과 분석 · 지표 16종 | [`docs/analysis_report.md`](docs/analysis_report.md) |
+| 에너지 제어 방식 비교 연구 (EXP-5 · 논문) | [`docs/10_energy_control_comparison_study.md`](docs/10_energy_control_comparison_study.md) |
+| 논문 신뢰성 검토 · 조치 계획 | [`docs/11_paper_credibility_review.md`](docs/11_paper_credibility_review.md) |
+| 판정 · 지표 동결 · 사후 개정 · 보류 평가 기록 | [`docs/12_freeze_record.md`](docs/12_freeze_record.md) |
 | 센서리스 알고리즘 · Isaac Sim 구현 | [`docs/04_sensorless_window_control.md`](docs/04_sensorless_window_control.md) |
 | 선행연구 대비 · 참고문헌 | [`docs/05_related_work.md`](docs/05_related_work.md) |
 | **가전 편입 · 인터페이스 · 환경 모델 확장** | [`docs/06_appliance_integration.md`](docs/06_appliance_integration.md) |
@@ -814,6 +856,9 @@ actuator_workspace/
 | ~~19~~ | ~~가스레인지는 전력으로 감지 불가~~ | ✅ v3.3 해소 — 후드 아래 온도 |
 | 20 | **소리 신호는 시뮬레이션에서 검증 불가** | 확장 슬롯으로만 예약 |
 | 21 | **문 기반 판정은 출입구가 문 하나라는 가정** | 창문 · 베란다 출입은 다루지 않음. 문을 열어 두면 폴백 |
+| 22 | **에너지를 줄이지 못했다** | 같은 조건 짝 비교에서 제안은 A 보다 전력량 +21–26 % (중앙값) — 대신 쾌적 유지율 약 2배. 목표 #7 미달 (§9.4) |
+| 23 | **시나리오 · 보류 묶음 작성자 = 제어기 개발자** | 보류 평가 7차를 사전 등록으로 했지만 독립 작성자가 없다 · 작성 오류가 차수마다 0–2개 |
+| 24 | **장비 한계 — 후드 배기량 ≫ 흡기팬** | 창문을 못 쓸 때 요리 중 양압은 규칙으로 해결 불가 |
 
 ### 범위 밖 (Out of Scope)
 
@@ -839,6 +884,6 @@ Isaac Sim 가상 원룸에서 검증하는 AIoT 시뮬레이션 프로젝트"**
 
 <br>
 
-*기획 v3.1 · 2026-10-05 · 가전 편입 재설계 + 피드백 2 (다중 신호 · 전력 상태 · 우선 목표 · 에너지 예측)*
+*기획 v3.4 · 제어기 v1.29 (2026-10-25 동결) · 결과는 모두 시뮬레이션*
 
 </div>

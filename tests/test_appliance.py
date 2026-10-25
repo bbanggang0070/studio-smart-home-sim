@@ -30,7 +30,7 @@ def test_power_monitor_thermo_off_is_not_off_and_manual_detected(monitor):
     _feed(monitor, 0, 5, 0.0)
     monitor.note_command("ac", 5.0)
     st = _feed(monitor, 5, 30, 700.0)["ac"]
-    assert st == {"state": "run", "edge": "off→run", "source": "command"}
+    assert {k: st[k] for k in ("state", "edge", "source")} == {"state": "run", "edge": "off→run", "source": "command"}
     st = _feed(monitor, 30, 80, 30.0)["ac"]                 # 써모오프 — 송풍
     assert st["state"] == "fan_only" and st["source"] == "self"
     st = _feed(monitor, 80, 140, 0.0)["ac"]                 # 명령 없이 꺼짐 = 수동 조작

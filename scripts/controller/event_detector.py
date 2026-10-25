@@ -56,6 +56,24 @@ class _History:
         return sum(vals) / len(vals) if vals else None
 
 
+def own_load_w(p, o: Observation) -> float:
+    """자기 장치(계량 플러그가 없는 것)의 정격 전력 추정 — 상태 토픽의 단 · 회전수 · 밝기 × thresholds 정격 (v3.4.29).
+    전력 한도(E11 · I8)는 계량 플러그 측정값 + 이 추정으로 판단한다."""
+    g = p.get
+    a = "appliances."
+    w = 0.0
+    if o.ceiling_fan:
+        w += g(a + "ceiling_fan.power_w")["low" if abs(int(o.ceiling_fan)) == 1 else "high"]
+    if o.purifier_level > 0:
+        w += g(a + "purifier.power_w")[f"l{int(o.purifier_level)}"]
+    if o.hood_level > 0:
+        w += g(a + "range_hood.power_w")[f"l{int(o.hood_level)}"]
+    w += g(a + "intake_fan.power_w") if o.intake_rpm > 0 else 0.0
+    w += g(a + "exhaust_fan.power_w") if o.exhaust_rpm > 0 else 0.0
+    lw = g("events.power_limit.own_light_w")
+    return w + (lw["ceiling"] * o.ceiling_pct + lw["desk"] * o.desk_pct) / 100.0
+
+
 class EventDetector:
     def __init__(self, p: ControllerParams, psy: Psychro):
         self.p, self.psy = p, psy
@@ -261,7 +279,9 @@ class EventDetector:
         pl = "events.power_limit."
         g = self.p.get
         limit = float(self.p.modes["energy"]["power_limit_w"])
-        total = sum(float(v) for v in o.power_w.values())
+        # 계량 플러그(에어컨 · 제습기 · 가습기 · 발생원) + 제어기가 켠 자기 장치의 정격 추정 — 팬 · 청정기 · 후드 · 조명은
+        # 플러그가 없어 측정되지 않는다 (v3.4.29 · 6차 보류 H608: 실제 2.1–2.4 kW 인데 한도 2 kW 안으로 봤다)
+        total = sum(float(v) for v in o.power_w.values()) + own_load_w(self.p, o)
         ev = self.active.get("POWER_LIMIT")
         if ev is None:
             if total >= g(pl + "enter_ratio") * limit:

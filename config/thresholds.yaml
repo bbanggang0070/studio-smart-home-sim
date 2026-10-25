@@ -602,7 +602,9 @@ smart_home_controller:
         primary_goal: 'drying_time'
         budget: { indoor_temp_rise_c: 1.0, indoor_temp_rise_away_c: 3.0, noise_grade: 'N2', extra_energy_wh: -1.0 }   # -1 = 상한 없음
         overrides: ['I6']
-      power_limit: { enter_ratio: 0.90, release_ratio: 0.75, release_hold_s: 300.0, layer: 1, shed_step_s: 10.0 }   # E11 · [v3.4.3] shed_step_s — 한도 90 % 이상이 이어지면 I8 순서로 이 간격마다 한 단계씩 더 끈다
+      power_limit: { enter_ratio: 0.90, release_ratio: 0.75, release_hold_s: 300.0, layer: 1, shed_step_s: 10.0,
+                     own_light_w: { ceiling: 40.0, desk: 8.0 } }   # [v3.4.29] own_light_w — 전력 합계 = 계량 플러그 + 제어기가 켠 자기 장치 정격(appliances.*.power_w · 조명) 추정 (6차 보류 H608)
+                     # E11 · [v3.4.3] shed_step_s — 한도 90 % 이상이 이어지면 I8 순서로 이 간격마다 한 단계씩 더 끈다
       manual_override: { hold_min: 30.0, layer: 4 }                                              # E12
       precool: { quantile: 0.2, margin_min: 5.0, timeout_after_pred_min: 60.0, layer: 3 }       # E13
       unattended_cooking: { layer: 1, plug_cooktop_cutoff: true, gas_alert_only: true }          # E15 [v3.3] — 차단 명령 /studio/cmd/cooktop_power (v3.4.5)

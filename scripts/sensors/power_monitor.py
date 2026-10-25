@@ -40,6 +40,7 @@ class PowerMonitor:
         self._cand: dict[str, tuple[str, float]] = {}
         self.last_cmd_t: dict[str, float] = {}
         self.last_cmd_on: dict[str, bool | None] = {}   # 마지막 명령의 전원 방향 (원인 판정 · 2026-10-25)
+        self.recent_cmds: dict[str, deque] = {}          # 원인 창 안의 (시각, 방향) — 방향 맞는 명령이 하나라도 있나 (v3.4.29)
         self._initialized = False
 
     def _classify(self, dev: str, w: float) -> str:
@@ -62,6 +63,7 @@ class PowerMonitor:
         """그 기기로 명령(IR · 릴레이)이 나간 시각 — 하네스 · 브릿지가 알려 준다. want_on = 명령의 전원 방향 (모르면 None)."""
         self.last_cmd_t[dev] = t
         self.last_cmd_on[dev] = want_on
+        self.recent_cmds.setdefault(dev, deque()).append((t, want_on))
 
     def update(self, t: float, power_w: dict[str, float]) -> dict[str, dict[str, str]]:
         if not self._initialized:                     # 첫 측정은 초기 상태로 받아들인다 (켜진 채 시작한 기기를 수동 조작으로 보지 않게)
@@ -92,10 +94,14 @@ class PowerMonitor:
             else:
                 lc = self.last_cmd_t.get(dev)
                 # 이동평균 창만큼 상태 판정이 늦으므로 원인 창 = 확인 시간 + 평균 창
-                in_window = lc is not None and cand[1] - lc <= self.confirm_s + self.avg_s
-                want = self.last_cmd_on.get(dev)
-                same_dir = want is None or (new != "off") == want      # 명령 방향과 변화 방향이 맞나
-                source = "command" if in_window and same_dir else "manual"
+                # 원인 창 안의 명령 중 방향이 맞는 것이 하나라도 있으면 command — 마지막 명령만 보면 '끄라' 뒤 바로
+                # '켜라'가 나갔을 때(L0 로 꺼짐이 남는다) 그 꺼짐을 수동 조작으로 본다 (6차 보류 H603 · v3.4.29)
+                win = self.confirm_s + self.avg_s
+                rc = self.recent_cmds.get(dev, deque())
+                while rc and cand[1] - rc[0][0] > win:
+                    rc.popleft()
+                on_edge = new != "off"
+                source = "command" if any(w is None or w == on_edge for _, w in rc) else "manual"
             self.cur[dev] = DeviceState(new, f"{cs.state}→{new}", source, t)
             self._cand.pop(dev, None)
-        return {d: {"state": s.state, "edge": s.edge, "source": s.source} for d, s in self.cur.items()}
+        return {d: {"state": s.state, "edge": s.edge, "source": s.source, "since": round(s.since_s, 1)} for d, s in self.cur.items()}

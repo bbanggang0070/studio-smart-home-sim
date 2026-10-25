@@ -43,7 +43,7 @@ class ApplianceGuard:
         if self._last_bump is None:
             self._last_bump = now
         # E12 — 사용자가 직접 조작했다
-        edge_key = f"{st.get('edge')}@{st.get('source')}"
+        edge_key = f"{st.get('edge')}@{st.get('source')}@{st.get('since')}"   # 발생 시각까지 — 같은 종류 두 번째 조작도 새 조작 (v3.4.29 · H603)
         if st.get("source") == "manual" and edge_key != self._seen_manual_edge:
             self._seen_manual_edge = edge_key
             self.manual_until = now + self.hold_s

@@ -16,7 +16,7 @@ from collections import deque
 
 from controller.arbiter import Candidate
 from controller.energy import EnergyPlanner, daylight_fn
-from controller.event_detector import GRADE_ORDER, ActiveEvent, _History
+from controller.event_detector import GRADE_ORDER, ActiveEvent, _History, own_load_w
 from controller.ladders import ComfortLadders
 from controller.lighting import Lighting
 from controller.params import ControllerParams
@@ -510,6 +510,13 @@ class RuleEngine:
 
     def _power_limit(self, o: Observation, ev, add) -> None:
         """E11 — I8 차단 순서대로 단계마다 하나씩 더 끈다 (L1). 요리 중 후드는 끄지 않는다(I8_never_shed)."""
+        # 기동 전 여유 확인 — 꺼진 에어컨을 켜면 한도를 넘는다면 켜지 않는다. 켠 뒤 줄이려 해도 L0 압축기 최소 ON(300 s)
+        # 동안 못 끈다 (v3.4.29 · 6차 보류 H608: 인덕션 1.5 kW 중 에어컨 기동 → 2.4 kW · 5분 초과)
+        limit = float(self.p.modes["energy"]["power_limit_w"])
+        if "ac" in self.devices and not o.ac_power:
+            now_w = sum(float(v) for v in o.power_w.values()) + own_load_w(self.p, o)
+            if now_w + float(self.p.get("appliances.ac.power_w")) > limit:
+                add("ac", "cap", 0, L1, f"I8 에어컨 기동 전 여유 부족 (지금 {now_w:.0f} W + 정격 > 한도 {limit:.0f} W)")
         pev = ev.get("POWER_LIMIT")
         if pev is None:
             return

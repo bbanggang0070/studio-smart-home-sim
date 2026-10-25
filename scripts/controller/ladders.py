@@ -32,6 +32,7 @@ class ComfortLadders:
         self._fan_high = False
         self._escalated = False
         self._ac_on = False
+        self._started = False                        # 첫 판단 — 이미 켜진 에어컨이면 히스테리시스를 '켜짐'에서 시작 (v3.4.29)
         self._outdoor_cooler = False
         self._shade_useful = False
         self._blind_choice = None                    # CoolingBlind — 조명 모듈이 필요해 처음 쓸 때 만든다
@@ -112,6 +113,14 @@ class ComfortLadders:
         i10 = self._i10(o)
         # ---- 냉방 ----
         sp = m.get("cooling_setpoint_c")
+        if not self._started:
+            # 시작할 때 에어컨이 이미 돌고 있으면(사용자가 켜 둔 채 시스템 시작) 냉방 · 에어컨 상태를 켜짐에서 시작한다 —
+            # 꺼짐에서 시작하면 히스테리시스 구간 안에서 '끄기'를 내 L0 로 3분 꺼지고 수동 조작으로 오판된다 (6차 보류 H603)
+            self._started = True
+            if o.ac_power and o.ac_mode in ("cool", "dry", "auto"):
+                # 지금 쓰는 수단이 에어컨이다 — 승격 상태로 시작해 최소 유지 동안 무료 냉방으로 바꾸지 않는다 (C18: 비 · 습한 외기 배기)
+                self.cooling = self._ac_on = self._escalated = True
+                self._escalated_since = o.now_s
         if sp is None:
             self.cooling = False
         elif season == "winter":

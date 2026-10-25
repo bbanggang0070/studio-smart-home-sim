@@ -399,3 +399,14 @@ def test_winter_overheat_uses_free_cooling_then_ac_only_without_it(params):
     mild = inbox(**{T.S_TEMPERATURE: 26.8, T.S_HUMIDITY: 40.0, T.S_HOOD_TEMPERATURE: 26.8, T.S_WEATHER: _weather(5.0, 60.0)})
     out3 = c3.step(13 * 3600, mild)
     assert not json.loads(out3[T.C_AC])["power"] and out3[T.C_WINDOW_OPEN_RATIO] == 0.0   # 목표 + 1 °C 아래 — 겨울엔 그대로
+
+
+def test_ac_not_started_when_rated_power_exceeds_limit(params):
+    """I8 기동 전 여유 — 지금 합계(플러그 + 자기 장치 추정) + 에어컨 정격 > 한도면 꺼진 에어컨을 켜지 않는다 (6차 보류 H608)."""
+    hot = {T.S_TEMPERATURE: 29.0, T.S_HUMIDITY: 55.0, T.S_WEATHER: _weather(31.0, 55.0)}
+    c = _ctrl(params)
+    out = c.step(14 * 3600, inbox(**hot, **{T.S_APPLIANCE_POWER: json.dumps({"cooktop": 2600.0})}))
+    assert not json.loads(out[T.C_AC])["power"]                         # 2600 + 700 > 3000
+    c2 = _ctrl(params)
+    out2 = c2.step(14 * 3600, inbox(**hot, **{T.S_APPLIANCE_POWER: json.dumps({"cooktop": 1000.0})}))
+    assert json.loads(out2[T.C_AC])["power"]                            # 여유가 있으면 그대로 켠다

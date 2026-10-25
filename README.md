@@ -689,7 +689,8 @@ Baseline B = 협조 O · 히스테리시스 X / Proposed
 | **보류 평가 7차 (마지막 · 사전 등록 · 결과 고치지 않음)** | 9/21 | 15/21 | **32/36 회 · 10/12 시나리오** |
 | BOPTEST BESTEST Air 열 불쾌 tdis (보통 · 더운 날, 에어컨만) | 265.9 · 259.2 | 291.7 · 281.5 | **266.5 · 259.0** |
 | 에너지 (같은 조건 짝 · 제안 / A 중앙값) | — | — | **1.21–1.26 배** (절감 아님) |
-| 물리 모드 8개 (Isaac Sim) | ⏳ v1.29 재실행 중 | | |
+| 물리 모드 8개 (Isaac Sim · 39회) | C2 0/3 (끼임 감지 없음) | 9/9 | **23/24** (C2 rep 2 — 화분이 경로에 없음 · 하네스 문제) |
+| 지표 16종 (고속 + 물리) | — | — | **14 달성 · 2 미달** (#7 에너지 · #9 기본 환기 1회 94.95 %) |
 | 센서리스 창문 | — | — | 끼임 감지 165/165 · 오검출 0/20 · 최대 52.9 N (스윕) |
 
 통과율 = 시나리오 판정 기준을 모두 지킨 실행 비율 · [ ] = Wilson 95 % 신뢰구간 · 보류 평가 1–7차 경과는 [`docs/12`](docs/12_freeze_record.md) §18
@@ -768,6 +769,7 @@ studio-smart-home-sim/
 │   ├── sim/                           # Isaac Sim 액추에이터 브릿지 · 로컬 창문 안전
 │   ├── scenario_runner.py             # 하네스 CLI (물리 / 고속)
 │   ├── physics_eval.py · analyze_results.py
+├── launch/                            # ROS 2 launch (물리 모드 노드 묶음)
 ├── tools/                             # 물리 배치 · 보류 평가 · 무작위 · 실측 기상 · BOPTEST · 동결 점검 · 에너지 실험 · Isaac · ROS 컨테이너
 ├── tests/                             # pytest (uv run pytest)
 ├── pyproject.toml · uv.lock           # uv 환경 (Python 3.12)

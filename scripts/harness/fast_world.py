@@ -258,6 +258,7 @@ class FastActuators:
                 setattr(self.actual, name, tgt)
         self.actual.ac = replace(self.target.ac)
         if self.l0:                                   # L0 — 제어기 판단과 무관하게 기기를 지킨다 (브릿지와 같은 순서)
+            prev_ac, prev_dh = self.l0["ac"].on, self.l0["dehumidifier"].on
             ac_on = self.l0["ac"].apply(self.target.ac.power, self.t)
             self.l0_held["ac"] += self.l0["ac"].held
             self.actual.ac = replace(self.actual.ac, power=ac_on)
@@ -265,6 +266,12 @@ class FastActuators:
             dehum = self.l0["dehumidifier"].apply(dehum, self.t)
             self.l0_held["dehumidifier"] += self.l0["dehumidifier"].held
             self.actual.dehumidifier, self.actual.humidifier = dehum, hum and not dehum
+            # 보호로 미뤘던 명령을 지금 실행했다 — 전력 감시에 '명령 시각'으로 알린다. 안 알리면 늦게 생긴 전력 변화를
+            # 수동 조작(E12)으로 판정해 30분 자동 제어를 멈춘다 (5차 보류 H501 · H510 · 2026-10-25)
+            if ac_on != prev_ac and self.l0["ac"].since == self.t:
+                self.cmd_log.append(("ac", self.t))
+            if dehum != prev_dh and self.l0["dehumidifier"].since == self.t:
+                self.cmd_log.append(("dehumidifier", self.t))
             self.actual.ceiling_fan = self.fan_guard.apply(int(self.target.ceiling_fan), self.t)
 
     def state_topics(self) -> dict[str, Any]:

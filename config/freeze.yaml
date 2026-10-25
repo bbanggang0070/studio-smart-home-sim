@@ -8,6 +8,7 @@
 #  2026-10-24 동결 개정 2 — controller 다시 씀(겨울 후드 · IR 반복 · 수동 외출 해제) + user_modes.yaml · 고속 하네스 브릿지 모델 추가 + 3차 보류 등록 (docs/12 §4 · §9)
 #  2026-10-24 동결 개정 3 — controller 다시 씀(수동 외출 해제 재실 확정 · 레이더 두절 위치) + 4차 보류 등록 (docs/12 §4 · §11)
 #  2026-10-25 동결 개정 4 — controller 다시 씀(BOPTEST · 모드 대조 · 센서 잡음 대책) + 고속 하네스 센서 특성 · L0 + 5차 보류 등록 (docs/12 §4 · §13)
+#  2026-10-25 동결 개정 5 — 하네스만 (fast_world 브릿지 모델 · 물리 전력 감시 노드) — 제어 코드 불변 (docs/12 §4)
 # ============================================================================
 frozen_at: '2026-10-19'
 files:
@@ -51,7 +52,7 @@ controller:
 - path: config/user_modes.yaml
   sha256: 5e1e89e739c65cea27a9537b26c3be28b05c0d9c58e5bb310e28f0798673bdbd
 - path: scripts/harness/fast_world.py
-  sha256: 3dde31afe69b23dd93e05176ea32906bacf3d73ef83cfdec4205548c9ae5c248
+  sha256: b9dac26776126329c6d864fa5e4d531d3a5e6e25bbf1c7c42f6d91cda8a5cf93
 - path: config/baselines.yaml
   sha256: f5db42c8035c79899161e2ae1c2945a11dbc459bb33db6cb0e410492dc9ec7db
 - path: config/sensor_models.yaml

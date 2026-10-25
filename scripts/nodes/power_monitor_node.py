@@ -26,7 +26,7 @@ def main() -> None:
     rclpy.init()
     node = rclpy.create_node("power_monitor")
     clock = ros_io.SimClock(node)
-    st: dict = {"power": None, "last_cmd": {}}
+    st: dict = {"power": None, "last_cmd": {}, "last_state": {}}
 
     def on_cmd(topic, v):
         if st["last_cmd"].get(topic) != v:                 # 바뀐 명령만 '명령 시각' (같은 값 반복 발행은 무시)
@@ -35,6 +35,24 @@ def main() -> None:
 
     for tp in CMD_DEVICE:
         ros_io.subscribe(node, tp, on_cmd)
+
+    # 가전 브릿지 상태(L0 보호 뒤 실제 전원)가 바뀐 시각도 '명령 시각' — 보호로 미뤘던 명령이 늦게 실행되면
+    # 명령 토픽 시각만으로는 전력 변화를 수동 조작으로 판정한다 (고속 하네스와 같다 · 2026-10-25)
+    def on_state(topic, v):
+        if topic == T.T_AC:
+            try:
+                on = bool(json.loads(v).get("power"))
+            except (ValueError, TypeError):
+                return
+            dev = "ac"
+        else:
+            on, dev = bool(v), ("dehumidifier" if topic == T.T_DEHUMIDIFIER else "humidifier")
+        if st["last_state"].get(dev) is not None and st["last_state"][dev] != on:
+            pm.note_command(dev, clock.elapsed())
+        st["last_state"][dev] = on
+
+    for tp in (T.T_AC, T.T_DEHUMIDIFIER, T.T_HUMIDIFIER):
+        ros_io.subscribe(node, tp, on_state)
     ros_io.subscribe(node, T.S_APPLIANCE_POWER, lambda _, v: st.update(power=json.loads(v)))
     pub = ros_io.publisher(node, T.T_APPLIANCE_STATES)
 

@@ -27,3 +27,6 @@ worlds/cache/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 외부 도구 (BOPTEST 원본 저장소 등 — 필수 조치 5 · 준비 방법은 tools/boptest/run_server.sh 머리말)
+external/

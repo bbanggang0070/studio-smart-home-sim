@@ -10,6 +10,9 @@ dependencies = [
     "pyyaml>=6.0",        # config/*.yaml
     "scikit-learn>=1.4",  # 분위수 GBM (귀가 시각 분포 예측)
     "matplotlib>=3.8",    # 결과 그래프
+    "torch>=2.14.1",  # EXP-5 LSTM 예측기 · RL 학습 (CUDA 13.0 빌드 — 아래 pytorch-cu130 색인)
+    "stable-baselines3>=2.9.0",  # EXP-5 심층 강화학습 (SAC · DQN)
+    "gymnasium>=1.4.0",  # EXP-5 강화학습 환경 인터페이스
 ]
 
 [dependency-groups]
@@ -17,7 +20,17 @@ dev = ["pytest>=8.0"]
 
 [tool.uv]
 package = false
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["scripts"]
+
+# PyTorch CUDA 13.0 빌드 (드라이버 580 · RTX 5070 Ti) — 2026-10-24 사용자 허락 · 리눅스 x86_64 전용 (environments)
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }

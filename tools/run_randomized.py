@@ -1,6 +1,6 @@
 """무작위 반복 실행 (docs/11 필수 조치 2) — 반복마다 참값 계수 · 외기를 뽑아 고속 시나리오 전체를 돌린다.
 
-    uv run python tools/run_randomized.py [--reps 5] [--workers 16] [--ids C1,C8]
+    uv run python tools/run_randomized.py [--reps 5] [--workers 16] [--ids C1,C8] [--profile shared_copies] [--no-raw]
         → results/randomized/summary.csv (실행마다 지표 · 판정 · 뽑은 조건) · raw/<run_id>.csv
 
 설정: config/harness.yaml randomization. 판정 · 지표는 동결된 정의(config/freeze.yaml)를 그대로 쓴다 — 시작 때 점검한다.
@@ -63,10 +63,17 @@ def perturb_scenario(sc: dict, ext: dict) -> dict:
     return sc
 
 
+def profile_cfg(hcfg: dict, profile: str) -> dict:
+    cfg = dict(hcfg["randomization"])
+    if profile:
+        cfg.update(cfg["profiles"][profile])          # truth_params · external · out_dir 를 프로파일 값으로
+    return cfg
+
+
 def one(args):
-    sid, rep = args
+    sid, rep, profile, keep_raw = args
     hcfg = load_harness_config()
-    cfg = hcfg["randomization"]
+    cfg = profile_cfg(hcfg, profile)
     env0 = load_config(REPO / hcfg["paths"]["environment_model"])
     sc0 = next(s for s in load_scenarios(REPO / hcfg["paths"]["scenarios"]) if s["id"] == sid)
     over, ext = draw(cfg, env0, int(sc0["seed"]) * 1000 + rep, nominal=(rep == 1 and cfg["nominal_first"]))
@@ -79,7 +86,7 @@ def one(args):
         run = Run(scenario=sc, baseline=bl, rep=rep, seed=int(sc["seed"]) + rep)
         spec = hcfg["controllers"][bl]
         r = run_fast(run, hcfg, env_cfg, make_controller(spec), spec)
-        if r.df is not None:
+        if keep_raw and r.df is not None:
             r.df.to_csv(out / f"{run.run_id}.csv", index=False)
         results.append(r)
     judge_group(results)
@@ -97,12 +104,14 @@ def one(args):
 
 def main() -> None:
     hcfg = load_harness_config()
-    cfg = hcfg["randomization"]
     ap = argparse.ArgumentParser()
-    ap.add_argument("--reps", type=int, default=cfg["reps"])
-    ap.add_argument("--workers", type=int, default=cfg["workers"])
+    ap.add_argument("--reps", type=int, default=hcfg["randomization"]["reps"])
+    ap.add_argument("--workers", type=int, default=hcfg["randomization"]["workers"])
     ap.add_argument("--ids", default="")
+    ap.add_argument("--profile", default="")
+    ap.add_argument("--no-raw", action="store_true")   # 시계열을 저장하지 않는다 (디스크 절약 — 요약 · 판정만)
     a = ap.parse_args()
+    cfg = profile_cfg(hcfg, a.profile)
     chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py")], capture_output=True, text=True)
     print(chk.stdout.strip())
     if chk.returncode != 0:
@@ -110,7 +119,7 @@ def main() -> None:
     scen = [s for s in load_scenarios(REPO / hcfg["paths"]["scenarios"]) if s["run_mode"] == "fast"]
     if a.ids:
         scen = [s for s in scen if s["id"] in a.ids.split(",")]
-    jobs = [(s["id"], k) for s in scen for k in range(1, a.reps + 1)]
+    jobs = [(s["id"], k, a.profile, not a.no_raw) for s in scen for k in range(1, a.reps + 1)]
     print(f"시나리오 {len(scen)}개 × 반복 {a.reps} = {len(jobs)}묶음 · 병렬 {a.workers}", flush=True)
     rows = []
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
@@ -118,6 +127,7 @@ def main() -> None:
             rows += part
     df = pd.DataFrame(rows)
     out = REPO / cfg["out_dir"]
+    out.mkdir(parents=True, exist_ok=True)
     df.to_csv(out / "summary.csv", index=False)
     p = df[df.baseline == "proposed"]
     print(f"실행 {len(df)}회 · 제안 판정 통과 {int((p.status == 'PASS').sum())}/{len(p)}")

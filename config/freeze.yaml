@@ -7,6 +7,7 @@
 #  2026-10-24 동결 개정 — controller 다시 씀(규칙 공백 · B8 · C4 수정) + 2차 보류 config/heldout_scenarios_r2.yaml 등록 (docs/12 §4 · §7)
 #  2026-10-24 동결 개정 2 — controller 다시 씀(겨울 후드 · IR 반복 · 수동 외출 해제) + user_modes.yaml · 고속 하네스 브릿지 모델 추가 + 3차 보류 등록 (docs/12 §4 · §9)
 #  2026-10-24 동결 개정 3 — controller 다시 씀(수동 외출 해제 재실 확정 · 레이더 두절 위치) + 4차 보류 등록 (docs/12 §4 · §11)
+#  2026-10-25 동결 개정 4 — controller 다시 씀(BOPTEST · 모드 대조 · 센서 잡음 대책) + 고속 하네스 센서 특성 · L0 + 5차 보류 등록 (docs/12 §4 · §13)
 # ============================================================================
 frozen_at: '2026-10-19'
 files:
@@ -25,27 +26,35 @@ files:
   sha256: bc14124d332054ef6ed678bd2659c91e3e85090a9203cca2b860166366f6f56d
 - path: config/heldout_scenarios.yaml
   sha256: 7e16eb4ce43425399d38226b96ee71a70065ebc2b0d576c1da4274c24a611519
+- path: config/heldout_scenarios_r5.yaml
+  sha256: 8fe284b88e76c5dcf1f86e453eed20762ea4b692de2ef9e102a78ab34f31cbd0
 - path: config/heldout_scenarios_r4.yaml
   sha256: 184ad0acabd830023ee1fa6ad57e1686cd26855fd5eb3a3fdadf0652a19d2aca
 - path: config/heldout_scenarios_r3.yaml
   sha256: 0e8973bd44e618c95f683381f316722294f80af62abfb4fabf18d5d33e1cf016
 - path: config/heldout_scenarios_r2.yaml
   sha256: bc539dffcae5fdce946db9a4fa3f79591ef3141e60b9b3ee19a52c25ddd19a92
-controller_frozen_at: '2026-10-24'
+controller_frozen_at: '2026-10-25'
 controller:
 - glob: scripts/controller/*.py
-  sha256: 51c0c609b4fd6d972fb26cd5cda58e486a7621d4d282d6406f5a748fd7e145a6
+  sha256: a8ccac657f787d3308cdeb20c573eb11f57be881010cc37140daaae45c667d18
 - glob: scripts/sensors/*.py
-  sha256: 7b47516eac54ab4d938047958b93b3d56207e3fc9e7864aa07c37b9bda1e9f66
+  sha256: 735719d3e70d2b2e8080a8975dce05260e8be3f1d97ee806b236555880150fce
 - glob: scripts/actuators/*.py
   sha256: 482ddf1c448b77b123eb9a0189422b5a6f633320948f0cec937ca38fe520c731
 - path: scripts/harness/controllers.py
   sha256: 3d6446ab3b07ebd7a257f66d7dd5eb05470984dd7e05b858daa4003f9a7a7a5c
 - path: config/thresholds.yaml
-  sha256: 397c8160cd21462fca487bf625d89b998b448f431d1f27ed325ef913dd2af136
+  sha256: 729a96ce3c2e8444994d146ace3e232016f180ad01b5d4537fa4b90ca8304b66
 - glob: models/*
   sha256: 543c1aef8870d243f1be861ef90390c94f9a9d271b26ae74cefcde13d1e54bce
 - path: config/user_modes.yaml
   sha256: 5e1e89e739c65cea27a9537b26c3be28b05c0d9c58e5bb310e28f0798673bdbd
 - path: scripts/harness/fast_world.py
-  sha256: 844d257fb46395de0fa995cda24bebc398d99e7f108df016206e7a6b9fee2dd3
+  sha256: 3dde31afe69b23dd93e05176ea32906bacf3d73ef83cfdec4205548c9ae5c248
+- path: config/baselines.yaml
+  sha256: f5db42c8035c79899161e2ae1c2945a11dbc459bb33db6cb0e410492dc9ec7db
+- path: config/sensor_models.yaml
+  sha256: c6b51194e2a0354e246c72a07c7f77a8ab20ec78e9e4fbd94f344d37ab0cb712
+- path: scripts/harness/runner.py
+  sha256: 435314694e7b4d42a6f2a6506bf9e7dd69a1f9511f92ff7b3f08ccefc4519f89

@@ -28,6 +28,7 @@ class Lighting:
         self._glare = False
         self._glare_deg: float | None = None
         self._settled_since: float | None = None
+        self._ceil_on = False                       # 천장등 켜짐 (불감대 히스테리시스 · v3.4.27)
         self._hold_c_pct: float | None = None
         self.virtual = False
         self.alerted = False
@@ -114,8 +115,14 @@ class Lighting:
         # 블라인드가 움직이는 중이거나 막 멈췄으면(센서 · 조명 지연) 조도로 다시 판단하지 않는다 — 과보정 진동 방지 (B2 물리 모드)
         settled = self._blind_settled(o)
         short = ceil_target - daylight
-        if short < g("illuminance.ceiling_deadband_lux"):
-            short = 0.0                                    # 목표 근처 — 센서 잡음에 천장등이 깜빡이지 않게
+        # 불감대는 켤 때만 (히스테리시스) — 꺼져 있으면 부족분이 불감대를 넘어야 켜고, 켜져 있으면 부족분이 0 이하일 때 끈다.
+        # 끄는 쪽에도 쓰면 목표가 불감대 이하인 모드(수면 30 lux)에서 주광 추정 잡음 몇 lux 로 깜빡인다 (v3.4.27 · B10)
+        if self._ceil_on:
+            self._ceil_on = short > 0.0
+        else:
+            self._ceil_on = short >= g("illuminance.ceiling_deadband_lux")
+        if not self._ceil_on:
+            short = 0.0
         c_pct = min(100.0, max(0.0, short / g(lm + "ceiling_lux_at_floor_full") * 100.0))
         if settled or self._hold_c_pct is None:
             self._hold_c_pct = c_pct
@@ -127,7 +134,8 @@ class Lighting:
         if m["target"] == "desk":
             c_eff = min(c_pct, g("setpoints.ceiling_light_thermal_cap_pct")) if cooling else c_pct   # 고온 상한이 걸린 실제 밝기
             desk_from_ceiling = g(lm + "ceiling_lux_at_desk_full") * c_eff / 100.0
-            d_pct = min(100.0, max(0.0, (m["lux"] - daylight - desk_from_ceiling) / g(lm + "desk_lux_at_desk_full") * 100.0))
+            aim = m["lux"] + g("illuminance.desk_target_margin_lux")   # 센서 잡음 여유 (v3.4.27 · C4)
+            d_pct = min(100.0, max(0.0, (aim - daylight - desk_from_ceiling) / g(lm + "desk_lux_at_desk_full") * 100.0))
             add("desk_light", "need", d_pct, L6, f"스탠드 — 책상 {m['lux']:g} lux 목표 (추정)")
         else:
             add("desk_light", "need", 0, L6, "스탠드 — 모드 목표 없음")

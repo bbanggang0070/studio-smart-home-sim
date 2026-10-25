@@ -218,3 +218,24 @@ def test_bridge_blind_repeat_and_refresh_for_purifier():
         acts.command({T.C_PURIFIER_LEVEL: 2}, float(t))
     assert acts.ir_tx["purifier"] == 1 + 3 + 1                  # 첫 송신 + 반복 3 (60 · 120 · 180 s) + 주기 1 (180 + 600 = 780 s)
 
+
+
+def test_fast_l0_compressor_guard_and_mutex():
+    """고속 하네스 L0 — 물리 모드 가전 브릿지와 같은 압축기 최소 ON 300 s / OFF 180 s · 제습 ⟂ 가습 (2026-10-24)."""
+    from controller.params import load_params
+    from harness.fast_world import FastActuators, initial_actuators
+    acts = FastActuators(initial_actuators({"initial": {}}), {}, ["ac", "dehumidifier", "humidifier"])
+    acts.l0_setup(load_params().th["appliances"])
+    on = json.dumps({"power": True, "mode": "cool", "setpoint": 26.0})
+    off = json.dumps({"power": False, "mode": "cool", "setpoint": 26.0})
+    acts.command({T.C_AC: on}, 0.0); acts.update(1.0)
+    assert acts.actual.ac.power                                   # 처음 켜기는 바로 (최소 OFF 는 시작 전부터 지났다)
+    acts.command({T.C_AC: off}, 60.0); acts.update(59.0)
+    assert acts.actual.ac.power                                   # 켠 지 60 s — 최소 ON 300 s 전이라 유지
+    for _ in range(250):
+        acts.update(1.0)
+    assert not acts.actual.ac.power                               # 300 s 지나 꺼짐
+    acts.command({T.C_AC: on}, 320.0); acts.update(10.0)
+    assert not acts.actual.ac.power                               # 끈 지 10 s — 최소 OFF 180 s 전
+    acts.command({T.C_DEHUMIDIFIER: True, T.C_HUMIDIFIER: True}, 330.0); acts.update(1.0)
+    assert acts.actual.dehumidifier and not acts.actual.humidifier   # 제습 ⟂ 가습

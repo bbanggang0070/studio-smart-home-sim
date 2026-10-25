@@ -86,8 +86,8 @@ def main() -> None:
             row["pm.ac.run"], row["pm.ac.fan_only"] = ac.get("state") == "run", ac.get("state") == "fan_only"
             row["pm.ac.manual"] = ac.get("source") == "manual"
         row["power.ac_w"] = power.get("ac", 0.0)
-        if T.S_APPLIANCE_POWER in last:
-            row["power.total_w"] = sum(float(v) for v in json.loads(last[T.S_APPLIANCE_POWER]).values())
+        # 판정용 전체 전력 = 참값 (모든 가전 + 발생원) — 고속 하네스와 같은 정의 (2026-10-24 모드 대조: 전에는 계량 플러그 측정값)
+        row["power.total_w"] = sum(float(v) for v in power.values()) + sum(float(v) for v in tr.get("extra_power_w", {}).values())
         row["truth.occupied"] = tr["occupied_truth"]
         row["truth.door_open"] = tr["door_open"]
         for k, v in tr["ext"].items():

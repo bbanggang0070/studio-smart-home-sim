@@ -10,6 +10,12 @@ import math
 import numpy as np
 
 
+# 참값 관측 키 ← 센서 이름 (config/sensor_models.yaml sensors) — 물리 모드 센서 노드 · 고속 하네스가 같이 쓴다
+TRUTH_SENSORS = {"temperature": "temperature_c", "humidity": "humidity_pct", "illuminance": "illuminance_lux",
+                 "pm25": "pm25_ugm3", "hood_temperature": "hood_temperature_c"}
+PLUG_DEVICES = ("ac", "dehumidifier", "humidifier")          # 계량 플러그가 달린 가전 (+ 시나리오 발생원 전력) — docs/08 §3
+
+
 class SensorModel:
     def __init__(self, spec: dict, rng: np.random.Generator):
         self.s, self.rng = spec, rng
@@ -26,6 +32,24 @@ class SensorModel:
         v = round(v / q) * q if q > 0 else v
         lo, hi = s["range"]
         return float(min(max(v, lo), hi))
+
+
+class SensorSuite:
+    """참값 관측 → 센서 측정값 묶음 (고속 하네스 · 2026-10-24 모드 대조). 물리 모드 센서 노드와 같은 모델 · 같은 계량 플러그 범위.
+    측정 주기는 제어 주기(1 Hz)로 한 번 — 물리 모드는 온습도 · 조도를 10 Hz 로 뽑지만 제어기는 1 Hz 로 마지막 값을 읽는다."""
+
+    def __init__(self, cfg: dict, rng: np.random.Generator):
+        s = cfg["sensors"]
+        self.models = {name: SensorModel(s[name], rng) for name in TRUTH_SENSORS}
+        self.plug = {d: SensorModel(s["appliance_power"], rng) for d in PLUG_DEVICES}
+
+    def measure(self, obs: dict, dt: float) -> dict[str, float]:
+        return {name: self.models[name].measure(float(obs[key]), dt) for name, key in TRUTH_SENSORS.items()}
+
+    def plug_power(self, obs: dict, extra_power: dict[str, float], dt: float) -> dict[str, float]:
+        p = {d: self.plug[d].measure(float(obs["appliance_power_w"].get(d, 0.0)), dt) for d in PLUG_DEVICES}
+        p.update({k: round(float(v), 1) for k, v in extra_power.items()})
+        return p
 
 
 class RippleCounter:

@@ -51,6 +51,7 @@ smart_home_controller:
       over_bright_lux: 700.0     # 이상 → 블라인드 차광 시작
       shade_release_lux: 620.0   # 이하 → 차광 해제 (데드밴드 80 lux)
       glare_partial_shade: true  # [v3.4.13] 눈부심 차광은 부분 차광 — 방 조도 목표에 맞는 각도 (전부 가리고 조명을 켜지 않게 · B2)
+      desk_target_margin_lux: 20.0 # [v3.4.27] draft — 스탠드는 책상 목표 + 이 여유로 맞춘다 (조도 센서 잡음 → 주광 추정이 흔들려 책상 조도 σ ≈ 3 lux · 최저 −18 · C4)
       ceiling_deadband_lux: 30.0 # [v3.4.13] draft — 작업면 부족분이 이보다 작으면 천장등을 켜지 않는다 (주광이 목표 근처일 때 깜빡임 방지)
       glare_angle_step_deg: 5.0
       glare_settle_s: 5.0        # [v3.4.13] draft — 블라인드가 지령 각도에 도착한 뒤 이만큼 지나서야 조도로 다시 판단 (움직이는 중 · 센서 지연에 과보정 진동 방지)  # 부분 차광 각도 단위 · 이만큼 넘게 달라질 때만 바꾼다 (센서 잡음에 블라인드가 떨지 않게)
@@ -551,6 +552,7 @@ smart_home_controller:
       condensation: { layer_warn: 5, layer_critical: 2 }   # E2 — 수치는 condensation 블록
       shower:                          # E3 [v3.4] — docs/07 §3.4
         rh_rise_pct_in_5min: 8.0
+        average_window_s: 30.0         # [v3.4.27] draft — 지금 · 5분 전 습도를 이 구간 평균으로 비교 (센서 잡음 σ 0.8 %p — 샘플 두 개 비교가 순간적으로 넘어 오감지 · C1)
         compensate_dehumidifier_removal: true   # [v3.4.24] 제습기가 도는 중이면 5분 제거량(정격 · 방 부피 · 포화 절대습도로 환산 ≈ 3.4 %p)만큼 기준을 낮춘다 — 제습기가 상승을 가려 샤워를 놓쳤다 (보류 H10)
         require_no_hood_heat: true     # 후드 아래 온도 정상 (요리 수증기와 구분)
         require_humidifier_off: true   # 가습기 전력으로 확인
@@ -588,7 +590,10 @@ smart_home_controller:
         ac_mode: 'dry'
         ac_setpoint_above_entry_c: 0.0           # 냉방 전환 시 설정 = 진입 시 온도 + 이 값 · 단 쾌적 냉방 설정을 넘지 않는다
         cool_switch_above_entry_c: 0.7           # draft — 진입 + 0.7 °C 이상이면 냉방 (예산 1.0 안에서 여유)
-        dry_resume_below_entry_c: 0.2            # draft — 진입 + 0.2 °C 이하로 내려오면 다시 제습 모드
+        dry_resume_below_entry_c: 0.2            # draft — max(진입, 보낸 냉방 설정) + 0.2 °C 이하로 내려오면 다시 제습 모드 (v3.4.27)
+        setpoint_release_band_c: 0.5    # [v3.4.27] draft — '실내 > 냉방 설정(+I5)' 로 냉방에 든 경우 이만큼 내려와야 제습으로
+        average_window_s: 30.0          # [v3.4.27] draft — 제습 ↔ 냉방 판단을 이 구간 평균 온도로 (온도 센서 잡음 σ 0.1 °C 로 경계에 일찍 닿아
+                                        #  1–2분마다 전환 · 고속 하네스 센서 특성 추가 뒤 C15 299회 · 2026-10-24)
         rh_rise_pct_per_h: 3.0
         rh_rise_hold_min: 60.0
         done_remaining_moisture: 0.05
@@ -758,6 +763,8 @@ smart_home_controller:
       ceiling_fan_high_above_setpoint_c: 2.0   # 목표 + 2 °C 초과면 실링팬 강 (소음 등급 허용 시)
       ceiling_fan_speed_band_c: 0.5        # 강 → 약 복귀는 목표 + 2 − 0.5 °C 아래 (I5 로 에어컨이 목표 + 1 근처에 머물 때 강/약 채터링 방지)
       dehumidify_off_band_pct: 5.0         # 제습: 상한 초과 진입 → 상한 − 5 %p 아래에서 해제
+      humidify_confirm_s: 60.0             # [v3.4.27] draft — 하한 미만이 이 시간 이어져야 가습 진입 (습도 센서 잡음 σ 0.8 %p — 하한 바로 위에서 한 샘플로 진입 · C6)
+      humidify_average_window_s: 30.0      # [v3.4.27] draft — 가습 진입 · 정지 · 재개는 이 구간 평균 습도로
       humidify_restart_band_pct: 3.0       # 가습: 하한 미만 진입 → 유효 상한 도달 정지 · 상한 − 3 %p 아래로 내려오면 재개 허용
       humidify_target_below_hi_pct: 3.0    # [v3.4.18] draft — 가습 목표 = 모드 상한 − 3 %p (상한까지 올려 제습이 켜지는 상충 방지 · 상충 점검 R5)
       humidify_cap_guard_pct: 1.0          # [v3.4.24] draft — 가습 정지 = 결로 상한(I4) − 1 %p · 상한에 딱 붙으면 끄는 지연(1 s) 동안 여유가 2 °C 아래로 내려간다 (보류 H9)
@@ -776,7 +783,9 @@ smart_home_controller:
       #  RH 60 % 언저리에서 제습 모드로 28.4 °C 까지 올라 1800 s 시점 실링팬 보정 온도가 27 °C 를 넘었다 (실측 기상 B8)
       humid_priority_excess_pct: 10.0      # draft
       ac_cool_resume_above_mild_c: 0.8     # draft
-      ac_mode_min_dwell_s: 600.0           # draft
+      ac_mode_min_dwell_s: 600.0           # draft — [v3.4.27] 양방향 (제습 → 냉방도) · 단 실내 > 냉방 설정 + ac_cool_resume_above_c 면 바로 냉방
+      humid_priority_release_band_pct: 2.0 # [v3.4.27] draft — 습도 우선 해제 = 초과 < humid_priority_excess_pct − 이 폭 (습도 센서 잡음 σ 0.8 %p 로
+                                           #  매 초 뒤집혀 냉방 ↔ 제습 299회 전환 · C15 건조 지연 — 고속 하네스 센서 특성 추가로 드러남 2026-10-24)
       ac_dry_setpoint_below_c: 1.5         # [v3.4.6] draft — 제습 운전 설정 = 냉방 목표 − 1.5 (설정 아래 써모오프로 제습이 멈추지 않게)
       ac_dry_min_setpoint_c: 24.0          # [v3.4.6] user_modes editable_ranges.cooling_setpoint_c 하한과 같게
 

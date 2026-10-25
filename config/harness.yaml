@@ -15,6 +15,7 @@ paths:
 fast_mode:
   dt_s: 1.0                       # 환경 모델 적분 · 정책 주기 (thresholds policy_rate_hz 1 Hz 와 같게)
   log_interval_s: 1.0             # CSV 기록 간격
+  sensor_models: true             # [2026-10-24] 센서 지연 · 잡음 · 양자화 (config/sensor_models.yaml — 물리 모드 센서 노드와 같다). false = 참값 그대로 (비교용)
   # 고속 모드에서 창문 · 블라인드는 1차 지연 위치 모델로 대체한다 (docs/03 §5.3)
   actuator_time_constant_s:
     window_open_ratio: 3.0        # draft — 지표 #2 '창문 응답 ≤ 5 s' 를 만족하는 크기
@@ -288,6 +289,21 @@ randomization:
     outdoor_temp_c: { offset: [-1.0, 1.0] }
     outdoor_rh_pct: { offset: [-5.0, 5.0], clip: [5.0, 100.0] }
     outdoor_illuminance_lux: { scale: [0.8, 1.2] }
+  profiles:                         # --profile <이름> — 위 truth_params · external · out_dir 를 이 값으로 바꿔 돌린다
+    shared_copies:                  # docs/11 권장 10 (§6.5) — 제어기가 '참값과 같은 사본'을 쓰는 계수만 참값 쪽에서 흔든다.
+                                    #  제어기는 명목값(thresholds lighting_model.daylight · cooling_blind 계수)을 그대로 쓴다.
+                                    #  범위는 가정 — 렌더 대조(W12 T12.5) · SHGC 문헌값 폭을 넉넉히 덮는 ±30 % 수준
+      out_dir: results/randomized_shared
+      external: {}
+      truth_params:
+        window.blind_flow_factor_shaded: { uniform: [0.35, 0.65] }
+        thermal.blind_solar_heat_factor_open: { uniform: [0.85, 1.0] }
+        thermal.blind_solar_heat_factor_shaded: { uniform: [0.4, 0.7] }
+        thermal.solar_heat_gain_fraction: { uniform: [0.45, 0.75] }
+        lighting.daylight.direct.df_open: { scale: [0.7, 1.3] }
+        lighting.daylight.diffuse.df_open: { scale: [0.7, 1.3] }
+        lighting.daylight.direct.sensor_ratio: { scale: [0.85, 1.15] }
+        lighting.daylight.diffuse.sensor_ratio: { scale: [0.85, 1.15] }
 
 # ---- 실측 기상 시계열 (docs/11 필수 조치 3 · tools/weather/fetch_weather.py · scripts/harness/weather.py) ------------
 #  자료: Open-Meteo 과거 기상 API (ERA5 · ERA5-Land 재분석 · CC BY 4.0) — 관측을 동화한 재분석이다(지점 관측 아님).
@@ -322,3 +338,25 @@ weather:
 heldout:
   scenarios: config/heldout_scenarios.yaml   # 사전 등록 · 해시 동결 (freeze.yaml files)
   out_dir: results/heldout
+
+# ---- 외부 고충실도 에뮬레이터 BOPTEST (docs/11 필수 조치 5 · tools/boptest/) ------------------------------
+#  BESTEST Air (BESTEST Case 900 · 48 m² · 4관 FCU · 덴버 TMY) — Modelica FMU. 우리 참값 모델과 무관한 외부 모델
+#  연결: 제어기 출력 에어컨 명령 → 냉방 설정온도(켜짐 = 설정 · 꺼짐 = ac_off_setpoint_k) · 난방은 테스트 케이스 기본값(모든 방식 공통)
+#  테스트 케이스에 없는 신호(실내 습도 · PM · 조도 · 후드 온도)는 고정값 — 냉방 판단만 비교된다 (습도 · 환기 · 차광 사다리는 쉰다)
+#  재실 = 테스트 케이스 일정(8–18시 2명) · 제어기는 1 Hz 로 부르고 BOPTEST 는 step_s 마다 진행
+boptest:
+  url: http://127.0.0.1:5000
+  testcase: bestest_air
+  periods: [typical_cool_day, peak_cool_day]    # 각 14일 (BOPTEST 표준 시나리오)
+  electricity_price: constant
+  step_s: 60.0
+  controller_dt_s: 1.0
+  ac_off_setpoint_k: 308.15                     # 입력 최댓값 35 °C — 사실상 냉방 꺼짐
+  occupied_hours: [8, 18]
+  assumed: { humidity_pct: 50.0, pm25_ugm3: 10.0, illuminance_lux: 300.0 }
+  ac_indoor_fan_w: 40.0                         # 계량 플러그 = 명령에 즉시 반응 — 켜짐 max(BOPTEST 전력, 이 실내기 팬 W) · 꺼짐 0 (thresholds ac.fan_only 20–100 W 안)
+                                                #  BOPTEST 전력은 step_s(60 s) 마다만 바뀌어, 그대로 넘기면 E9 가 켤 때 · 끌 때 한 스텝 안에 무응답으로 확정한다 (2026-10-24)
+  devices: [ac]                                 # 이 건물에 있는 우리 장치 — 제어기 장치 목록을 이것으로 둔다 (X8 과 같은 방식)
+  methods: [boptest_baseline, A, B, proposed]
+  baseline_a: { auto_appliances: [ac], user_ac_away: true }   # 사람이 켜고 끄는 에어컨 (C16 과 같은 사용자 모델)
+  out_dir: results/boptest

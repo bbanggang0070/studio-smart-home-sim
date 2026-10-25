@@ -14,6 +14,8 @@ import math
 from dataclasses import dataclass, replace
 from typing import Any
 
+from actuators.l0_protect import CompressorGuard, FanDirectionGuard, dehum_hum_mutex
+
 from env_model import AcCommand, ActuatorCommands, ExternalConditions, Occupancy, RoomModel
 from interfaces import topics as T
 
@@ -164,6 +166,20 @@ class FastActuators:
         self.rng = None
         self.cmd_log: list[tuple[str, float]] = []    # (기기, 시각) — 전력 감시 노드의 원인 판정용
         self.desk_cct = 0.0
+        # L0 가전 보호 — 물리 모드 가전 브릿지(nodes/appliance_bridge_node.py)와 같은 계층 · 같은 클래스 (2026-10-24 · BOPTEST 점검에서 누락 발견)
+        #  압축기 최소 ON/OFF (에어컨 · 제습기) · 제습 ⟂ 가습. 러너가 thresholds 값으로 l0_setup() 을 부른다 (없으면 보호 없음 — 단위 시험용)
+        self.t = 0.0
+        self.l0: dict[str, CompressorGuard] = {}
+        self.l0_held: dict[str, int] = {"ac": 0, "dehumidifier": 0}   # 보호로 명령을 미룬 횟수 (진단용)
+
+    def l0_setup(self, appliances: dict) -> None:
+        for dev, on in (("ac", self.target.ac.power), ("dehumidifier", bool(self.target.dehumidifier))):
+            a = appliances[dev]
+            self.l0[dev] = CompressorGuard(a["compressor_min_off_s"], a["compressor_min_on_s"], on=on)
+        # 실링팬 방향 전환 — 멈춘 뒤 대기 (물리 모드 Isaac 액추에이터 브릿지와 같은 클래스)
+        self.fan_guard = FanDirectionGuard(appliances["ceiling_fan"]["direction_change_wait_s"])
+        self.fan_guard.level = int(self.target.ceiling_fan)
+        self.fan_guard._last_dir = (self.fan_guard.level > 0) - (self.fan_guard.level < 0)
 
     def command(self, cmds: dict[str, Any], now: float = 0.0) -> None:
         for topic, value in cmds.items():
@@ -227,8 +243,11 @@ class FastActuators:
         elif device in ("dehumidifier", "humidifier"):
             setattr(self.target, device, on)
             setattr(self.actual, device, on)
+        if device in self.l0 and self.l0[device].on != on:   # 수동 조작도 압축기 상태 — 보호 시각을 다시 센다
+            self.l0[device].on, self.l0[device].since = on, self.t
 
     def update(self, dt: float) -> None:
+        self.t += dt
         for name in FIELD_TO_STATE:
             tgt = getattr(self.target, name)
             tau = self.tau.get(name)
@@ -238,12 +257,22 @@ class FastActuators:
             else:
                 setattr(self.actual, name, tgt)
         self.actual.ac = replace(self.target.ac)
+        if self.l0:                                   # L0 — 제어기 판단과 무관하게 기기를 지킨다 (브릿지와 같은 순서)
+            ac_on = self.l0["ac"].apply(self.target.ac.power, self.t)
+            self.l0_held["ac"] += self.l0["ac"].held
+            self.actual.ac = replace(self.actual.ac, power=ac_on)
+            dehum, hum = dehum_hum_mutex(bool(self.target.dehumidifier), bool(self.target.humidifier))
+            dehum = self.l0["dehumidifier"].apply(dehum, self.t)
+            self.l0_held["dehumidifier"] += self.l0["dehumidifier"].held
+            self.actual.dehumidifier, self.actual.humidifier = dehum, hum and not dehum
+            self.actual.ceiling_fan = self.fan_guard.apply(int(self.target.ceiling_fan), self.t)
 
     def state_topics(self) -> dict[str, Any]:
         out: dict[str, Any] = {topic: getattr(self.actual, name) for name, topic in FIELD_TO_STATE.items()}
         ac = self.actual.ac
         out[T.T_AC] = json.dumps({"power": ac.power, "mode": ac.mode, "setpoint": ac.setpoint_c,
-                                  "confidence": "CONFIRMED"})   # 고속 모드 v0.1: IR 역확인 없음
+                                  "confidence": "CONFIRMED",    # 고속 모드 v0.1: IR 역확인 없음
+                                  "l0_hold": bool(self.l0["ac"].held) if self.l0 else False})   # 물리 모드 브릿지와 같은 필드
         return out
 
 

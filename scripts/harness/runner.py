@@ -27,6 +27,7 @@ from harness.sensing import PersonTruth, SensingWorld
 from controller.params import load_params
 from sensors.occupancy import OccupancyJudge
 from sensors.power_monitor import PowerMonitor
+from sensors.sensor_models import PLUG_DEVICES, SensorSuite
 from harness.timeline import build_timeline
 from interfaces import topics as T
 
@@ -96,11 +97,17 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
     acts.rng = np.random.default_rng([run.seed, 104729, zlib.crc32(run.baseline.encode())])
     base_miss = th["appliances"]["ir"]["sim_miss_probability"]
     acts.ir_refresh_s = float(th["appliances"]["ir"]["state_refresh_s"])
+    acts.l0_setup(th["appliances"])                    # L0 압축기 보호 · 제습 ⟂ 가습 (물리 모드 브릿지와 같다)
     acts.ir_refresh_devices = set(th["appliances"]["ir"].get("bridge_refresh_devices") or [])
     rep = th["appliances"]["ir"].get("bridge_blind_repeat") or {}
     acts.ir_repeat = (int(rep.get("count", 0)), float(rep.get("interval_s", 0.0)))
     pmon = PowerMonitor(th["power_monitor"], th["events"]["appliance_no_response"]["power_confirm_s"])
     logged_cmds = 0
+    # 센서 특성 — 물리 모드 센서 노드와 같은 모델 (config/sensor_models.yaml · 2026-10-24 모드 대조). 실행마다 시드가 다르다
+    sens = None
+    if hcfg["fast_mode"].get("sensor_models", True):
+        scfg = yaml.safe_load((REPO / "config" / "sensor_models.yaml").read_text(encoding="utf-8"))
+        sens = SensorSuite(scfg, np.random.default_rng(run.seed + 104729))
 
     controller.reset({"scenario": sc, "baseline": run.baseline, "seed": run.seed, "rng": rng})
     user_cmds: dict[str, Any] = {T.C_MODE: world.user_mode}
@@ -157,12 +164,19 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
         for dev, tcmd in acts.cmd_log[logged_cmds:]:
             pmon.note_command(dev, tcmd)
         logged_cmds = len(acts.cmd_log)
-        plug_power = {**{d: obs["appliance_power_w"].get(d, 0.0) for d in ("ac", "dehumidifier", "humidifier")},
-                      **extra_power}
+        # 계량 플러그 = 플러그가 달린 가전 + 발생원 (물리 모드와 같은 범위 — 팬 · 조명 등은 측정하지 않는다, docs/08 §3)
+        plug_power = (sens.plug_power(obs, extra_power, dt) if sens else
+                      {**{d: obs["appliance_power_w"].get(d, 0.0) for d in PLUG_DEVICES}, **extra_power})
         app_states = pmon.update(now, plug_power)
 
         inbox = sensor_topics(obs, world, contact, extra_power,
                               grade["pm_grade_bounds_ugm3"], grade["pm_grade_names"], occ=occ, wifi=wifi)
+        inbox[T.S_APPLIANCE_POWER] = json.dumps({k: round(float(v), 1) for k, v in plug_power.items()}, sort_keys=True)
+        if sens:
+            m = sens.measure(obs, dt)
+            for tp, name in ((T.S_TEMPERATURE, "temperature"), (T.S_HUMIDITY, "humidity"), (T.S_ILLUMINANCE, "illuminance"),
+                             (T.S_PM25, "pm25"), (T.S_HOOD_TEMPERATURE, "hood_temperature")):
+                inbox[tp] = m[name]
         inbox[T.T_OCCUPANCY_BASIS] = occ.basis                    # 재실 노드가 내는 상태 토픽
         inbox[T.T_APPLIANCE_STATES] = json.dumps(app_states)      # 전력 감시 노드
         if tl.active_kind(now, "lux_invalid"):
@@ -217,7 +231,8 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
             row[T.T_OCCUPANCY_BASIS] = occ.basis
             row["occ.alerts"] = len(sensing.alerts)
             row[T.S_WIFI_PRESENCE] = wifi
-            row["power.total_w"] = sum(float(v) for v in json.loads(inbox[T.S_APPLIANCE_POWER]).values())
+            # 판정용 전체 전력 = 참값 (모든 가전 + 발생원) — 제어기가 보는 계량 플러그 합(일부 가전 · 잡음)과 다르다 (물리 로거와 같은 정의)
+            row["power.total_w"] = sum(float(v) for v in obs["appliance_power_w"].values()) + sum(float(v) for v in extra_power.values())
             row["ext.outdoor_pm25_ugm3"] = world.ext.outdoor_pm25_ugm3
             row["ext.outdoor_dew_c"] = _dew(world.ext.outdoor_temp_c, world.ext.outdoor_rh_pct, env_cfg)
             row["ext.outdoor_temp_c"] = world.ext.outdoor_temp_c

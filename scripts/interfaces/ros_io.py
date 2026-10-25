@@ -70,6 +70,13 @@ class SimClock:
             return self.sim % 86400.0
         return (self._time.time() - self._time.timezone) % 86400.0
 
+    def seconds(self) -> float:
+        """제어기 시각 — 연속 초 (자정에 0 으로 돌아가지 않는다 · 하루 중 시각은 제어기가 % 86400 으로 구한다).
+        고속 하네스(clock0 + 경과) · BOPTEST 연결과 같은 기준 (2026-10-24 모드 대조)."""
+        if self.sim is not None:
+            return self.sim
+        return self._time.time() - self._time.timezone
+
     def elapsed(self) -> float:
         if self.sim is not None:
             return self.sim - self._first

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import math
 
+from controller.event_detector import _History
 from controller.cooling_blind import CoolingBlind
 from controller.params import ControllerParams
 from controller.signals import Observation, Psychro
@@ -35,6 +36,9 @@ class ComfortLadders:
         self._shade_useful = False
         self._blind_choice = None                    # CoolingBlind — 조명 모듈이 필요해 처음 쓸 때 만든다
         self._ac_mode_since = -math.inf              # 냉방 ↔ 제습 모드를 바꾼 시각 (최소 유지 · B8)
+        self._humid_first = False                    # 습도 우선 (히스테리시스 — 센서 잡음 · v3.4.27)
+        self._hum_low_since: float | None = None     # 습도가 하한 아래로 내려간 시작 (가습 진입 확인 · v3.4.27)
+        self._rh_hist = _History(120.0)              # 가습 판단용 평균 습도 (v3.4.27)
         self._escalated_since = -math.inf            # 에어컨 승격 시각 (최소 유지 · C4)
         self.moisture_event = False                  # 요리 · 샤워 진행 중 (규칙 엔진이 알려 준다 — I6 회복 보조)
         self._moisture_recovery = False
@@ -85,7 +89,9 @@ class ComfortLadders:
             need_dt -= self._band_ml("window_cooling_release_band_c")
         self._outdoor_cooler = (not math.isnan(o.outdoor_temp_c) and o.outdoor_temp_c <= o.temp_c - need_dt)
         outdoor_cooler = self._outdoor_cooler
-        free_cool = outdoor_cooler                      # 환기로 하는 냉방 — 아래에서 I10 이 막을 수 있다
+        # 환기로 하는 냉방 — 아래에서 I10 이 막을 수 있다. 창문 · 배기팬이 둘 다 없으면 환기 냉방 수단이 없다
+        # (에어컨만 있는 건물 — BOPTEST BESTEST Air · 2026-10-24: 없는 창문으로 냉방하려고 에어컨 승격을 풀어 재실 중 끄고 있었다)
+        free_cool = outdoor_cooler and bool({"window", "exhaust_fan"} & self.rules.devices)
         # 창문을 못 쓰면 배기 + 흡기만 남는다 — 소음 등급 · 외기 등급 상한 뒤 배기 여력이 작으면 무료 냉방이 없는 것과 같다
         if free_cool and blocked:
             ex_cap = min(noise["exhaust_fan_max_rpm"], g("air_quality.grade_policy")[o.outdoor_pm_grade]["fan_max_rpm"])
@@ -194,14 +200,22 @@ class ComfortLadders:
                 # 냉방 + 제습이 함께 필요하면 설정 근처에서는 제습 모드 — 저부하 냉방은 습기를 거의 못 뺀다 (C1)
                 prev = self._ac_dry
                 # 더 많이 벗어난 쪽 우선 — 습도가 조금만 넘으면 온도가 먼저 (B8), 크게 넘으면 제습을 오래 끈다 (C1 · C13)
-                humid_first = hi is not None and o.rh_pct - hi >= g(cl + "humid_priority_excess_pct")
+                # 습도 우선은 히스테리시스로 잡는다 — 들어갈 때 초과 ≥ excess, 풀릴 때 초과 < excess − release_band (v3.4.27)
+                excess = (o.rh_pct - hi) if hi is not None else -math.inf
+                if self._humid_first:
+                    self._humid_first = excess >= g(cl + "humid_priority_excess_pct") - self._band("humid_priority_release_band_pct")
+                else:
+                    self._humid_first = excess >= g(cl + "humid_priority_excess_pct")
+                humid_first = self._humid_first
                 resume = g(cl + "ac_cool_resume_above_c") if humid_first else g(cl + "ac_cool_resume_above_mild_c")
-                dwell_ok = (humid_first or not self.hyst
-                            or o.now_s - self._ac_mode_since >= g(cl + "ac_mode_min_dwell_s"))
+                # 최소 유지는 양방향 — 습도 우선이 막 켜졌을 때 냉방 → 제습만 바로 허용 (C1 · C13), 너무 더우면 바로 냉방 (v3.4.27)
+                dwell_ok = not self.hyst or o.now_s - self._ac_mode_since >= g(cl + "ac_mode_min_dwell_s")
+                too_hot = o.temp_c > sp_ac + g(cl + "ac_cool_resume_above_c")
                 if self.dehumidifying and season == "summer":
-                    if not self._ac_dry and dwell_ok and o.temp_c <= sp_ac + g(cl + "ac_dry_within_setpoint_c"):
+                    if (not self._ac_dry and (dwell_ok or humid_first)
+                            and o.temp_c <= sp_ac + g(cl + "ac_dry_within_setpoint_c")):
                         self._ac_dry = True
-                    elif self._ac_dry and o.temp_c > sp_ac + resume:
+                    elif self._ac_dry and o.temp_c > sp_ac + resume and (dwell_ok or too_hot):
                         self._ac_dry = False
                 else:
                     self._ac_dry = False
@@ -254,12 +268,24 @@ class ComfortLadders:
         info["humidify_cap_pct"] = round(cap, 1)
         if lo is None:
             self.humidifying = False
-        elif o.rh_pct < lo:
-            self.humidifying, self._hum_paused = True, False
+        # 가습 진입 · 정지 · 재개는 30 s 평균 습도로 판단 — 한 샘플 잡음(σ 0.8 %p)으로 정지 기준을 넘나들었다 (B9 · C10 · v3.4.27)
+        self._rh_hist.push(o.now_s, o.rh_pct)
+        rh = self._rh_hist.mean(o.now_s, 0.0, g("comfort_ladders.humidify_average_window_s")) or o.rh_pct
+        if lo is None:
+            pass
+        elif rh < lo:
+            # 하한 미만이 humidify_confirm_s 이어져야 진입 — 한 샘플 잡음으로 들어가지 않게 (v3.4.27 · C6)
+            self._hum_low_since = self._hum_low_since if self._hum_low_since is not None else o.now_s
+            if self.humidifying:
+                self._hum_paused = False                  # 이미 가습 중 — 하한 아래면 정지 해제 (이전과 같다)
+            elif not self.hyst or o.now_s - self._hum_low_since >= g("comfort_ladders.humidify_confirm_s"):
+                self.humidifying, self._hum_paused = True, False
+        else:
+            self._hum_low_since = None
         if self.humidifying:
-            if o.rh_pct >= target:
+            if rh >= target:
                 self._hum_paused = True
-            elif o.rh_pct < target - self._band("humidify_restart_band_pct"):
+            elif rh < target - self._band("humidify_restart_band_pct"):
                 self._hum_paused = False
             if not self._hum_paused and not self.dehumidifying:     # 제습 중에는 가습하지 않는다 (상충 점검 R5)
                 add("humidifier", "need", 1, L5, f"가습 (유효 상한 {target:.0f} %)")

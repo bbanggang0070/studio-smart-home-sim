@@ -42,6 +42,7 @@ class BaselineA:
                                     ("purifier", int(app.get("purifier_level", 0)) > 0)) if on]
         self.ac_on, self.dehum_on = "ac" in auto, "dehumidifier" in auto
         self.hum_on, self.purifier_on = "humidifier" in auto, "purifier" in auto
+        self._pur_level: int | None = None           # 청정기 내장 자동의 현재 단 (히스테리시스)
         self._venting = False
         self._cook_seen_at: float | None = None
         self._dehum_run = self._hum_run = False
@@ -75,7 +76,15 @@ class BaselineA:
 
         if self.purifier_on:
             lo, hi = c["purifier_auto_bounds_ugm3"]
-            out[T.C_PURIFIER_LEVEL] = 1 if pm <= lo else 2 if pm <= hi else 3
+            want = 1 if pm <= lo else 2 if pm <= hi else 3
+            if self._pur_level is not None and want != self._pur_level:     # 경계 ± 폭 히스테리시스 (실제 청정기의 평활 자리)
+                b = c["purifier_auto_band_ugm3"]
+                up = want > self._pur_level
+                edge = (lo if min(want, self._pur_level) == 1 else hi)
+                if (up and pm <= edge + b) or (not up and pm >= edge - b):
+                    want = self._pur_level
+            self._pur_level = want
+            out[T.C_PURIFIER_LEVEL] = want
         band = c["humidistat_band_pct"]
         if self.dehum_on:
             sp = c["dehumidifier_setpoint_pct"]

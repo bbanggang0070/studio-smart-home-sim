@@ -27,4 +27,4 @@ for b in s['baselines']:
   done
 done
 echo "=== 전체 채점"
-uv run python scripts/physics_eval.py --scenarios "$(IFS=,; echo "$*")" 2>&1 | grep -E "^[A-Z][0-9a-z]*_|요약" | head -60
+uv run python scripts/physics_eval.py --scenarios "$(IFS=,; echo "$*")" --baselines A,B,proposed --reps 3 2>&1 | grep -E "^[A-Z][0-9a-z]*_|요약" | head -60

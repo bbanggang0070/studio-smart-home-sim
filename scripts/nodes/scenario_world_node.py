@@ -8,7 +8,7 @@
   발행       /studio/internal/env_truth (String JSON — 센서 노드 입력: 참값 · 외기 · 사람 · 고장 주입)
              /studio/internal/door_open (Bool — 사람이 문을 연다 → Isaac 문 조인트) · /studio/internal/person (String JSON → Isaac 사람 프록시)
              /studio/state/air_balance (Float32 — Q_net) · /studio/cmd/mode · activity (사용자 = 시나리오) · /clock (시뮬레이션 시각)
-  시각       /clock = 하루 중 초 (시나리오 time_of_day + 경과). 제어기 노드가 이 시각을 쓴다
+  시각       /clock = 연속 초 (시나리오 time_of_day + 경과 · 자정에도 0 으로 돌아가지 않는다). 제어기 노드가 이 시각을 쓴다
   준비       제어기가 첫 판단을 낼 때(state/living_mode)까지 t = 0 참값을 반복해 내며 기다린다 (최대 30 s) —
              고속 모드처럼 제어기가 t = 0 상태를 보고 판단한 뒤에 시나리오 시계가 흐른다 (노드 기동 순서에 결과가 흔들리지 않게)
 """

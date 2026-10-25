@@ -209,7 +209,7 @@ class SmartHomeController:
             return "send" if "ac" in decided else "failed"
         on = decided["ac"].value > 0
         key = self._ac_command(on).rsplit('"seq"', 1)[0]   # seq 를 뺀 명령 내용
-        action = self.guard.ac_step(o.now_s, on, o.appliance_states, key)
+        action = self.guard.ac_step(o.now_s, on, o.appliance_states, key, l0_hold=o.ac_l0_hold)
         if action == "failed" and "APPLIANCE_FAULT" not in ev:
             ev["APPLIANCE_FAULT"] = ActiveEvent("APPLIANCE_FAULT", o.now_s, {"device": "ac"})
             self.rules.devices = self.devices = self.devices - {"ac"}     # 사다리에서 제외 → 다음 주기부터 다른 수단

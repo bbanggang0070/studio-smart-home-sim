@@ -56,6 +56,7 @@ class Observation:
     desk_pct: float
     appliance_states: dict
     safety_state: str = "NORMAL"           # 창문 안전 계층 (W10) — SAFETY_HOLD · LOCKED_* 이면 창문을 못 쓴다
+    ac_l0_hold: bool = False               # 가전 브릿지 L0 압축기 보호가 지금 명령을 미루는 중 (state/ac l0_hold) — E9 판정은 이 동안 세지 않는다
     sky: str = "clear"                     # 날씨 API 하늘 상태 — 주광의 직사광 비율 (common/daylight.py · v3.4.21)
 
     @property
@@ -95,6 +96,7 @@ def parse_inbox(now_s: float, inbox: dict[str, Any]) -> Observation:
         ac_cooling=bool(ac.get("power")) and ac.get("mode") == "cool",
         ac_power=bool(ac.get("power")),
         ac_mode=str(ac.get("mode", "cool")),
+        ac_l0_hold=bool(ac.get("l0_hold", False)),
         dehumidifier_on=bool(inbox.get(T.T_DEHUMIDIFIER, False)),
         occupancy_basis=str(inbox.get(T.T_OCCUPANCY_BASIS, "")),
         ceiling_pct=float(inbox.get(T.T_CEILING_LIGHT, 0.0)),

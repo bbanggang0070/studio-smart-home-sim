@@ -8,6 +8,8 @@ E12 전력 감시가 command 가 아닌 manual 원인의 변화를 보고하면 
     모드 · 설정온도 · 풍량만 바뀐 명령은 전력으로 확인할 수 없다(제습 · 냉방 모두 '가동') → 확인 시간 뒤 1회 확인 재송신.
     IR 에어컨 프레임은 전체 상태를 담으므로 같은 프레임을 다시 쏘아도 무해하다.
     확인 재송신까지 누락되면 잘못된 모드가 계속 남으므로(C15) state_refresh_s 마다 같은 프레임을 다시 보낸다.
+L0 보호(압축기 최소 ON 300 s / OFF 180 s)는 브릿지가 명령을 미룬다 — 그동안(state/ac l0_hold) 불일치를 세지 않는다.
+    세면 보호 중인 정상 에어컨을 1분 안에 무응답으로 확정하고 제어를 놓는다 (2026-10-24 · 고속 하네스 L0 추가로 드러남 · C16 · C18 · X5).
 v1: 에어컨 (IR). 청정기 효과 확인 · 제습기 물통 가득은 같은 틀로 W10 에 더한다.
 """
 
@@ -35,7 +37,7 @@ class ApplianceGuard:
         self._confirm_at: float | None = None
         self.alerts: list[dict] = []
 
-    def ac_step(self, now: float, want_on: bool, states: dict, key: str | None = None) -> str:
+    def ac_step(self, now: float, want_on: bool, states: dict, key: str | None = None, l0_hold: bool = False) -> str:
         """→ 'send' (평소대로 명령) | 'hold' (수동 조작 보류 — 내지 않음) | 'failed' (무응답 확정 — 내지 않음)."""
         st = states.get("ac") or {}
         if self._last_bump is None:
@@ -63,8 +65,8 @@ class ApplianceGuard:
             self._bump(now)                            # 주기 상태 동기화
         if want_on != self._last_want:                 # 원하는 상태가 바뀌었다 — 새 명령, 재송신 횟수 초기화
             self._last_want, self.resends, self._mismatch_since = want_on, 0, None
-        if not st or want_on == observed_on:
-            self._mismatch_since = None
+        if not st or want_on == observed_on or l0_hold:
+            self._mismatch_since = None                # 일치 · 또는 L0 보호가 미루는 중 — 보호가 끝난 뒤부터 다시 센다
             return "send"
         self._mismatch_since = self._mismatch_since if self._mismatch_since is not None else now
         if now - self._mismatch_since >= self.wait_s:

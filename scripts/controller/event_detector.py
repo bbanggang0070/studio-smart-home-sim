@@ -48,13 +48,20 @@ class _History:
                 break
         return best
 
+    def mean(self, t: float, dt: float, window: float) -> float | None:
+        """(t − dt − window, t − dt] 구간 평균 — 센서 잡음을 줄인 비교값 (이력이 그 구간을 덮지 못하면 None)."""
+        if not self.buf or self.buf[0][0] > t - dt - window:
+            return None
+        vals = [v for ts, v in self.buf if t - dt - window < ts <= t - dt]
+        return sum(vals) / len(vals) if vals else None
+
 
 class EventDetector:
     def __init__(self, p: ControllerParams, psy: Psychro):
         self.p, self.psy = p, psy
         self.active: dict[str, ActiveEvent] = {}
         self.hood_hist = _History(120.0)
-        self.rh_hist = _History(600.0)
+        self.rh_hist = _History(660.0)                 # 5분 전 30 s 평균까지 (v3.4.27)
         self.dew_hist = _History(600.0)
         self._rain_clear_since: float | None = None
         self._pm_clear_since: float | None = None
@@ -193,8 +200,11 @@ class EventDetector:
         g = self.p.get
         ev = self.active.get("SHOWER")
         if ev is None:
-            rh_5min = self.rh_hist.ago(o.now_s, 300.0)
-            if rh_5min is None:
+            # 지금 · 5분 전 모두 average_window_s 평균으로 비교 — 잡음 섞인 샘플 두 개 비교는 순간적으로 넘는다 (v3.4.27 · C1)
+            win = g(s + "average_window_s")
+            rh_5min = self.rh_hist.mean(o.now_s, 300.0, win)
+            rh_now = self.rh_hist.mean(o.now_s, 0.0, win)
+            if rh_5min is None or rh_now is None:
                 return
             hood_normal = (o.hood_temp_c - o.temp_c) < g("events.cooking.hood_temp_delta_vs_room_c")
             need = g(s + "rh_rise_pct_in_5min")
@@ -202,13 +212,13 @@ class EventDetector:
                 # 제습기가 5분 동안 빼는 습기만큼 상승이 가려진다 — %p 로 환산해 기준에서 뺀다 (보류 H10)
                 removed_g_m3 = g("appliances.dehumidifier.rated_g_per_h") * 300.0 / 3600.0 / g("air_balance.room_volume_m3")
                 need -= 100.0 * removed_g_m3 / self.psy.abs_humidity(o.temp_c, 100.0)
-            ok = (o.rh_pct - rh_5min >= need
+            ok = (rh_now - rh_5min >= need
                   and (hood_normal or not g(s + "require_no_hood_heat"))
                   and (not o.humidifier_on or not g(s + "require_humidifier_off"))
                   and (o.occupied or not g(s + "require_occupied"))
                   and "COOKING" not in self.active and "HOOD_POST_RUN" not in self.active)   # 잔류 운전 중 습기도 요리 몫 (v3.4.24)
             if ok:
-                pre_dew = self.dew_hist.ago(o.now_s, 300.0)
+                pre_dew = self.dew_hist.mean(o.now_s, 300.0, win)
                 self._enter("SHOWER", o.now_s, pre_dew=pre_dew)
             return
         dew = self.psy.dew_point(o.temp_c, o.rh_pct)

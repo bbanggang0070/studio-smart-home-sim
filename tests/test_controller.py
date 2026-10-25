@@ -135,15 +135,20 @@ def test_cooking_release_then_post_run(params):
 
 
 def test_shower_needs_rh_jump_without_hood_heat(params):
+    """지금 · 5분 전 습도를 30 s 평균으로 비교한다 (v3.4.27 — 한 샘플 잡음으로 진입하지 않는다)."""
     det = _detector(params)
-    for t in range(0, 301):
+    for t in range(0, 331):
         det.update(parse_inbox(t, inbox()))
-    det.update(parse_inbox(301, inbox(**{T.S_HUMIDITY: 60.0})))
-    assert "SHOWER" in det.active
+    det.update(parse_inbox(331, inbox(**{T.S_HUMIDITY: 60.0})))
+    assert "SHOWER" not in det.active                                # 한 샘플 튐 — 평균은 아직 기준 아래
+    for t in range(332, 362):
+        det.update(parse_inbox(t, inbox(**{T.S_HUMIDITY: 60.0})))
+    assert "SHOWER" in det.active                                    # 30 s 이어진 상승
     det2 = _detector(params)
-    for t in range(0, 301):
+    for t in range(0, 331):
         det2.update(parse_inbox(t, inbox()))
-    det2.update(parse_inbox(301, inbox(**{T.S_HUMIDITY: 60.0, T.S_HOOD_TEMPERATURE: 40.0})))
+    for t in range(331, 362):
+        det2.update(parse_inbox(t, inbox(**{T.S_HUMIDITY: 60.0, T.S_HOOD_TEMPERATURE: 40.0})))
     assert "SHOWER" not in det2.active                               # 요리 수증기 — 샤워 아님
 
 
@@ -257,7 +262,11 @@ def test_humid_outside_blocks_vent_cooling_and_uses_ac(params):
 
 def test_humidify_cap_extension_by_ceiling_fan_reverse(params):
     c = _ctrl(params)
-    out = c.step(0, inbox(**{T.S_TEMPERATURE: 21.0, T.S_HUMIDITY: 30.0, T.S_WEATHER: _weather(-5.0, 70.0)}))
+    ib = inbox(**{T.S_TEMPERATURE: 21.0, T.S_HUMIDITY: 30.0, T.S_WEATHER: _weather(-5.0, 70.0)})
+    assert c.step(0, ib)[T.C_HUMIDIFIER] is False                    # 하한 미만 확인 60 s 전 (v3.4.27)
+    for t in range(1, 60):
+        c.step(t, ib)
+    out = c.step(60, ib)
     assert out[T.C_HUMIDIFIER] is True
     assert out[T.C_CEILING_FAN] == -1                                # I4 상한 확장
     assert out[T.C_DEHUMIDIFIER] is False                            # I1

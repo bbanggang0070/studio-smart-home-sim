@@ -22,14 +22,13 @@ from std_msgs.msg import String
 from harness.fast_world import pm_grade
 from interfaces import ros_io
 from interfaces import topics as T
-from sensors.sensor_models import SensorModel
+from sensors.sensor_models import PLUG_DEVICES, TRUTH_SENSORS, SensorModel
 
 REPO = Path(__file__).resolve().parents[2]
 ENV_TRUTH = f"{T.P}/internal/env_truth"
-TRUTH_KEY = {T.S_TEMPERATURE: ("temperature", "temperature_c"), T.S_HUMIDITY: ("humidity", "humidity_pct"),
-             T.S_ILLUMINANCE: ("illuminance", "illuminance_lux"), T.S_PM25: ("pm25", "pm25_ugm3"),
-             T.S_HOOD_TEMPERATURE: ("hood_temperature", "hood_temperature_c")}
-PLUG_DEVICES = ("ac", "dehumidifier", "humidifier")          # 계량 플러그가 달린 가전 (+ 시나리오 발생원 전력)
+_TOPIC = {"temperature": T.S_TEMPERATURE, "humidity": T.S_HUMIDITY, "illuminance": T.S_ILLUMINANCE,
+          "pm25": T.S_PM25, "hood_temperature": T.S_HOOD_TEMPERATURE}
+TRUTH_KEY = {_TOPIC[name]: (name, key) for name, key in TRUTH_SENSORS.items()}   # 고속 하네스와 같은 표 (sensors/sensor_models.py)
 
 
 def main() -> None:

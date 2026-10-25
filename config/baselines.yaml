@@ -17,6 +17,8 @@ baseline_a:
     cooking_hood_delta_c: 8.0
   # 공기청정기 내장 자동 — 자체 PM 센서 단계 (단 경계 µg/m³ → 1 · 2 · 3단)
   purifier_auto_bounds_ugm3: [15.0, 35.0]
+  purifier_auto_band_ugm3: 3.0     # [2026-10-24] draft — 단을 올릴 땐 경계 + 폭, 내릴 땐 경계 − 폭 (실제 청정기의 평활 · 히스테리시스 자리.
+                                   #  없으면 경계에서 매 초 단 전환 — C8 208회 · 센서 잡음 시 908회로 기준선이 실제보다 불리)
   # 제습기 · 가습기 내장 습도 설정 (서로의 존재와 결로를 모른다)
   dehumidifier_setpoint_pct: 50.0
   humidifier_setpoint_pct: 60.0

@@ -16,7 +16,7 @@ from collections import deque
 
 from controller.arbiter import Candidate
 from controller.energy import EnergyPlanner, daylight_fn
-from controller.event_detector import GRADE_ORDER, ActiveEvent
+from controller.event_detector import GRADE_ORDER, ActiveEvent, _History
 from controller.ladders import ComfortLadders
 from controller.lighting import Lighting
 from controller.params import ControllerParams
@@ -41,6 +41,8 @@ class RuleEngine:
         self._i10_open = False
         self._hood_next_eval = -math.inf
         self._laundry_cooling = False
+        self._laundry_temps = _History(120.0)       # 빨래 건조 냉방 ↔ 제습 판단용 평균 온도 (v3.4.27)
+        self._precool_dry = False                   # 프리쿨링 제습 모드 (히스테리시스 · v3.4.27)
         self.filter_hours = 0.0                     # 흡기 필터 누적 가동 시간 (제어기가 스스로 기록 · 교체 시 0)
         self._e4_short_since: float | None = None
         self._e4_ok_since: float | None = None
@@ -84,9 +86,18 @@ class RuleEngine:
         if d["precool_active"]:
             ev.setdefault("PRECOOL", ActiveEvent("PRECOOL", o.now_s, {"start_tod": d["start_tod"]}))
             # 습도 동시 제어 — 설정 근처에 왔는데 습도가 모드 상한을 넘으면 제습 운전 (사다리 C1 규칙과 같다)
+            # 히스테리시스 — 들어갈 때 '설정 + within 이하 · 상한 초과', 나올 때 '설정 + resume_mild 초과 또는 상한 − off_band 미만'
+            # (없으면 설정 + 0.5 경계에서 매 초 냉방 ↔ 제습 — C16 330회 · v3.4.27)
             rh_hi = self.p.mode(self.home_mode)["humidity_range_pct"][1]
-            dry = (rh_hi is not None and o.rh_pct > rh_hi
-                   and o.temp_c <= sp + self.p.get("comfort_ladders.ac_dry_within_setpoint_c"))
+            cl = "comfort_ladders."
+            if rh_hi is None:
+                self._precool_dry = False
+            elif self._precool_dry:
+                self._precool_dry = not (o.temp_c > sp + self.p.get(cl + "ac_cool_resume_above_mild_c")
+                                         or o.rh_pct < rh_hi - self.p.get(cl + "dehumidify_off_band_pct"))
+            else:
+                self._precool_dry = o.rh_pct > rh_hi and o.temp_c <= sp + self.p.get(cl + "ac_dry_within_setpoint_c")
+            dry = self._precool_dry
             add("ac", "force", 1, L3, f"E13 프리쿨링 — {sp:g} °C" + (" · 제습" if dry else "")
                 + f" (귀가 중앙 {d['arrival_q50'] / 3600:.2f} h)")
             self.info["ac_override"] = ({"mode": "dry", "setpoint": self.ladders._dry_sp(sp), "fan": "auto"} if dry
@@ -478,9 +489,19 @@ class RuleEngine:
             entry = lev.info["entry_temp_c"]
             target = min(entry + g(e + "ac_setpoint_above_entry_c"), sp + relax)
             # 기본은 제습 모드 — 온도가 예산에 가까워지면 냉방, 충분히 내려오면 다시 제습 (예산 히스테리시스)
-            if o.temp_c >= entry + g(e + "cool_switch_above_entry_c") or o.temp_c > sp + relax:
+            # 두 진입 조건 모두 해제 폭이 있다 — 설정 경계에 해제 폭이 없으면 온도 잡음만으로 매 초 냉방 ↔ 제습 (v3.4.27)
+            # 판단은 average_window_s 평균 온도로 — 한 샘플로 경계에 닿아 1–2분마다 전환하던 문제 (센서 잡음 · v3.4.27 · C15)
+            self._laundry_temps.push(o.now_s, o.temp_c)
+            t_avg = self._laundry_temps.mean(o.now_s, 0.0, g(e + "average_window_s")) or o.temp_c
+            want_cool = t_avg >= entry + g(e + "cool_switch_above_entry_c") or t_avg > sp + relax
+            # 제습 복귀 기준은 실제로 보낸 냉방 설정(0.5 °C 단위 반올림) 기준 — 진입 온도 기준이면 반올림된 설정이 기준보다 높아
+            # 에어컨이 설정을 지키는 한 닿지 않는다 (진입 24.76 → 설정 25.0 · 기준 24.96, v3.4.27)
+            sent_sp = round(target * 2) / 2
+            want_dry = (t_avg <= max(entry, sent_sp) + g(e + "dry_resume_below_entry_c")
+                        and t_avg <= sp + relax - g(e + "setpoint_release_band_c"))
+            if want_cool:
                 self._laundry_cooling = True
-            elif o.temp_c <= entry + g(e + "dry_resume_below_entry_c"):
+            elif want_dry:
                 self._laundry_cooling = False
             mode_ac = "cool" if self._laundry_cooling else g(e + "ac_mode")
             add("ac", "need", 1, L45, f"E10 제습기 열 상쇄 — 에어컨 {mode_ac} (예산 +{g(e + 'budget.indoor_temp_rise_c'):g} °C)")

@@ -1,0 +1,65 @@
+# EXP-5 외출 중 냉방 결정 비교 — 사전 등록 docs/13 (2026-10-27 · e52c44d)
+# 이 파일의 값은 docs/13 과 같아야 한다. 평가 전에 바꾸면 docs/13 §10 에 적는다.
+# 제어기 설정(thresholds.yaml · user_modes.yaml)은 읽기만 한다 — 계획기 · 비용식 · 셋백 폭 · 명판 값은 v1.29 그대로.
+
+personas: [commuter, irregular, home]
+mode: NORMAL                       # 냉방 목표 · λ 를 이 모드에서 읽는다 (user_modes.yaml)
+
+episode:
+  min_absence_h: 1.0               # 이 이상 이어진 외출 = 에피소드 (3 h 이상은 부분집합으로 따로 보고)
+  long_absence_h: 3.0
+  warmup_h: 6.0                    # 출발 전 설정 온도 냉방 · 재실 — 축열 질량 초기화
+  after_arrival_min: 60.0          # 귀가 후 비용을 세는 창 (계획기 after_arrival_horizon_min 과 같다)
+  truth_dt_s: 60.0                 # 참값 적분 보폭
+  decision_s: 300.0                # 결정 간격 (계획기 격자와 같다)
+  start_temp_c: 26.0
+  start_rh_pct: 55.0
+  months: [6, 7, 8, 9]
+
+weather:
+  train_years: [2021, 2022, 2023]  # 학습 · 검증
+  eval_years: [2024]               # 평가
+
+data:
+  weeks: [1, 2, 4, 8]              # 학습 데이터 양
+  val_weeks: 2                     # 학습 직후 — 튜닝 · 선택에만
+  main_weeks: 4                    # 주 비교
+  log_dt_s: 300.0                  # 운전 기록 간격 (energy_training 과 같다)
+
+eval:
+  weeks: 4
+  occupancy_seed_base: 20262700    # + 페르소나 번호 (0 · 1 · 2)
+  draw_seed_base: 20262710         # 기상 날짜 · 참값 계수 (+ 페르소나 번호)
+  conditions: [base, params, pattern]
+  pattern_shift:                   # E-패턴 — weight: 근무 형태 가중치 배율 · out_scale: 그 시간대 (1 − p_home) 배율 (모든 근무 형태)
+    commuter: { weight: { late: 3.333 } }                       # 야근 비율 0.12 → 0.40
+    irregular: { weight: { night: 2.0 } }                       # 야간 근무 비율 ×2
+    home: { out_scale: { hours: [12, 18], factor: 2.0 } }        # 오후 외출 확률 ×2
+  bootstrap: 10000
+  bootstrap_seed: 20262720
+
+train:
+  seeds: [0, 1, 2, 3, 4]
+  tuning_trials: 20
+  tuning_seed: 20262730
+  rl_steps: 300000                 # 결정 단계 (③a · ③b 공통)
+  lstm_max_epochs: 200
+  lstm_patience: 15
+
+lstm_space:                        # 무작위 탐색 범위 (②)
+  hidden: [32, 64, 128]
+  window_h: [1.0, 2.0, 4.0]
+  lr_log10: [-4.0, -2.0]
+  dropout: [0.0, 0.3]
+  batch: [64, 256]
+
+dqn_space:                         # 무작위 탐색 범위 (③a · ③b)
+  lr_log10: [-4.5, -3.0]
+  gamma: [0.97, 0.999]
+  exploration_fraction: [0.05, 0.3]
+  target_update: [500, 5000]
+  net: [[64, 64], [128, 128], [256, 256]]
+  batch: [64, 256]
+
+out_dir: results/exp5
+workers: 24

@@ -99,13 +99,13 @@ def main() -> None:
         scen = [s for s in scen if s["id"] in a.ids.split(",")]
     ser = series(cfg)
     jobs = []
+    extra = {x: "A" for x in a.extra_baselines.split(",") if x}
+    only = [x for x in a.only.split(",") if x]
     for s in scen:
         rng = np.random.default_rng(int(cfg["seed"]) + int(s["seed"]))
         starts, scale = W.match_starts(ser, s, cfg, a.samples, rng)
         widen = "" if scale == 1.0 else f" (허용 차이 ×{scale:g})"
         print(f"{s['id']}: {', '.join(t.strftime('%m-%d') for t in starts)}{widen}")
-    extra = {x: "A" for x in a.extra_baselines.split(",") if x}
-    only = [x for x in a.only.split(",") if x]
         jobs += [(s["id"], k + 1, t.isoformat(), scale, not a.no_raw, extra, only) for k, t in enumerate(starts)]
     print(f"시나리오 {len(scen)}개 × 날 {a.samples} = {len(jobs)}묶음 · 평가 연도 {cfg['years']['eval']} · 병렬 {a.workers}", flush=True)
     rows = []

@@ -29,7 +29,7 @@ from harness import weather as W  # noqa: E402
 from harness.manifest import write_manifest  # noqa: E402
 from harness.controllers import make_controller  # noqa: E402
 from harness.runner import judge_group, load_harness_config, run_fast  # noqa: E402
-from harness.scenario import Run, load_scenarios  # noqa: E402
+from harness.scenario import Run, load_scenarios, scenario_baselines  # noqa: E402
 
 _SERIES: pd.DataFrame | None = None
 
@@ -42,7 +42,7 @@ def series(cfg: dict) -> pd.DataFrame:
 
 
 def one(args):
-    sid, rep, start_iso, scale, keep_raw = args
+    sid, rep, start_iso, scale, keep_raw, extra, only = args
     hcfg = load_harness_config()
     cfg = hcfg["weather"]
     env_cfg = load_config(REPO / hcfg["paths"]["environment_model"])
@@ -53,7 +53,7 @@ def one(args):
     out = REPO / cfg["out_dir"] / "raw"
     out.mkdir(parents=True, exist_ok=True)
     results = []
-    for bl in sc["baselines"]:
+    for bl in [b for b in scenario_baselines(sc, extra) if not only or b in only]:
         run = Run(scenario=sc, baseline=bl, rep=rep, seed=int(sc["seed"]) + rep)
         spec = hcfg["controllers"][bl]
         r = run_fast(run, hcfg, env_cfg, make_controller(spec), spec)
@@ -86,6 +86,9 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=cfg["workers"])
     ap.add_argument("--ids", default="")
     ap.add_argument("--no-raw", action="store_true")   # 시계열을 저장하지 않는다 (디스크 절약 — 요약 · 판정만)
+    ap.add_argument("--extra-baselines", default="")   # 예: A2 — A 를 돌리는 시나리오에서 A2 도 (harness extra_baselines · 2026-10-26)
+    ap.add_argument("--only", default="")              # 이 기준선만 돌린다 (예: A,A2 — 제안 · B 는 이미 있는 결과와 짝 비교)
+    ap.add_argument("--out-suffix", default="")        # 결과 폴더 뒤에 붙인다 (예: _a2)
     a = ap.parse_args()
     chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py")], capture_output=True, text=True)
     print(chk.stdout.strip())
@@ -101,14 +104,17 @@ def main() -> None:
         starts, scale = W.match_starts(ser, s, cfg, a.samples, rng)
         widen = "" if scale == 1.0 else f" (허용 차이 ×{scale:g})"
         print(f"{s['id']}: {', '.join(t.strftime('%m-%d') for t in starts)}{widen}")
-        jobs += [(s["id"], k + 1, t.isoformat(), scale, not a.no_raw) for k, t in enumerate(starts)]
+    extra = {x: "A" for x in a.extra_baselines.split(",") if x}
+    only = [x for x in a.only.split(",") if x]
+        jobs += [(s["id"], k + 1, t.isoformat(), scale, not a.no_raw, extra, only) for k, t in enumerate(starts)]
     print(f"시나리오 {len(scen)}개 × 날 {a.samples} = {len(jobs)}묶음 · 평가 연도 {cfg['years']['eval']} · 병렬 {a.workers}", flush=True)
     rows = []
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
         for part in ex.map(one, jobs):
             rows += part
     df = pd.DataFrame(rows)
-    out = REPO / cfg["out_dir"]
+    out = REPO / (cfg["out_dir"] + a.out_suffix)
+    out.mkdir(parents=True, exist_ok=True)
     df.to_csv(out / "summary.csv", index=False)
     write_manifest(out, {"kind": "measured_weather", "samples": a.samples, "eval_years": cfg["years"]["eval"], "runs": len(df)})
     p = df[df.baseline == "proposed"]

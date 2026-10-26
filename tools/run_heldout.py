@@ -29,6 +29,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenarios", default="")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--extra-baselines", default="")   # 예: A2 (기준선 A′ · 2026-10-26)
     a = ap.parse_args()
     chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py"), "--group", "all"],
                          capture_output=True, text=True)
@@ -39,6 +40,8 @@ def main() -> None:
     hcfg["paths"]["scenarios"] = a.scenarios or hcfg["heldout"]["scenarios"]
     sfx = f"_{a.tag}" if a.tag else ""
     out = REPO / (hcfg["heldout"]["out_dir"] + sfx)
+    if a.extra_baselines:
+        hcfg["extra_baselines"] = {x: "A" for x in a.extra_baselines.split(",") if x}
     res = run_batch(hcfg=hcfg, out_dir=out, progress=lambda m: None)
     write_manifest(out, {"kind": "heldout", "scenarios": hcfg["paths"]["scenarios"], "runs": len(res)})
     df = pd.read_csv(out / "summary.csv")

@@ -27,7 +27,7 @@ from harness.controllers import make_controller  # noqa: E402
 from harness.runner import judge_group, load_harness_config, run_fast  # noqa: E402
 from harness.randomize import draw, perturb_scenario  # noqa: E402
 from harness.manifest import write_manifest  # noqa: E402
-from harness.scenario import Run, load_scenarios  # noqa: E402
+from harness.scenario import Run, load_scenarios, scenario_baselines  # noqa: E402
 
 
 def profile_cfg(hcfg: dict, profile: str) -> dict:
@@ -38,7 +38,7 @@ def profile_cfg(hcfg: dict, profile: str) -> dict:
 
 
 def one(args):
-    sid, rep, profile, keep_raw = args
+    sid, rep, profile, keep_raw, extra, only = args
     hcfg = load_harness_config()
     cfg = profile_cfg(hcfg, profile)
     env0 = load_config(REPO / hcfg["paths"]["environment_model"])
@@ -49,7 +49,7 @@ def one(args):
     out = REPO / cfg["out_dir"] / "raw"
     out.mkdir(parents=True, exist_ok=True)
     results = []
-    for bl in sc["baselines"]:
+    for bl in [b for b in scenario_baselines(sc, extra) if not only or b in only]:
         run = Run(scenario=sc, baseline=bl, rep=rep, seed=int(sc["seed"]) + rep)
         spec = hcfg["controllers"][bl]
         r = run_fast(run, hcfg, env_cfg, make_controller(spec), spec)
@@ -77,6 +77,9 @@ def main() -> None:
     ap.add_argument("--ids", default="")
     ap.add_argument("--profile", default="")
     ap.add_argument("--no-raw", action="store_true")   # 시계열을 저장하지 않는다 (디스크 절약 — 요약 · 판정만)
+    ap.add_argument("--extra-baselines", default="")   # 예: A2 — A 를 돌리는 시나리오에서 A2 도 (harness extra_baselines · 2026-10-26)
+    ap.add_argument("--only", default="")              # 이 기준선만 돌린다 (예: A,A2 — 제안 · B 는 이미 있는 결과와 짝 비교)
+    ap.add_argument("--out-suffix", default="")        # 결과 폴더 뒤에 붙인다 (예: _a2)
     a = ap.parse_args()
     cfg = profile_cfg(hcfg, a.profile)
     chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py")], capture_output=True, text=True)
@@ -86,14 +89,16 @@ def main() -> None:
     scen = [s for s in load_scenarios(REPO / hcfg["paths"]["scenarios"]) if s["run_mode"] == "fast"]
     if a.ids:
         scen = [s for s in scen if s["id"] in a.ids.split(",")]
-    jobs = [(s["id"], k, a.profile, not a.no_raw) for s in scen for k in range(1, a.reps + 1)]
+    extra = {x: "A" for x in a.extra_baselines.split(",") if x}
+    only = [x for x in a.only.split(",") if x]
+    jobs = [(s["id"], k, a.profile, not a.no_raw, extra, only) for s in scen for k in range(1, a.reps + 1)]
     print(f"시나리오 {len(scen)}개 × 반복 {a.reps} = {len(jobs)}묶음 · 병렬 {a.workers}", flush=True)
     rows = []
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
         for part in ex.map(one, jobs):
             rows += part
     df = pd.DataFrame(rows)
-    out = REPO / cfg["out_dir"]
+    out = REPO / (cfg["out_dir"] + a.out_suffix)
     out.mkdir(parents=True, exist_ok=True)
     df.to_csv(out / "summary.csv", index=False)
     write_manifest(out, {"kind": "randomized", "profile": a.profile or "default", "reps": a.reps, "runs": len(df)})

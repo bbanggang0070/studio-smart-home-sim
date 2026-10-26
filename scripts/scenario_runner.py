@@ -29,6 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--controller", help="모든 baseline 에 이 제어기를 쓴다 (예: hold)")
     ap.add_argument("--out", help="결과 폴더 (기본: results/)")
     ap.add_argument("--list", action="store_true", help="실행 조합만 출력")
+    ap.add_argument("--extra-baselines", default="", help="A 를 돌리는 시나리오에서 함께 돌릴 기준선 (예: A2)")
     args = ap.parse_args(argv)
 
     ids = args.scenarios.split(",") if args.scenarios else None
@@ -47,6 +48,8 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 2
 
+    if args.extra_baselines:
+        hcfg["extra_baselines"] = {x: "A" for x in args.extra_baselines.split(",") if x}
     results = run_batch(ids, bls, args.reps, args.controller, args.out, args.mode, hcfg)
     write_manifest(Path(args.out or REPO / "results"), {"kind": f"scenario_runner_{args.mode}", "runs": len(results)})
     print()

@@ -26,6 +26,7 @@ from env_model import load_config  # noqa: E402
 from harness.controllers import make_controller  # noqa: E402
 from harness.runner import judge_group, load_harness_config, run_fast  # noqa: E402
 from harness.randomize import draw, perturb_scenario  # noqa: E402
+from harness.manifest import write_manifest  # noqa: E402
 from harness.scenario import Run, load_scenarios  # noqa: E402
 
 
@@ -95,6 +96,7 @@ def main() -> None:
     out = REPO / cfg["out_dir"]
     out.mkdir(parents=True, exist_ok=True)
     df.to_csv(out / "summary.csv", index=False)
+    write_manifest(out, {"kind": "randomized", "profile": a.profile or "default", "reps": a.reps, "runs": len(df)})
     p = df[df.baseline == "proposed"]
     print(f"실행 {len(df)}회 · 제안 판정 통과 {int((p.status == 'PASS').sum())}/{len(p)}")
 

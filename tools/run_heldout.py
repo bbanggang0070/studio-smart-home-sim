@@ -21,6 +21,7 @@ import pandas as pd
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
+from harness.manifest import write_manifest  # noqa: E402
 from harness.runner import load_harness_config, run_batch  # noqa: E402
 
 
@@ -39,6 +40,7 @@ def main() -> None:
     sfx = f"_{a.tag}" if a.tag else ""
     out = REPO / (hcfg["heldout"]["out_dir"] + sfx)
     res = run_batch(hcfg=hcfg, out_dir=out, progress=lambda m: None)
+    write_manifest(out, {"kind": "heldout", "scenarios": hcfg["paths"]["scenarios"], "runs": len(res)})
     df = pd.read_csv(out / "summary.csv")
     lines = [f"# 보류(held-out) 평가 {a.tag or 'r1'} — {hcfg['paths']['scenarios']} · 동결 제어기 · 고속 모드 · 시나리오당 반복 3", "",
              "| 시나리오 | " + " | ".join(b for b in ("A", "B", "proposed")) + " | 제안이 실패한 판정 |", "|---|---:|---:|---:|---|"]

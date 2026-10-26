@@ -25,6 +25,7 @@ import pandas as pd
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts"))
 
+from harness.manifest import write_manifest  # noqa: E402
 from actuators.l0_protect import CompressorGuard  # noqa: E402
 from controller.params import load_params  # noqa: E402
 from harness.controllers import make_controller  # noqa: E402
@@ -180,6 +181,7 @@ def main() -> None:
         lines.append(f"| {r.period} | {r.method} | {r.tdis_tot:.1f} | {r.ener_tot:.3f} | {r.cool_kwh:.1f} | "
                      f"{r.occ_temp_mean_c:.2f} | {r.occ_over_26_ratio * 100:.0f} % | {r.occ_over_28_ratio * 100:.0f} % |")
     (tab / "boptest_kpis.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_manifest(out, {"kind": "boptest", "periods": a.periods, "methods": a.methods, "url": a.url})
     print("\n".join(lines))
 
 

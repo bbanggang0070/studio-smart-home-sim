@@ -20,6 +20,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 from env_model.config import load_config  # noqa: E402
 from harness import criteria as C  # noqa: E402
 from interfaces.log_columns import fill_act_from_topics
+from harness.manifest import write_manifest  # noqa: E402
 from harness.runner import RunResult, finish_run, judge_group, load_harness_config, write_summary  # noqa: E402
 from harness.scenario import expand_runs, load_scenarios  # noqa: E402
 from harness.timeline import build_timeline  # noqa: E402
@@ -59,6 +60,7 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     old = pd.read_csv(out) if out.exists() else None
     write_summary(results, out)
+    write_manifest(out.parent, {"kind": "physics_eval", "dir": a.dir})
     if old is not None:                                   # 이번에 채점한 실행만 바꾸고 나머지는 남긴다 (일부 시나리오만 재실행해도 요약이 줄지 않게)
         new = pd.read_csv(out)
         merged = pd.concat([old[~old.run_id.isin(new.run_id)], new], ignore_index=True).sort_values("run_id")

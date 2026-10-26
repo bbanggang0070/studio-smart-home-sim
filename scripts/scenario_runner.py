@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from harness import criteria as C  # noqa: E402
+from harness.manifest import write_manifest  # noqa: E402
 from harness.runner import REPO, load_harness_config, run_batch  # noqa: E402
 from harness.scenario import expand_runs, load_scenarios  # noqa: E402
 
@@ -47,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     results = run_batch(ids, bls, args.reps, args.controller, args.out, args.mode, hcfg)
+    write_manifest(Path(args.out or REPO / "results"), {"kind": f"scenario_runner_{args.mode}", "runs": len(results)})
     print()
     for r in results:
         print(f"{r.run.run_id:<20} {r.status:<8} 판정 {sum(c.status == C.PASS for c in r.criteria)}/{len(r.criteria)}"

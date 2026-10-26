@@ -86,6 +86,9 @@ controllers:
   B: "controller.smart_home:SmartHomeController"   # docs/03 §6 — 같은 제어기, baseline=B 이면 히스테리시스 · 자동 전환 대기 0
   proposed: "controller.smart_home:SmartHomeController"   # W09 v1 — 규칙 + 모드 + 이벤트 · 6계층 중재
   proposed_np: "controller.smart_home:SmartHomeController"   # Proposed−P (docs/03 C15) — 우선 목표(L4.5) 비활성
+  A2: "controller.baseline_a2:BaselineAPrime"   # [2026-10-26] A′ — 상용 스마트홈 허브 수준 규칙 자동화 (docs/11 권장 7 · baselines.yaml baseline_a2)
+
+extra_baselines: {}                   # [2026-10-26] {추가: 짝} — 짝 기준선을 돌리는 시나리오에서 추가 기준선도 (도구 --extra-baselines A2 → {A2: A})
 
 # ---- 가전 프로파일 — 세계(참값)에 존재하는 장치 (docs/06 §7 · thresholds appliances.profiles 와 같은 구성) ----
 #  프로파일에 없는 장치로 가는 명령은 무시되고 결과 notes 에 기록된다 (X8 · X2 의 전제).

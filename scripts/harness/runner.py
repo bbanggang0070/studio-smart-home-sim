@@ -308,7 +308,7 @@ def run_batch(ids: list[str] | None = None, baselines: list[str] | None = None, 
     hcfg = hcfg or load_harness_config()
     env_cfg = load_config(REPO / hcfg["paths"]["environment_model"])
     scenarios = load_scenarios(REPO / hcfg["paths"]["scenarios"])
-    runs = expand_runs(scenarios, ids, baselines, reps)
+    runs = expand_runs(scenarios, ids, baselines, reps, hcfg.get("extra_baselines"))
     out = Path(out_dir) if out_dir else REPO / hcfg["paths"]["results_dir"]
     (out / "raw").mkdir(parents=True, exist_ok=True)
 

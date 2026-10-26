@@ -53,12 +53,20 @@ def load_scenarios(path: str | Path) -> list[dict[str, Any]]:
     return scenarios
 
 
+def scenario_baselines(sc: dict[str, Any], extra: dict[str, str] | None = None) -> list[str]:
+    """시나리오의 기준선 + extra 중 짝 기준선이 있는 것 (시나리오 파일은 동결 — 고치지 않고 추가 기준선을 붙인다)."""
+    bls = list(sc["baselines"])
+    return bls + [x for x, ref in (extra or {}).items() if ref in bls and x not in bls]
+
+
 def expand_runs(
     scenarios: list[dict[str, Any]],
     ids: list[str] | None = None,
     baselines: list[str] | None = None,
     reps: int | None = None,
+    extra: dict[str, str] | None = None,
 ) -> list[Run]:
+    """extra = {추가 기준선: 짝 기준선} — 짝 기준선을 돌리는 시나리오에서 추가 기준선도 돌린다 (예: {"A2": "A"} · 2026-10-26)."""
     if ids:
         unknown = set(ids) - {s["id"] for s in scenarios}
         if unknown:
@@ -69,7 +77,7 @@ def expand_runs(
             continue
         n_rep = sc["repeat"] if reps is None else min(reps, sc["repeat"])
         for rep in range(1, n_rep + 1):
-            for bl in sc["baselines"]:
+            for bl in scenario_baselines(sc, extra):
                 if baselines and bl not in baselines:
                     continue
                 runs.append(Run(scenario=sc, baseline=bl, rep=rep, seed=int(sc["seed"]) + rep))

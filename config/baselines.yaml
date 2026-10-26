@@ -38,3 +38,19 @@ baseline_a:
   # 수동 고정
   ceiling_fan_fixed: 1               # 실링팬 약
   intake_fan_fixed_rpm: 0.0          # 흡기팬 OFF
+
+# ============================================================================
+#  Baseline A′ (A2) — 상용 스마트홈 허브 수준의 규칙 자동화 (docs/11 권장 7 · 2026-10-26)
+#  결과를 보기 전에 정한 규칙 · 값 (사전 명세 — docs/12 §19). 기기마다 독립 규칙 · 히스테리시스 있음 · 협조 없음.
+#  값은 상용 기본값 · 흔한 사용자 설정을 따른 가정이다 (에어컨 26 °C · 제습 55 % · 가습 40 % · 습도 스위치 70/60 %)
+# ============================================================================
+baseline_a2:
+  ac: { setpoint_c: 26.0, on_above_c: 0.5, off_below_c: 1.0, dry_rh_pct: 65.0, dry_band_pct: 5.0, cool_resume_above_c: 1.5 }
+  window: { ratio: 0.4, open_above_c: 26.5, close_below_c: 25.0, outdoor_cooler_by_c: 2.0 }
+  exhaust: { on_rh_pct: 70.0, off_rh_pct: 60.0, rpm: 1400.0 }
+  hood: { level: 2, cooking_hood_delta_c: 8.0, cooktop_power_w: 300.0, off_after_s: 300.0 }
+  intake_rpm: 1000.0
+  humidistat: { dehumidifier_pct: 55.0, humidifier_pct: 40.0, band_pct: 3.0, away_dehumidifier_pct: 70.0 }
+  lighting: { dark_below_lux: 300.0, ceiling_pct: 100.0, desk_pct: 100.0 }
+  blind: { shade_above_lux: 700.0, open_below_lux: 500.0, shade_deg: 75.0 }
+  ceiling_fan: { on_above_c: 27.0, off_below_c: 26.0, level: 1 }

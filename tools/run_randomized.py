@@ -25,7 +25,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 from env_model import load_config  # noqa: E402
 from harness.controllers import make_controller  # noqa: E402
 from harness.runner import judge_group, load_harness_config, run_fast  # noqa: E402
-from harness.randomize import draw, perturb_scenario  # noqa: E402
+from harness.randomize import draw, perturb_scenario, scale_controller_params  # noqa: E402
 from harness.manifest import write_manifest  # noqa: E402
 from harness.scenario import Run, load_scenarios, scenario_baselines  # noqa: E402
 
@@ -51,15 +51,25 @@ def one(args):
     out = REPO / cfg["out_dir"] / "raw"
     out.mkdir(parents=True, exist_ok=True)
     results = []
+    cond_scale: dict = {}
     for bl in [b for b in scenario_baselines(sc, extra) if not only or b in only]:
         run = Run(scenario=sc, baseline=bl, rep=rep, seed=int(sc["seed"]) + rep)
         spec = hcfg["controllers"][bl]
-        r = run_fast(run, hcfg, env_cfg, make_controller(spec), spec)
+        ctrl = make_controller(spec)
+        cs = cfg.get("controller_scale")
+        if cs and bl in ("B", "proposed", "proposed_np"):       # A2 임계값 민감도 — 같은 협조 제어기를 흔든 설정으로
+            from controller.params import load_params
+            from controller.smart_home import SmartHomeController
+            sp, scales = scale_controller_params(load_params(), cs, int(sc0["seed"]) * 1000 + rep + 7)
+            ctrl = SmartHomeController(sp)
+            cond_scale = {"c.n_scaled": len(scales), "c.mean_scale": float(np.mean(list(scales.values())))}
+        r = run_fast(run, hcfg, env_cfg, ctrl, spec)
         if keep_raw and r.df is not None:
             r.df.to_csv(out / f"{run.run_id}.csv", index=False)
         results.append(r)
     judge_group(results)
-    cond = {**{f"p.{k}": (v if not isinstance(v, list) else v[3]) for k, v in over.items()},
+    cond = {**cond_scale,
+            **{f"p.{k}": (v if not isinstance(v, list) else v[3]) for k, v in over.items()},
             **{f"x.{k}": v[1] for k, v in ext.items()}}
     rows = []
     for r in results:

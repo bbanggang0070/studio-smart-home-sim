@@ -42,3 +42,29 @@ def perturb_scenario(sc: dict, ext: dict) -> dict:
     for ev in sc.get("events") or []:
         apply(ev.get("set") or {})
     return sc
+
+
+def scale_controller_params(p, spec: dict, seed: int):
+    """A2 임계값 민감도 (2026-10-26) — 제어기 판단 임계값(숫자 · float)을 각각 균등 [lo, hi] 배로 흔든 ControllerParams 사본.
+    spec = {sections: [...], range: [lo, hi], exclude: 정규식} · 판정 · 지표가 쓰는 값(budget)과 모델 상수는 exclude 로 뺀다.
+    → (새 params, {키: 배율})"""
+    import re
+    from controller.params import ControllerParams
+    rng = np.random.default_rng(seed)
+    ex = re.compile(spec.get("exclude", "$^"))
+    th = copy.deepcopy(p.th)
+    lo, hi = spec["range"]
+    drawn: dict[str, float] = {}
+
+    def walk(d: dict, pre: str) -> None:
+        for k in sorted(d):
+            v, key = d[k], f"{pre}.{k}"
+            if isinstance(v, dict):
+                walk(v, key)
+            elif isinstance(v, float) and not ex.search(key):
+                x = float(rng.uniform(lo, hi))
+                d[k], drawn[key] = v * x, x
+    for sec in spec["sections"]:
+        walk(th[sec], sec)
+    return ControllerParams(th, p.modes), drawn
+

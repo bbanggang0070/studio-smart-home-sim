@@ -48,6 +48,18 @@ sensors:
     rel_sigma: 0.03
     resolution: 0.1
     range: [0.0, 4000.0]
+# ---- 센서 결함 (2026-10-26 · 견고성 평가 A1 — 기본 꺼짐 · harness fast_mode.sensor_faults 로 켠다) -----------------------------
+#  bias        실행마다 균등 [−b, +b] 로 뽑아 고정 (relative: true 면 값의 비율) — 데이터시트 정확도 범위
+#  drift_per_h 시간 비례 드리프트 균등 [−d, +d] / h (결로 · 오염 · 노화 — 짧은 실험에서 보이게 크게 잡은 가정)
+#  outlier_p   샘플당 이상값 확률 · outlier_sigma 배의 잡음 크기로 튐 (통신 오류 · 전기 잡음)
+#  dropout     초당 끊김 시작 확률 · 지속 [최소, 최대] s — 그동안 마지막 값이 남는다 (I2C 오류 · Wi-Fi 재접속)
+faults:
+  temperature:      { bias: 0.3, drift_per_h: 0.05, outlier_p: 0.001, outlier_sigma: 10.0, dropout_p_per_s: 0.0005, dropout_s: [10.0, 60.0] }   # SHT31 ±0.3 °C (max)
+  humidity:         { bias: 3.0, drift_per_h: 0.5, outlier_p: 0.001, outlier_sigma: 10.0, dropout_p_per_s: 0.0005, dropout_s: [10.0, 60.0] }    # SHT31 ±3 %RH (max)
+  illuminance:      { bias: 0.2, relative: true, drift_per_h: 0.0, outlier_p: 0.001, outlier_sigma: 10.0, dropout_p_per_s: 0.0005, dropout_s: [10.0, 60.0] }   # BH1750 ±20 %
+  pm25:             { bias: 0.1, relative: true, drift_per_h: 0.02, outlier_p: 0.002, outlier_sigma: 10.0, dropout_p_per_s: 0.0005, dropout_s: [10.0, 60.0] }   # PMS7003 ±10 %
+  hood_temperature: { bias: 0.5, drift_per_h: 0.0, outlier_p: 0.001, outlier_sigma: 10.0, dropout_p_per_s: 0.0005, dropout_s: [10.0, 60.0] }    # DS18B20 ±0.5 °C
+  appliance_power:  { bias: 0.03, relative: true, drift_per_h: 0.0, outlier_p: 0.0005, outlier_sigma: 10.0, dropout_p_per_s: 0.0005, dropout_s: [10.0, 60.0] }   # 계량 플러그 ±3 %
 api:
   weather_period_s: 600.0          # 기상청 초단기실황 — 10분마다 (변경 시 즉시)
   outdoor_pm_period_s: 3600.0      # 에어코리아 — 1시간마다 (변경 시 즉시)

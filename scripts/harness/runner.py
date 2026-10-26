@@ -107,7 +107,8 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
     sens = None
     if hcfg["fast_mode"].get("sensor_models", True):
         scfg = yaml.safe_load((REPO / "config" / "sensor_models.yaml").read_text(encoding="utf-8"))
-        sens = SensorSuite(scfg, np.random.default_rng(run.seed + 104729))
+        frng = np.random.default_rng(run.seed + 31337) if hcfg["fast_mode"].get("sensor_faults", False) else None
+        sens = SensorSuite(scfg, np.random.default_rng(run.seed + 104729), frng)   # frng — 센서 결함 (A1 · 기본 꺼짐)
 
     controller.reset({"scenario": sc, "baseline": run.baseline, "seed": run.seed, "rng": rng})
     user_cmds: dict[str, Any] = {T.C_MODE: world.user_mode}

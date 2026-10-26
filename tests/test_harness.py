@@ -239,3 +239,21 @@ def test_fast_l0_compressor_guard_and_mutex():
     assert not acts.actual.ac.power                               # 끈 지 10 s — 최소 OFF 180 s 전
     acts.command({T.C_DEHUMIDIFIER: True, T.C_HUMIDIFIER: True}, 330.0); acts.update(1.0)
     assert acts.actual.dehumidifier and not acts.actual.humidifier   # 제습 ⟂ 가습
+
+
+def test_sensor_faults_bias_dropout_and_pairing():
+    """센서 결함 (A1 · 2026-10-26) — 편향은 실행 동안 고정 · 끊김이면 마지막 값 유지 · 결함 난수는 따로라 기본 잡음 순서가 같다."""
+    import numpy as np
+    from sensors.sensor_models import SensorModel
+    spec = {"tau_s": 0.0, "sigma": 0.0, "rel_sigma": 0.0, "resolution": 0.0, "range": [-100.0, 100.0]}
+    f = {"bias": 0.3, "drift_per_h": 0.0, "outlier_p": 0.0, "outlier_sigma": 10.0, "dropout_p_per_s": 0.0, "dropout_s": [10.0, 60.0]}
+    m = SensorModel(spec, np.random.default_rng(0), f, np.random.default_rng(1))
+    vals = [m.measure(20.0, 1.0) for _ in range(5)]
+    assert len(set(vals)) == 1 and abs(vals[0] - 20.0) <= 0.3 and vals[0] != 20.0     # 고정 편향
+    f2 = {**f, "bias": 0.0, "dropout_p_per_s": 1.0, "dropout_s": [30.0, 30.0]}
+    m2 = SensorModel(spec, np.random.default_rng(0), f2, np.random.default_rng(1))
+    first = m2.measure(20.0, 1.0)
+    assert all(m2.measure(25.0, 1.0) == first for _ in range(20))                    # 끊김 — 참값이 바뀌어도 마지막 값
+    a = SensorModel({**spec, "sigma": 1.0}, np.random.default_rng(5))
+    b = SensorModel({**spec, "sigma": 1.0}, np.random.default_rng(5), {**f, "bias": 0.0}, np.random.default_rng(9))
+    assert [a.measure(0.0, 1.0) for _ in range(5)] == [b.measure(0.0, 1.0) for _ in range(5)]   # 결함 0 이면 기본 잡음이 같다

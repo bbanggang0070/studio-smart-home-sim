@@ -17,9 +17,18 @@ PLUG_DEVICES = ("ac", "dehumidifier", "humidifier")          # 계량 플러그�
 
 
 class SensorModel:
-    def __init__(self, spec: dict, rng: np.random.Generator):
+    def __init__(self, spec: dict, rng: np.random.Generator, faults: dict | None = None, frng: np.random.Generator | None = None):
+        """faults (선택 · 2026-10-26) — 실제 센서 결함: 편향(실행마다 고정) · 드리프트(시간 비례) · 이상값 · 끊김(마지막 값 유지).
+        결함 난수(frng)는 기본 잡음 난수와 따로 — 같은 시드면 결함만 더한 짝 비교가 된다."""
         self.s, self.rng = spec, rng
         self.y: float | None = None
+        self.f, self.frng = faults, frng
+        self.t = 0.0
+        self.last: float | None = None
+        self.hold_until = -1.0
+        if faults:
+            self.bias = float(frng.uniform(-faults["bias"], faults["bias"]))
+            self.drift = float(frng.uniform(-faults["drift_per_h"], faults["drift_per_h"]))
 
     def measure(self, truth: float, dt: float) -> float:
         s = self.s
@@ -28,20 +37,34 @@ class SensorModel:
         else:
             self.y += (truth - self.y) * (1.0 - math.exp(-dt / s["tau_s"]))
         v = self.y + self.rng.normal(0.0, s["sigma"] + s["rel_sigma"] * abs(self.y))
+        f = self.f
+        if f:
+            self.t += dt
+            scale = abs(self.y) if f.get("relative") else 1.0          # 상대 편향(PM · 조도 · 전력)은 값에 비례
+            v += (self.bias + self.drift * self.t / 3600.0) * scale
+            if self.frng.random() < f["outlier_p"]:
+                v += self.frng.choice([-1.0, 1.0]) * f["outlier_sigma"] * (s["sigma"] + s["rel_sigma"] * abs(self.y))
+            if self.t < self.hold_until and self.last is not None:
+                return self.last                                       # 끊김 — 갱신이 멈춰 마지막 값이 남는다
+            if self.frng.random() < f["dropout_p_per_s"] * dt:
+                self.hold_until = self.t + float(self.frng.uniform(*f["dropout_s"]))
         q = s["resolution"]
         v = round(v / q) * q if q > 0 else v
         lo, hi = s["range"]
-        return float(min(max(v, lo), hi))
+        self.last = float(min(max(v, lo), hi))
+        return self.last
 
 
 class SensorSuite:
     """참값 관측 → 센서 측정값 묶음 (고속 하네스 · 2026-10-24 모드 대조). 물리 모드 센서 노드와 같은 모델 · 같은 계량 플러그 범위.
     측정 주기는 제어 주기(1 Hz)로 한 번 — 물리 모드는 온습도 · 조도를 10 Hz 로 뽑지만 제어기는 1 Hz 로 마지막 값을 읽는다."""
 
-    def __init__(self, cfg: dict, rng: np.random.Generator):
+    def __init__(self, cfg: dict, rng: np.random.Generator, frng: np.random.Generator | None = None):
+        """frng 를 주면 cfg['faults'] 의 센서 결함을 켠다 (기본 꺼짐)."""
         s = cfg["sensors"]
-        self.models = {name: SensorModel(s[name], rng) for name in TRUTH_SENSORS}
-        self.plug = {d: SensorModel(s["appliance_power"], rng) for d in PLUG_DEVICES}
+        fl = (cfg.get("faults") or {}) if frng is not None else {}
+        self.models = {name: SensorModel(s[name], rng, fl.get(name), frng) for name in TRUTH_SENSORS}
+        self.plug = {d: SensorModel(s["appliance_power"], rng, fl.get("appliance_power"), frng) for d in PLUG_DEVICES}
 
     def measure(self, obs: dict, dt: float) -> dict[str, float]:
         return {name: self.models[name].measure(float(obs[key]), dt) for name, key in TRUTH_SENSORS.items()}

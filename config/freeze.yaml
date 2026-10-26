@@ -12,6 +12,7 @@
 #  2026-10-25 동결 개정 6 — controller 다시 씀(겨울 과열 냉방 · 수동 조작 방향 판정) + 6차 보류 등록 (docs/12 §4 · §15)
 #  2026-10-25 동결 개정 7 — controller 다시 씀(시작 상태 · 수동 구분 · 전력 한도) + 7차(마지막) 보류 등록 (docs/12 §4 · §17)
 #  2026-10-26 동결 개정 8 — 하네스 · 기준선만 (A′ 추가 · extra_baselines 기본 {} · A 불변) (docs/12 §4 · §19)
+#  2026-10-26 동결 개정 9 — 하네스 · 센서 모델만 (센서 결함 옵션 · 기본 꺼짐) (docs/12 §4)
 # ============================================================================
 frozen_at: '2026-10-19'
 files:
@@ -47,7 +48,7 @@ controller:
 - glob: scripts/controller/*.py
   sha256: 8e0aeba118428bdcc2f473657fa7fd209f0c5e07960e5f6f57d00c8ffb35f9b0
 - glob: scripts/sensors/*.py
-  sha256: 1e70e5348cb5074e64cd3d4297faca705517334820b8984d052acc73a5ee36f3
+  sha256: 3c88378efca49f92926c254ea0068b7b60e5053a9596ca14363b00cbe996c352
 - glob: scripts/actuators/*.py
   sha256: 482ddf1c448b77b123eb9a0189422b5a6f633320948f0cec937ca38fe520c731
 - path: scripts/harness/controllers.py
@@ -63,6 +64,6 @@ controller:
 - path: config/baselines.yaml
   sha256: 036bd6c6229d64ba0e1267e80e2280f26edc50924fe06412ff49bf3c691f53c3
 - path: config/sensor_models.yaml
-  sha256: c6b51194e2a0354e246c72a07c7f77a8ab20ec78e9e4fbd94f344d37ab0cb712
+  sha256: ab0ed0510659861f4f3a8165acba0636da8ee34aa8f7b0eb6bf488dd4520e525
 - path: scripts/harness/runner.py
-  sha256: 0d2d652ff40910be4f0fd414b98aa4ea892241ddecfb144829484eff3aa66375
+  sha256: 96573a78741015387bf6708d253034eaaf768d1df6e84854b4f662260dcf381c

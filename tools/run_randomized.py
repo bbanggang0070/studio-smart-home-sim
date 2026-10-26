@@ -41,6 +41,8 @@ def one(args):
     sid, rep, profile, keep_raw, extra, only = args
     hcfg = load_harness_config()
     cfg = profile_cfg(hcfg, profile)
+    for sect, vals in (cfg.get("harness_overrides") or {}).items():   # 프로파일의 하네스 설정 덮어쓰기 (예: 센서 결함 켬)
+        hcfg[sect] = {**hcfg.get(sect, {}), **vals}
     env0 = load_config(REPO / hcfg["paths"]["environment_model"])
     sc0 = next(s for s in load_scenarios(REPO / hcfg["paths"]["scenarios"]) if s["id"] == sid)
     over, ext = draw(cfg, env0, int(sc0["seed"]) * 1000 + rep, nominal=(rep == 1 and cfg["nominal_first"]))

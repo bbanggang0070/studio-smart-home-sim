@@ -127,6 +127,16 @@ def main() -> None:
     fast_pubs = {tp: ros_io.publisher(node, tp) for tp in list(FIELD_TO_STATE.values()) + [T.T_AC]} if args.fast_actuators else {}
 
     state = {"t": 0.0, "was_present": world.occupancy, "arrived_at": None, "ready": False, "wait": 0}
+    # 시험 물체 배치 확인 (2026-10-27) — 보내고 확인하지 않으면 브릿지 구독 연결 전에 보낸 명령이 사라진다 (물리 무작위 X4 rep 2:
+    # 화분 없이 창문 완주). 브릿지가 window_local 에 물체 이름을 보고할 때까지 1 s 마다 다시 보낸다 (브릿지는 같은 배치를 무시)
+    obstacle_pending: dict[str, float] = {}           # 사양 → 처음 보낸 시각
+    def on_local(m):
+        name = (json.loads(m.data) or {}).get("obstacle")
+        for spec in list(obstacle_pending):
+            if name and spec.split("@")[0].split(":")[0] == name:
+                log.info(f"시험 물체 배치 확인: {spec}")
+                obstacle_pending.pop(spec, None)
+    node.create_subscription(String, T.I_WINDOW_LOCAL, on_local, rel)
     ros_io.subscribe(node, T.T_LIVING_MODE, lambda _t, _v: state.update(ready=True))
     dt = 1.0
     unsupported_seen: set[str] = set(tl.unsupported)
@@ -145,16 +155,23 @@ def main() -> None:
             # t = 0 시험 물체도 대기 중 되풀이 — 연결 전에 한 번만 보내면 사라진다 (W11 물리 배치 C2_B_3: 화분 없이 창문 완주)
             for iv in tl.instants_between(-1.0, 1e-9, "obstacle"):
                 pub_obstacle.publish(String(data=str(iv.spec["obstacle"])))
+                obstacle_pending.setdefault(str(iv.spec["obstacle"]), now)
         state["t0_done"] = True
         if fresh:
             for iv in tl.instants_between(now - dt if now else -1.0, now + 1e-9, "obstacle"):
                 pub_obstacle.publish(String(data=str(iv.spec["obstacle"])))
+                obstacle_pending.setdefault(str(iv.spec["obstacle"]), now)
                 log.info(f"시험 물체 배치: {iv.spec['obstacle']}")
             for iv in tl.instants_between(now - dt if now else -1.0, now + 1e-9, "manual"):
                 man = iv.spec["manual"]
                 if man["device"] == "window":                # 창문 수동 명령 — 제어기와 같은 명령 토픽 (MANUAL 이면 제어기는 침묵)
                     ros_io.publish(pub_user_window, T.C_WINDOW_OPEN_RATIO, float(man["action"]))
                     log.info(f"사용자 수동 창문 명령: {man['action']}")
+        for spec, t_sent in list(obstacle_pending.items()):          # 확인될 때까지 다시 보낸다
+            pub_obstacle.publish(String(data=spec))
+            if now - t_sent > 30.0 and not state.get(f"warned_{spec}"):
+                state[f"warned_{spec}"] = True
+                log.warn(f"시험 물체 배치 확인 없음 30 s — {spec} (하네스 무효 실행)")
         for iv in tl.active_kind(now, "temp_wave"):          # 참값 강제 — 실내 공기 온도를 사인파로 (B5 히스테리시스)
             w = iv.spec["temp_wave"]
             model.state.temp_c = w["center_c"] + w["amplitude_c"] * math.sin(2 * math.pi * (now - iv.start_s) / w["period_s"])

@@ -46,8 +46,11 @@ def main() -> None:
             r = RunResult(run, C.PENDING, "physics", notes=[f"로그 없음: {path.relative_to(REPO)}"])
         else:
             df = fill_act_from_topics(pd.read_csv(path))
-            r = finish_run(run, df, build_timeline(run.scenario), hcfg, env_cfg, 1.0, "physics",
-                           [f"물리 모드 로그 {len(df)}행"])
+            notes = [f"물리 모드 로그 {len(df)}행"]
+            needs_obj = any("obstacle" in (i or {}) for i in run.scenario.get("injections") or [])
+            if needs_obj and ("sim.obstacle" not in df or df["sim.obstacle"].dropna().empty):
+                notes.append("⚠️ 하네스 무효 — 시험 물체 배치 확인 없음 (2026-10-27 · 판정은 그대로)")
+            r = finish_run(run, df, build_timeline(run.scenario), hcfg, env_cfg, 1.0, "physics", notes)
         results.append(r)
         groups.setdefault(run.scenario_id, []).append(r)
     for rs in groups.values():

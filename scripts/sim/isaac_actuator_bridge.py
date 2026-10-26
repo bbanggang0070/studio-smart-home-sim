@@ -222,6 +222,9 @@ def main() -> None:
         """시험 전용 — 끼임 물체를 창 개구부에 놓거나('park') 모두 치운다. 'rigid_pot@0.15' = 문설주에서 0.15 m (기본 0.2).
         'rigid_pot@1.03:30' = 질량 30 kg 로 바꿔 놓는다 (여는 방향 끼임 — 가벼운 물체는 뒤에 막는 것이 없어 밀려 간다)."""
         wd = L["window"]
+        if placed["spec"] == name and placed["target"] is not None:
+            return                                    # 이미 놓았다 — 확인 전 재전송 (월드 노드) 은 무시 (실행 중 순간 이동 방지)
+        spec_in = name
         name, _, mass = name.partition(":")
         name, _, at = name.partition("@")
         gap_x = float(at) if at else 0.20
@@ -239,7 +242,7 @@ def main() -> None:
             o.set_linear_velocity(np.zeros(3))
             o.set_angular_velocity(np.zeros(3))
         if name in obstacles:
-            placed["name"], placed["spec"] = name, f"{name}{'@' + at if at else ''}{':' + mass if mass else ''}"
+            placed["name"], placed["spec"] = name, spec_in
         log.info(f"시험 물체: {name}")
 
     def check_obstacle() -> float:
@@ -253,7 +256,8 @@ def main() -> None:
         if before_motion and dev > B["obstacle_tolerance_m"]:
             placed["replaced"] += 1
             log.warn(f"시험 물체가 자리에서 {dev * 1000:.0f} mm 벗어남 — 다시 놓는다 ({placed['replaced']}회)")
-            place_obstacle(placed["spec"])
+            spec, placed["spec"] = placed["spec"], None       # 같은 배치 무시를 피해 강제로 다시 놓는다
+            place_obstacle(spec)
         return dev
 
     import json as _json

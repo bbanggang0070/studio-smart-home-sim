@@ -1,0 +1,12 @@
+{
+ "p.air_balance.base_infiltration_ach": 0.3374225097766683,
+ "p.window.glazing_u_w_m2k": 2.5001141480794655,
+ "p.appliances.range_hood.capture_efficiency": 0.5347066696302648,
+ "p.thermal.air_capacity_wh_per_k": 50.84448502113417,
+ "p.thermal.mass_capacity_wh_per_k": 1395.162117193919,
+ "p.thermal.envelope_capacity_wh_per_k": 827.541514763579,
+ "p.appliances.ac.cop_values": 4.9550929199284415,
+ "x.outdoor_temp_c": -0.010448355659462116,
+ "x.outdoor_rh_pct": -3.5188723817360246,
+ "x.outdoor_illuminance_lux": 1.0493646800177012
+}

@@ -1,0 +1,3 @@
+phase,detect_s,zones,current_peak_a,pos_est_err_max_mm,contact_peak_n
+normal_close,,A_START → B_RUN → C_ENDZONE → D_SEAL,5.303990840911865,1.4545814330348321,0.0
+pinch_close,4.975900000000003,A_START → B_RUN → C_ENDZONE,2.551759719848633,0.8273005485534668,38.7

@@ -1,0 +1,30 @@
+{
+ "time": "2026-10-27T00:52:00+09:00",
+ "commit": "0a26d1aa6ff20487a77e153522b44cf756cefa74",
+ "branch": "exp/baseline-a2",
+ "uncommitted": [
+  "tools/analysis/paired_tests.py"
+ ],
+ "freeze": {
+  "ok": true,
+  "message": "동결 유지 — 23개 모두 동결 때와 같다 (동결: files 2026-10-19 · controller 2026-10-25)"
+ },
+ "argv": [
+  "tools/run_randomized.py",
+  "--profile",
+  "intake300",
+  "--no-raw",
+  "--workers",
+  "2",
+  "--ids",
+  "C11,C15,C16",
+  "--out-suffix",
+  "_fill"
+ ],
+ "python": "3.12.3",
+ "host": "airlab",
+ "kind": "randomized",
+ "profile": "intake300",
+ "reps": 5,
+ "runs": 50
+}

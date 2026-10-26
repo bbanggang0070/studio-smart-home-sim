@@ -1,0 +1,20 @@
+device,state,t_s,changed_px
+에어컨 (LED · 루버),"{""power"": true, ""mode"": ""cool"", ""setpoint"": 26.0, ""fan"": ""au",6.6,0
+에어컨 (LED · 루버),"{""power"": true, ""mode"": ""dry"", ""setpoint"": 26.0, ""fan"": ""aut",9.6,3
+에어컨 (LED · 루버),"{""power"": false, ""mode"": ""cool"", ""setpoint"": 26.0, ""fan"": ""a",42.7,36485
+제습기 LED,True,12.8,97
+제습기 LED,False,15.8,1
+가습기 LED · 분무,True,15.8,660
+가습기 LED · 분무,False,42.8,634
+청정기 LED 링,1,18.8,780
+청정기 LED 링,3,21.8,552
+청정기 LED 링,0,42.8,802
+후드 LED · 등,1,9.4,34193
+후드 LED · 등,2,12.4,0
+후드 LED · 등,0,27.4,28038
+쿡탑 화구,"{""cooktop"": 1500.0}",9.4,16795
+쿡탑 화구,"{""cooktop"": 0.0}",15.4,3603
+창문 안전 LED,PINCH_REVERSE,33.7,368
+창문 안전 LED,SAFETY_HOLD,36.7,202
+창문 안전 LED,LOCKED_CLOSING,39.7,353
+창문 안전 LED,NORMAL,42.7,357

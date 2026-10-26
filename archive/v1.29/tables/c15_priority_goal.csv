@@ -1,0 +1,5 @@
+baseline,m.laundry_dry_time_s,m.energy_wh,m.overheat_time_s,m.comfort_ratio,건조 시간 h
+A,inf,1862.83,28170.0,0.0,inf
+B,20708.67,4033.39,0.0,0.91,5.75
+proposed,20706.0,4032.88,0.0,0.91,5.75
+proposed_np,inf,1555.0,0.0,0.0,inf

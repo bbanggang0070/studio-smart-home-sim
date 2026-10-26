@@ -1,0 +1,30 @@
+{
+ "time": "2026-10-27T02:33:52+09:00",
+ "commit": "0a26d1aa6ff20487a77e153522b44cf756cefa74",
+ "branch": "main",
+ "uncommitted": [
+  "scripts/nodes/scenario_world_node.py",
+  "scripts/physics_eval.py",
+  "scripts/sim/isaac_actuator_bridge.py",
+  "tools/analysis/paired_tests.py"
+ ],
+ "freeze": {
+  "ok": true,
+  "message": "동결 유지 — 23개 모두 동결 때와 같다 (동결: files 2026-10-19 · controller 2026-10-25)"
+ },
+ "argv": [
+  "scripts/physics_eval.py",
+  "--scenarios",
+  "B1,B2,B3,X2,C2,C3,X4,B5",
+  "--baselines",
+  "A,B,proposed",
+  "--reps",
+  "3",
+  "--dir",
+  "results/physics_random"
+ ],
+ "python": "3.12.3",
+ "host": "airlab",
+ "kind": "physics_eval",
+ "dir": "results/physics_random"
+}

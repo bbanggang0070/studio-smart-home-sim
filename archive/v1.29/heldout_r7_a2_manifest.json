@@ -1,0 +1,24 @@
+{
+ "time": "2026-10-26T20:03:05+09:00",
+ "commit": "7d084625f43949beed3483aa602a77e3832c93ee",
+ "branch": "exp/baseline-a2",
+ "uncommitted": [],
+ "freeze": {
+  "ok": true,
+  "message": "동결 유지 — 23개 모두 동결 때와 같다 (동결: files 2026-10-19 · controller 2026-10-25)"
+ },
+ "argv": [
+  "tools/run_heldout.py",
+  "--scenarios",
+  "config/heldout_scenarios_r7.yaml",
+  "--tag",
+  "r7_a2",
+  "--extra-baselines",
+  "A2"
+ ],
+ "python": "3.12.3",
+ "host": "airlab",
+ "kind": "heldout",
+ "scenarios": "config/heldout_scenarios_r7.yaml",
+ "runs": 99
+}

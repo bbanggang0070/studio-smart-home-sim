@@ -1,0 +1,9 @@
+t_s,observation,events,decision,reason
+0.0,실내 PM 12 · 외기 25 µg/m³ · 30.0 °C · 55 %RH,,해제 ac · blind 45 · ceiling_fan 2 · ceiling_light 0 · 해제 dehumidifier · desk_light 0 · exhaust 600 · 해제 hood · 해제 humidifier · 해제 intake · 해제 purifier · window 0.4,"need L5 냉방 — 블라인드 45° (일사 146 W + 조명 31 W − 환기 250 W = -74 W · 후보 45°:-74, 75°:-26) · need L5 냉방 ② 배기 저속 (창문 병행) · need L5 냉방 ② 창문 (외기가 더 시원) · need L5 냉방 ③ 실링팬 정회전 · need L6 스탠드 — 모드 목표 없음 · need L6 조명 — 천장 400 lux 목표 (NORMAL)"
+120.0,실내 PM 13 · 외기 25 µg/m³ · 29.9 °C · 54 %RH,,control_feasibility DEGRADED,cooling
+326.0,실내 PM 15 · 외기 25 µg/m³ · 29.8 °C · 52 %RH,,purifier 1 · blind 75 · exhaust 1400 · intake 1167 · 해제 window,"need L5 냉방 — 블라인드 75° (일사 113 W + 조명 40 W − 환기 0 W = 153 W · 후보 45°:177, 75°:153) · need L5 냉방 ④ 균형 급기 · need L5 냉방 ④ 배기 + 흡기 (창문 불가 pm_purifying) · need L5 실내 PM 목표 초과"
+720.0,실내 PM 12 · 외기 25 µg/m³ · 30.0 °C · 50 %RH,,해제 purifier · blind 45 · exhaust 600 · 해제 intake · window 0.4,"need L5 냉방 — 블라인드 45° (일사 146 W + 조명 31 W − 환기 248 W = -71 W · 후보 45°:-71, 75°:-24) · need L5 냉방 ② 배기 저속 (창문 병행) · need L5 냉방 ② 창문 (외기가 더 시원)"
+900.0,실내 PM 14 · 외기 25 µg/m³ · 29.9 °C · 49 %RH,,에어컨 cool 27.0 °C · blind 75 · 해제 exhaust · 해제 window · intake 833,"need L5 기본 환기 25 m³/h (흡기팬) · need L5 냉방 — 블라인드 75° (일사 113 W + 조명 40 W − 환기 0 W = 153 W · 후보 45°:177, 75°:153) · need L5 냉방 ⑤ 에어컨 (승격 — 무료 냉방 부족) (I5 +1 °C)"
+1201.0,실내 PM 13 · 외기 52 µg/m³ · 27.7 °C · 52 %RH,OUTDOOR_PM,–,–
+1264.0,실내 PM 13 · 외기 52 µg/m³ · 27.5 °C · 52 %RH,OUTDOOR_PM,ceiling_fan 1,need L5 냉방 ③ 실링팬 정회전
+2401.0,실내 PM 13 · 외기 90 µg/m³ · 27.1 °C · 49 %RH,OUTDOOR_PM,purifier 2,need L5 외기 very_bad 청정기 예방 가동

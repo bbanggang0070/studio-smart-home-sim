@@ -303,6 +303,14 @@ randomization:
         sections: [comfort_ladders, means_ladder, illuminance, events]
         range: [0.8, 1.2]
         exclude: 'layer|budget|glazing_area|luminous_efficacy|solar_heat_gain_fraction|heat_factor|flow_factor'   # 판정이 쓰는 예산 · 모델 상수 제외
+    intake150:                      # [2026-10-26] B4 장비 민감도 — 흡기를 150 m³/h 덕트팬으로 (사양은 바꾸지 않는다 · 민감도 실험만 · 사용자 결정)
+      out_dir: results/randomized_intake150   #  기본 무작위 조건과 같은 시드 · 참값과 제어기가 같은 사양을 안다 · 전력은 덕트팬 가정 20 W
+      truth_set: { appliances.intake_fan.max_m3h: 150.0, appliances.intake_fan.power_w: 20.0 }
+      controller_set: { appliances.intake_fan.max_m3h: 150.0, appliances.intake_fan.power_w: 20.0 }
+    intake300:                      #   300 m³/h (후드 1단 수준) · 40 W 가정
+      out_dir: results/randomized_intake300
+      truth_set: { appliances.intake_fan.max_m3h: 300.0, appliances.intake_fan.power_w: 40.0 }
+      controller_set: { appliances.intake_fan.max_m3h: 300.0, appliances.intake_fan.power_w: 40.0 }
     shared_copies:                  # docs/11 권장 10 (§6.5) — 제어기가 '참값과 같은 사본'을 쓰는 계수만 참값 쪽에서 흔든다.
                                     #  제어기는 명목값(thresholds lighting_model.daylight · cooling_blind 계수)을 그대로 쓴다.
                                     #  범위는 가정 — 렌더 대조(W12 T12.5) · SHGC 문헌값 폭을 넉넉히 덮는 ±30 % 수준

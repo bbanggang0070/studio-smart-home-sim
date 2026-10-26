@@ -46,6 +46,7 @@ def one(args):
     env0 = load_config(REPO / hcfg["paths"]["environment_model"])
     sc0 = next(s for s in load_scenarios(REPO / hcfg["paths"]["scenarios"]) if s["id"] == sid)
     over, ext = draw(cfg, env0, int(sc0["seed"]) * 1000 + rep, nominal=(rep == 1 and cfg["nominal_first"]))
+    over.update(cfg.get("truth_set") or {})                  # 고정 참값 (B4 장비 민감도 — 예: 흡기 용량)
     env_cfg = env0.with_overrides(over)
     sc = perturb_scenario(sc0, ext)
     out = REPO / cfg["out_dir"] / "raw"
@@ -57,6 +58,20 @@ def one(args):
         spec = hcfg["controllers"][bl]
         ctrl = make_controller(spec)
         cs = cfg.get("controller_scale")
+        cset = cfg.get("controller_set")
+        if cset and bl in ("B", "proposed", "proposed_np"):      # B4 — 장비 사양을 제어기도 같이 안다 (예: 흡기 최대 풍량)
+            import copy as _copy
+            from controller.params import ControllerParams, load_params
+            from controller.smart_home import SmartHomeController
+            p0 = load_params()
+            th = _copy.deepcopy(p0.th)
+            for key, v in cset.items():
+                node = th
+                *head, last = key.split(".")
+                for k in head:
+                    node = node[k]
+                node[last] = v
+            ctrl = SmartHomeController(ControllerParams(th, p0.modes))
         if cs and bl in ("B", "proposed", "proposed_np"):       # A2 임계값 민감도 — 같은 협조 제어기를 흔든 설정으로
             from controller.params import load_params
             from controller.smart_home import SmartHomeController

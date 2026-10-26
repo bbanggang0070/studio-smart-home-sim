@@ -30,12 +30,13 @@ def main() -> None:
     ap.add_argument("--scenarios", required=True)
     ap.add_argument("--baselines", default="proposed")
     ap.add_argument("--reps", type=int, default=1)
+    ap.add_argument("--dir", default="results/physics")       # 물리 조건 무작위화는 results/physics_random
     a = ap.parse_args()
     hcfg = load_harness_config()
     env_cfg = load_config(REPO / hcfg["paths"]["environment_model"])
     scen = load_scenarios(REPO / hcfg["paths"]["scenarios"])
     runs = expand_runs(scen, a.scenarios.split(","), a.baselines.split(","), a.reps)
-    raw = REPO / "results" / "physics" / "raw"
+    raw = REPO / a.dir / "raw"
     results: list[RunResult] = []
     groups: dict[str, list[RunResult]] = {}
     for run in runs:
@@ -54,7 +55,7 @@ def main() -> None:
         print(f"{r.run.run_id:<20} {r.status:<8} " + " · ".join(r.notes), flush=True)
         for c in r.criteria:
             print(f"    {c.status:<7} {c.text}  {c.detail}", flush=True)
-    out = REPO / "results" / "physics" / "summary.csv"
+    out = REPO / a.dir / "summary.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     old = pd.read_csv(out) if out.exists() else None
     write_summary(results, out)

@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import argparse
-import copy
 import json
 import subprocess
 import sys
@@ -26,41 +25,8 @@ sys.path.insert(0, str(REPO / "scripts"))
 from env_model import load_config  # noqa: E402
 from harness.controllers import make_controller  # noqa: E402
 from harness.runner import judge_group, load_harness_config, run_fast  # noqa: E402
+from harness.randomize import draw, perturb_scenario  # noqa: E402
 from harness.scenario import Run, load_scenarios  # noqa: E402
-
-
-def draw(cfg: dict, env_cfg, seed: int, nominal: bool) -> tuple[dict, dict]:
-    """→ (참값 덮어쓰기, 외기 변동 {키: (종류, 값)})."""
-    rng = np.random.default_rng(seed)
-    over, ext = {}, {}
-    for key, spec in cfg["truth_params"].items():
-        kind, (lo, hi) = next(iter((k, v) for k, v in spec.items()))
-        x = 1.0 if (nominal and kind == "scale") else float(rng.uniform(lo, hi))
-        base = env_cfg.get(key)
-        if kind == "uniform":
-            over[key] = base if nominal else x
-        else:
-            over[key] = [v * x for v in base] if isinstance(base, list) else base * x
-    for key, spec in cfg["external"].items():
-        kind = "offset" if "offset" in spec else "scale"
-        lo, hi = spec[kind]
-        x = (0.0 if kind == "offset" else 1.0) if nominal else float(rng.uniform(lo, hi))
-        ext[key] = (kind, x, spec.get("clip"))
-    return over, ext
-
-
-def perturb_scenario(sc: dict, ext: dict) -> dict:
-    sc = copy.deepcopy(sc)
-
-    def apply(d: dict) -> None:
-        for key, (kind, x, clip) in ext.items():
-            if key in d and isinstance(d[key], (int, float)):
-                v = d[key] + x if kind == "offset" else d[key] * x
-                d[key] = float(np.clip(v, *clip)) if clip else float(v)
-    apply(sc["external"])
-    for ev in sc.get("events") or []:
-        apply(ev.get("set") or {})
-    return sc
 
 
 def profile_cfg(hcfg: dict, profile: str) -> dict:

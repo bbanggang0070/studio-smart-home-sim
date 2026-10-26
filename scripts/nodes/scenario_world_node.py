@@ -26,6 +26,7 @@ from rosgraph_msgs.msg import Clock
 from std_msgs.msg import Bool, String
 
 from harness.fast_world import FIELD_TO_STATE, FastActuators, WorldInputs, initial_actuators, make_model
+from harness.randomize import draw, perturb_scenario
 from harness.scenario import load_scenarios
 from harness.timeline import build_timeline
 from interfaces import ros_io
@@ -55,6 +56,9 @@ def main() -> None:
     ap.add_argument("--scenario", required=True)
     ap.add_argument("--fast-actuators", action="store_true", help="Isaac 없이 — 1차 지연 액추에이터가 상태 토픽을 낸다")
     ap.add_argument("--speed", type=float, default=1.0, help="시뮬레이션 배속 (Isaac 과 함께면 1)")
+    ap.add_argument("--rep", type=int, default=1)
+    ap.add_argument("--randomize", default="false", help="true — 반복마다 참값 계수 · 외기를 뽑는다 (harness.yaml randomization · 2026-10-26)")
+    ap.add_argument("--out-dir", default="results/physics", help="뽑은 조건 JSON 을 남길 결과 폴더")
     args, _ = ap.parse_known_args()
 
     hcfg = yaml.safe_load((REPO / "config" / "harness.yaml").read_text(encoding="utf-8"))   # harness.runner 는 pandas 가 필요해 직접 읽는다
@@ -62,6 +66,17 @@ def main() -> None:
     env_cfg = load_config(REPO / hcfg["paths"]["environment_model"])
     if sc.get("environment_overrides"):
         env_cfg = env_cfg.with_overrides(sc["environment_overrides"])
+    cond = None
+    if args.randomize == "true":                  # 물리 모드 조건 무작위화 — 고속 무작위 반복과 같은 분포 · 같은 시드 규칙 (반복마다 다름)
+        rcfg = hcfg["randomization"]
+        over, ext = draw(rcfg, env_cfg, int(sc["seed"]) * 1000 + args.rep, nominal=False)
+        env_cfg = env_cfg.with_overrides(over)
+        sc = perturb_scenario(sc, ext)
+        cond = {**{f"p.{k}": (v if not isinstance(v, list) else v[3]) for k, v in over.items()},
+                **{f"x.{k}": v[1] for k, v in ext.items()}}
+        out = REPO / args.out_dir / "raw"
+        out.mkdir(parents=True, exist_ok=True)
+        (out / f"{args.scenario}_cond_{args.rep}.json").write_text(json.dumps(cond, ensure_ascii=False, indent=1), encoding="utf-8")
     tl = build_timeline(sc)
     world = WorldInputs.from_scenario(sc)
     model = make_model(env_cfg, sc)

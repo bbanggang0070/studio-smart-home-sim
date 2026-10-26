@@ -11,7 +11,7 @@
 set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
-RAW="$REPO/results/physics/raw"; mkdir -p "$RAW"
+RAW="$REPO/results/${PHYS_DIR:-physics}/raw"; mkdir -p "$RAW"      # PHYS_DIR=physics_random PHYS_RANDOM=1 — 조건 무작위화
 for SC in "$@"; do
   mapfile -t COMBOS < <(uv run python -c "
 import sys; sys.path.insert(0,'scripts')
@@ -27,4 +27,4 @@ for b in s['baselines']:
   done
 done
 echo "=== 전체 채점"
-uv run python scripts/physics_eval.py --scenarios "$(IFS=,; echo "$*")" --baselines A,B,proposed --reps 3 2>&1 | grep -E "^[A-Z][0-9a-z]*_|요약" | head -60
+uv run python scripts/physics_eval.py --scenarios "$(IFS=,; echo "$*")" --baselines A,B,proposed --reps 3 --dir "results/${PHYS_DIR:-physics}" 2>&1 | grep -E "^[A-Z][0-9a-z]*_|요약" | head -60

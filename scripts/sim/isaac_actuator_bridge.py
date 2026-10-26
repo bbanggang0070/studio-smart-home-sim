@@ -26,6 +26,7 @@ ap.add_argument("--record", default="", help="발표 영상용 — 이 폴더에
 ap.add_argument("--record-camera", default="overview",
                 help="scene_layout 카메라 이름 또는 'x,y,z:tx,ty,tz' (위치:바라보는 점)")
 ap.add_argument("--record-fps", type=float, default=10.0)
+ap.add_argument("--seed-offset", type=int, default=0, help="물리 조건 무작위화 — 반복마다 다른 리플 · 전류 잡음 (0 = 고정 시드)")
 ap.add_argument("--record-from", type=float, default=0.0, help="녹화 시작 시각 [s] (브릿지 시작 기준)")
 ap.add_argument("--record-ambient", type=float, default=150.0, help="녹화용 주변광(돔) 세기 — 화면용, 조도 센서는 환경 모델이 계산")
 ap.add_argument("--record-sun", type=float, default=0.0, help="녹화용 햇빛(장면의 sun) 세기 — 화면용 (0 = 장면 기본값 · 꺼짐)")
@@ -93,7 +94,7 @@ def main() -> None:
     person = SingleRigidPrim("/World/occupancy_object", name="person")
     person.initialize()
     sm = yaml.safe_load((REPO / "config" / "sensor_models.yaml").read_text(encoding="utf-8"))
-    rng = np.random.default_rng(sm["seed"] + 11)
+    rng = np.random.default_rng(sm["seed"] + 11 + 1000 * args.seed_offset)   # 리플 미스카운트 · 전류 잡음 (물리 조건 무작위화)
     ripple = RippleCounter(ws, L["window"]["travel_m"], sm["window_current"]["hard_stop_resync_m"], rng)
     i_noise = ws["ripple_estimation"]["current_noise_sigma_a"]
     ddrive = UsdPhysics.DriveAPI(stage.GetPrimAtPath("/World/entrance_door/entrance_door_joint"), "angular")

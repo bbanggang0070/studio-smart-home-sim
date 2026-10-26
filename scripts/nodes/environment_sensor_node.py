@@ -35,7 +35,11 @@ def main() -> None:
     cfg = yaml.safe_load((REPO / "config" / "sensor_models.yaml").read_text(encoding="utf-8"))
     hcfg = yaml.safe_load((REPO / "config" / "harness.yaml").read_text(encoding="utf-8"))
     grade = hcfg["outdoor_api"]
-    rng = np.random.default_rng(cfg["seed"])
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--seed-offset", type=int, default=0)   # 물리 조건 무작위화 — 반복마다 다른 잡음 (0 = 이전과 같은 고정 시드)
+    args, _ = ap.parse_known_args()
+    rng = np.random.default_rng(cfg["seed"] + 1000 * args.seed_offset)
     S = cfg["sensors"]
     models = {tp: SensorModel(S[name], rng) for tp, (name, _) in TRUTH_KEY.items()}
     plug = {d: SensorModel(S["appliance_power"], rng) for d in PLUG_DEVICES}

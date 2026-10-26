@@ -32,6 +32,7 @@ ENV_TRUTH = f"{T.P}/internal/env_truth"
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--door-from-truth", action="store_true")
+    ap.add_argument("--seed-offset", type=int, default=0)   # 물리 조건 무작위화 — 반복마다 다른 레이더 · Wi-Fi 잡음
     args, _ = ap.parse_known_args()
     hcfg = yaml.safe_load((REPO / "config" / "harness.yaml").read_text(encoding="utf-8"))
     seed = yaml.safe_load((REPO / "config" / "sensor_models.yaml").read_text(encoding="utf-8"))["seed"]
@@ -45,7 +46,7 @@ def main() -> None:
         tr = json.loads(m.data)
         p = tr["person"]
         if st["sensing"] is None:                    # 첫 참값으로 시작 상태를 맞춘다
-            st["sensing"] = SensingWorld(cfg=hcfg["mmwave"], rng=np.random.default_rng(seed + 7919),
+            st["sensing"] = SensingWorld(cfg=hcfg["mmwave"], rng=np.random.default_rng(seed + 7919 + 1000 * args.seed_offset),
                                          judge=OccupancyJudge(occ_params, p["present"], tr["t"]),
                                          person=PersonTruth(p["present"], p["zone"], p["motion"]))
         sw = st["sensing"]

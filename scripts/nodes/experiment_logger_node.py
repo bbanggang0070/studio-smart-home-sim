@@ -39,8 +39,9 @@ def main() -> None:
     ap.add_argument("--scenario", required=True)
     ap.add_argument("--baseline", default="proposed")
     ap.add_argument("--rep", type=int, default=1)
+    ap.add_argument("--out-dir", default="results/physics")   # 물리 조건 무작위화는 results/physics_random
     args, _ = ap.parse_known_args()
-    out = REPO / "results" / "physics" / "raw" / f"{args.scenario}_{args.baseline}_{args.rep}.csv"
+    out = REPO / args.out_dir / "raw" / f"{args.scenario}_{args.baseline}_{args.rep}.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
 
     rclpy.init()

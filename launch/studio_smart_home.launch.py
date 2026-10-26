@@ -25,6 +25,10 @@ def generate_launch_description():
     speed = LaunchConfiguration("speed")
     stub = LaunchConfiguration("stub")
     world_on = PythonExpression(["'", stub, "' != 'true'"])
+    rep = LaunchConfiguration("rep")
+    randomize = LaunchConfiguration("randomize")
+    out_dir = LaunchConfiguration("out_dir")
+    seed_off = PythonExpression(["str(", rep, ") if '", randomize, "' == 'true' else '0'"])   # 무작위화 때만 반복마다 다른 시드
     return LaunchDescription([
         DeclareLaunchArgument("scenario", default_value="B12", description="config/scenario_profiles.yaml 의 id"),
         DeclareLaunchArgument("fast_actuators", default_value="false", description="Isaac 없이 시험"),
@@ -32,22 +36,25 @@ def generate_launch_description():
         DeclareLaunchArgument("baseline", default_value="proposed"),
         DeclareLaunchArgument("rep", default_value="1", description="반복 번호 (로그 파일 이름)"),
         DeclareLaunchArgument("stub", default_value="false", description="W06 시험용 고정 센서 스텁 (월드 · 센서 노드 대신)"),
+        DeclareLaunchArgument("randomize", default_value="false", description="true — 반복마다 참값 계수 · 외기 · 잡음 시드를 바꾼다 (물리 조건 무작위화)"),
+        DeclareLaunchArgument("out_dir", default_value="results/physics", description="결과 폴더"),
         _node("smart_home_node.py", "--baseline", LaunchConfiguration("baseline"), "--scenario", scenario),
         _node("appliance_bridge_node.py"),
         # 시나리오 월드 + 센서 노드 (W07)
         ExecuteProcess(cmd=["python3", "scripts/nodes/scenario_world_node.py", "--scenario", scenario, "--speed", speed,
-                            "--fast-actuators"], output="screen",
+                            "--fast-actuators", "--rep", rep, "--randomize", randomize, "--out-dir", out_dir], output="screen",
                        condition=IfCondition(PythonExpression(["'", fast, "' == 'true' and ", world_on]))),
-        ExecuteProcess(cmd=["python3", "scripts/nodes/scenario_world_node.py", "--scenario", scenario, "--speed", speed],
+        ExecuteProcess(cmd=["python3", "scripts/nodes/scenario_world_node.py", "--scenario", scenario, "--speed", speed,
+                            "--rep", rep, "--randomize", randomize, "--out-dir", out_dir],
                        output="screen",
                        condition=IfCondition(PythonExpression(["'", fast, "' != 'true' and ", world_on]))),
-        _node("environment_sensor_node.py", condition=IfCondition(world_on)),
+        _node("environment_sensor_node.py", "--seed-offset", seed_off, condition=IfCondition(world_on)),
         _node("experiment_logger_node.py", "--scenario", scenario, "--baseline", LaunchConfiguration("baseline"),
-              "--rep", LaunchConfiguration("rep"), condition=IfCondition(world_on)),
+              "--rep", rep, "--out-dir", out_dir, condition=IfCondition(world_on)),
         _node("power_monitor_node.py", condition=IfCondition(world_on)),
-        _node("occupancy_sensor_node.py", "--door-from-truth",
+        _node("occupancy_sensor_node.py", "--door-from-truth", "--seed-offset", seed_off,
               condition=IfCondition(PythonExpression(["'", fast, "' == 'true' and ", world_on]))),
-        _node("occupancy_sensor_node.py",
+        _node("occupancy_sensor_node.py", "--seed-offset", seed_off,
               condition=IfCondition(PythonExpression(["'", fast, "' != 'true' and ", world_on]))),
           # 창문 상위 안전 계층 (W10) — Isaac 의 모터 전류 · 리플 위치를 쓰므로 물리 모드에서만
         _node("window_safety_node.py", condition=IfCondition(PythonExpression(

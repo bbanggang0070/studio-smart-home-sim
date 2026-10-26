@@ -721,6 +721,7 @@ uv run python tools/run_randomized.py --profile threshold_sensitivity --no-raw  
 uv run python tools/run_randomized.py --extra-baselines A2 --only A,A2 --out-suffix _a2 --no-raw   # 기준선 A′
 PHYS_RANDOM=1 PHYS_DIR=physics_random tools/run_physics_batch.sh B1 B2 B3 X2 C2 C3 X4 B5   # 물리 조건 무작위
 uv run python tools/analysis/criteria_classes.py · tools/analysis/paired_tests.py <summary.csv>   # 3분류 · 짝 검정
+uv run python tools/analysis/plot_final.py   # 최종 보고서 그림 5종 (archive/v1.29 요약에서) → results/figures/final_*.png
 uv run python tools/run_measured_weather.py --no-raw         # 실측 기상 (data/weather · tools/weather/fetch_weather.py)
 uv run python tools/run_heldout.py --scenarios config/heldout_scenarios_r7.yaml --tag r7   # 보류 7차
 tools/boptest/run_server.sh bestest_air 5000                 # BOPTEST 서버 (준비: 스크립트 머리말)

@@ -250,6 +250,7 @@ def main() -> None:
     ap.add_argument("stage", choices=["tune", "train"])
     ap.add_argument("--persona")
     ap.add_argument("--weeks", type=int)
+    ap.add_argument("--workers", type=int)
     a = ap.parse_args()
     ctx = Ctx.load()
     tcfg = ctx.cfg["train"]
@@ -267,7 +268,7 @@ def main() -> None:
             hp = json.loads((od / "selected.json").read_text(encoding="utf-8"))["hp"]
             jobs += [(p, k, 100 + s, hp, s) for s in tcfg["seeds"]]
     rows = []
-    with ProcessPoolExecutor(int(ctx.cfg["workers"])) as ex:
+    with ProcessPoolExecutor(a.workers or int(ctx.cfg["workers"])) as ex:
         for r in ex.map(trial, *zip(*jobs)):
             state = r.pop("_model")
             od = out_dir(ctx, r["persona"], r["weeks"])

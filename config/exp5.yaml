@@ -62,4 +62,4 @@ dqn_space:                         # 무작위 탐색 범위 (③a · ③b)
   batch: [64, 256]
 
 out_dir: results/exp5
-workers: 24
+workers: 30

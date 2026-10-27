@@ -696,6 +696,8 @@ Baseline B = 협조 O · 히스테리시스 X / Proposed
 | 지표 16종 (고속 + 물리) | | | | **14 달성 · 2 미달** (#7 에너지 · #9 기본 환기 1회 94.95 %) |
 | 센서리스 창문 | — | — | — | 끼임 감지 165/165 · 오검출 0/20 · 최대 52.9 N (스윕) · 86.5 N (시나리오) |
 
+**EXP-5 외출 중 냉방 결정** (사전 등록 [`docs/13`](docs/13_exp5_preregistration.md) · 학습 4주 · 304 에피소드 · 비용 비 = 방식 / ① 질문별 모델) — ② LSTM 1.000 [1.000, 1.000] · ③a 데이터 기반 강화학습 1.004 [0.940, 1.016] (둘 다 차이를 확인하지 못함) · ③b 참값 모델 접근 강화학습 0.924 [0.852, 0.972] (특권 정보) · **등록에 없던 '언제나 끄기' 가 모든 방식보다 쌌다** (평균 192 vs ① 245 · 오라클 167 Wh 환산) → 한계 27
+
 ### 9.5 실행 · 재현 방법
 
 환경 구성은 [`SETUP.md`](SETUP.md) (uv · Isaac Sim 5.1 컨테이너 · ROS 2 Jazzy 컨테이너). 결과는 `results/` (커밋하지 않는다).
@@ -721,6 +723,8 @@ uv run python tools/run_randomized.py --profile threshold_sensitivity --no-raw  
 uv run python tools/run_randomized.py --extra-baselines A2 --only A,A2 --out-suffix _a2 --no-raw   # 기준선 A′
 PHYS_RANDOM=1 PHYS_DIR=physics_random tools/run_physics_batch.sh B1 B2 B3 X2 C2 C3 X4 B5   # 물리 조건 무작위
 uv run python tools/analysis/criteria_classes.py · tools/analysis/paired_tests.py <summary.csv>   # 3분류 · 짝 검정
+uv run python tools/exp5/data.py && uv run python tools/exp5/lstm.py tune && uv run python tools/exp5/lstm.py train   # EXP-5 데이터 · ② (③: tools/exp5/rl.py tune|train --variant a|b)
+uv run python tools/exp5/evaluate.py --confirm-frozen && uv run python tools/exp5/analyze.py   # EXP-5 평가 (방식 동결 뒤 1회) · 분석
 uv run python tools/analysis/plot_final.py   # 최종 보고서 그림 5종 (archive/v1.29 요약에서) → results/figures/final_*.png
 uv run python tools/run_measured_weather.py --no-raw         # 실측 기상 (data/weather · tools/weather/fetch_weather.py)
 uv run python tools/run_heldout.py --scenarios config/heldout_scenarios_r7.yaml --tag r7   # 보류 7차
@@ -818,7 +822,7 @@ studio-smart-home-sim/
 | **시나리오 41개 상세 · 자동화 스키마** | [`docs/03_scenarios.md`](docs/03_scenarios.md) |
 | **최종 보고서 초안** | [`docs/report_draft.md`](docs/report_draft.md) |
 | 결과 분석 · 지표 16종 | [`docs/analysis_report.md`](docs/analysis_report.md) |
-| 에너지 제어 방식 비교 연구 (EXP-5 · 논문) | [`docs/10_energy_control_comparison_study.md`](docs/10_energy_control_comparison_study.md) |
+| 에너지 제어 방식 비교 연구 (EXP-5 · 논문) | [`docs/10_energy_control_comparison_study.md`](docs/10_energy_control_comparison_study.md) · 사전 등록 · 결과 [`docs/13_exp5_preregistration.md`](docs/13_exp5_preregistration.md) |
 | 논문 신뢰성 검토 · 조치 계획 | [`docs/11_paper_credibility_review.md`](docs/11_paper_credibility_review.md) |
 | 판정 · 지표 동결 · 사후 개정 · 보류 평가 기록 | [`docs/12_freeze_record.md`](docs/12_freeze_record.md) |
 | 센서리스 알고리즘 · Isaac Sim 구현 | [`docs/04_sensorless_window_control.md`](docs/04_sensorless_window_control.md) |
@@ -870,6 +874,7 @@ studio-smart-home-sim/
 | 26 | **끼임 반전 거리 50 mm** | FMVSS 118 의 반전 요건(125 mm 이상 등) 미충족 — 100 N 기준만 빌림 (사용자 결정으로 유지) |
 | 23 | **시나리오 · 보류 묶음 작성자 = 제어기 개발자** | 보류 평가 7차를 사전 등록으로 했지만 독립 작성자가 없다 · 작성 오류가 차수마다 0–2개 |
 | 24 | **장비 한계 — 후드 배기량 ≫ 흡기팬** | 창문을 못 쓸 때 요리 중 양압은 규칙으로 해결 불가 |
+| 27 | **외출 냉방 계획기(E13)가 '언제나 끄기' 보다 비싸다** | EXP-5 에서 같은 계획기 코드가 셋백 · 프리쿨링을 과하게 골라 평균 비용 245 vs 192 Wh 환산 · 동결 제어기 v1.29 도 같은 경향일 수 있다(전체 제어기에서 미검증) · 제어기는 바꾸지 않음 (§9.4 · docs/13 §12) |
 
 ### 범위 밖 (Out of Scope)
 

@@ -1,7 +1,10 @@
 # ============================================================================
 #  난방 확장 트랙 시나리오 (docs/14 §6 · 브랜치 heating) — v1.29 동결 파일(scenario_profiles.yaml)과 분리
-#  H0 = 개발용 동작 확인 (등록 대상 아님) · H1–H10 은 3주차에 작성 · 판정 동결 후 사전 등록 (docs/15)
-#  참값 모델은 environment_overrides 로 heating.mode = hydronic (보일러 + 온수 바닥난방)
+#  참값 = heating.mode: hydronic (보일러 + 온수 바닥난방) · 가전 프로파일 full_heating · 기상청 ASOS 수준의 겨울 외기
+#  계층(tier) = 동시에 부딪치는 목표 수 (1 단일 · 2 두 개 · 3 세 개 이상) — v1.29 시나리오와 같은 원칙
+#  판정은 환경 결과 위주 (온도 · 추위 · 결로 · PM · 동파 · 비용) — 수단 · 과정 판정은 꼭 필요한 곳만 (docs/14 §6 · 3분류)
+#  H0 = 개발용 동작 확인 (등록 대상 아님) · H1–H14 + B9H · C6H · C10H · C19H = 판정 동결 후 사전 등록 (docs/15)
+#  2026-10-28 작성 (v0.1 · 결과 보기 전) — 개발 실행에서 고친 판정은 파일 끝 변경 기록에 남긴다
 # ============================================================================
 scenarios:
   - id: H0
@@ -39,3 +42,790 @@ scenarios:
       - "temperature >= 20.5 within 21600 after 0"   # 2026-10-28 결과를 본 뒤 3 h · 20 °C → 6 h · 20.5 °C (바닥난방 속도 · 개발용 · 등록 대상 아님)
       - "dew_margin >= 0 for all t"
     metrics: [energy_wh, condensation_exposure_s]
+
+  # ==== Tier 1 — 단일 목표 ===================================================================
+
+  - id: H1
+    tier: 1
+    name: "아침 기상 — 수면 19 °C 에서 일반 21 °C 로"
+    duration_s: 10800                    # 05:00 – 08:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262801
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: SLEEP
+      temperature_c: 19.0
+      humidity_pct: 40.0
+      co2_ppm: 900.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 0.0
+      occupancy: true
+      occupant_zone: bed
+      time_of_day: "05:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 19.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: -6.0
+      outdoor_rh_pct: 65.0
+      outdoor_illuminance_lux: 0.0
+    injections: []
+    events:
+      - { at_s: 3600, set: { user_mode: NORMAL, occupant_zone: room, motion: moving } }   # 06:00 기상
+      - { at_s: 5400, set: { outdoor_illuminance_lux: 3000.0, outdoor_temp_c: -5.0 } }  # 06:30 해 뜸
+      - { at_s: 9000, set: { outdoor_illuminance_lux: 15000.0, outdoor_temp_c: -3.0 } }
+    pass_criteria:
+      - "temperature >= 18.0 for all t"                                     # 수면 중 과냉 없음
+      - "temperature >= 20.0 by 5400 after 3600"                            # 기상 90분 안에 20 °C (바닥난방 속도 고려)
+      - "dew_margin >= 0 for all t"
+    metrics: [energy_wh, condensation_exposure_s, cold_discomfort_kh, gas_kwh, energy_cost_won, boiler_ignitions]
+
+  - id: H2
+    tier: 1
+    name: "혹한의 밤 — 외기 −15 °C 에서 수면 온도 유지"
+    duration_s: 36000
+    log_interval_s: 10               # 긴 시나리오 — 로그 10 s 간격 (판정 해상도 10 s)                    # 22:00 – 08:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262802
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 35.0
+      co2_ppm: 700.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 200.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "22:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -10.0
+      outdoor_rh_pct: 55.0
+    events:
+      - { at_s: 1800, set: { user_mode: SLEEP, occupant_zone: bed, motion: sleeping } }   # 22:30 취침
+      - { at_s: 7200, set: { outdoor_temp_c: -13.0 } }
+      - { at_s: 18000, set: { outdoor_temp_c: -15.0 } }                                   # 03:00 최저
+      - { at_s: 30600, set: { outdoor_temp_c: -12.0, user_mode: NORMAL, occupant_zone: room, motion: moving } }   # 06:30 기상
+    pass_criteria:
+      - "temperature >= 17.5 for all t"
+      - "temperature >= 18.0 when mode_is('SLEEP')"                        # 수면 목표 19 − 1
+      - "dew_margin >= 0 for all t"
+      - "temperature >= 20.0 by 5400 after 30600"                          # 기상 90분 안
+    metrics: [energy_wh, condensation_exposure_s, cold_discomfort_kh, gas_kwh, energy_cost_won, boiler_ignitions, min_temp_c]
+
+  - id: H3
+    tier: 1
+    name: "맑은 겨울 낮 — 햇빛으로 데우기 (일사 활용)"
+    duration_s: 21600                    # 09:00 – 15:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262803
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: home
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 20.5
+      humidity_pct: 40.0
+      co2_ppm: 700.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "09:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0              # 밤새 닫아 둔 블라인드
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: 0.0
+      outdoor_rh_pct: 45.0
+      outdoor_illuminance_lux: 30000.0
+    events:
+      - { at_s: 3600, set: { outdoor_illuminance_lux: 50000.0, outdoor_temp_c: 2.0 } }
+      - { at_s: 10800, set: { outdoor_illuminance_lux: 60000.0, outdoor_temp_c: 4.0 } }   # 12:00
+      - { at_s: 18000, set: { outdoor_illuminance_lux: 40000.0, outdoor_temp_c: 3.0 } }
+    pass_criteria:
+      - "temperature >= 20.0 by 3600 after 0"
+      - "temperature >= 19.5 for all t"
+      - "temperature <= 25.0 for all t"                                     # 일사로 과열하지 않음 (겨울 과열 규칙)
+      - "gas_kwh <= baseline_A.gas_kwh"                                     # 햇빛만큼 보일러를 덜 쓴다
+    metrics: [energy_wh, cold_discomfort_kh, gas_kwh, energy_cost_won, boiler_ignitions]
+
+  # ==== Tier 2 — 두 목표 충돌 ================================================================
+
+  - id: H4
+    tier: 2
+    name: "평일 외출 · 귀가 — 셋백 ↔ 귀가 쾌적 ↔ 비용"
+    duration_s: 43200
+    log_interval_s: 10               # 긴 시나리오 — 로그 10 s 간격 (판정 해상도 10 s)                    # 08:00 – 20:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262804
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 40.0
+      co2_ppm: 800.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "08:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: cloudy
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -4.0
+      outdoor_rh_pct: 60.0
+      outdoor_illuminance_lux: 8000.0
+    injections:
+      - { at_s: 1800, door: open_close, label: leave, open_s: 8 }      # 08:30 출근
+      - { at_s: 36000, door: open_close, label: arrive, open_s: 8 }    # 18:00 귀가
+    events:
+      - { at_s: 1804, set: { occupancy: false, occupant_zone: none } }
+      - { at_s: 7200, set: { outdoor_temp_c: -1.0, outdoor_illuminance_lux: 15000.0 } }
+      - { at_s: 21600, set: { outdoor_temp_c: 2.0, outdoor_illuminance_lux: 12000.0 } }   # 14:00
+      - { at_s: 32400, set: { outdoor_temp_c: -1.0, outdoor_illuminance_lux: 0.0 } }      # 17:00
+      - { at_s: 36000, set: { occupancy: true, occupant_zone: room } }
+    pass_criteria:
+      - "temperature >= 14.0 for all t"                                     # 외출 중에도 지나친 냉각 없음
+      - "temperature >= 19.5 by 3600 after arrive_start"                    # 귀가 1시간 뒤 쾌적
+      - "dew_margin >= 0 for all t"
+      - "energy_cost_won <= baseline_A.energy_cost_won"                     # 22 °C 켜 둠보다 싸다
+    metrics: [energy_wh, cold_discomfort_kh, gas_kwh, energy_cost_won, boiler_ignitions, expected_cost_heating]
+
+  - id: H5
+    tier: 2
+    name: "겨울 저녁 요리 — 후드 배기 ↔ 열 손실 (I13)"
+    duration_s: 7200                     # 19:00 – 21:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262805
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 40.0
+      co2_ppm: 800.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: kitchen
+      time_of_day: "19:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -5.0
+      outdoor_rh_pct: 60.0
+    injections:
+      - { at_s: 300, source: cooking, label: cooking, stove: induction_plug, pm_mg_per_min: 1.5,
+          moisture_g_per_h: 400, heat_w: 800, duration_s: 1200 }
+    pass_criteria:
+      - "pm25 <= 35 by 1200 after cooking_end"                             # PM 회복
+      - "temperature >= 18.0 by 1800 after cooking_end"                    # 요리 뒤 30분 안에 18 °C (WHO 실내 최저 권고) — v0.3
+      - "dew_margin >= 0 for all t"
+      - "window_open_ratio <= 0.05 for all t"                              # 겨울에 창으로 빼지 않는다
+    metrics: [pm25_peak, pm25_recovery_time, cold_discomfort_kh, gas_kwh, energy_cost_won, boiler_ignitions]
+
+  - id: H6
+    tier: 2
+    name: "겨울 아침 샤워 — 습기 배출 ↔ 열 손실 ↔ 결로"
+    duration_s: 7200                     # 07:00 – 09:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262806
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 20.5
+      humidity_pct: 45.0
+      co2_ppm: 900.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "07:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -7.0
+      outdoor_rh_pct: 70.0
+      outdoor_illuminance_lux: 2000.0
+    injections:
+      - { at_s: 1800, source: shower, label: shower, moisture_g: 300, duration_s: 900 }   # v0.3 — 30분 뒤 (시작 습도 평형)
+    events:
+      - { at_s: 3600, set: { outdoor_illuminance_lux: 15000.0, outdoor_temp_c: -5.0 } }
+    pass_criteria:
+      - "dew_margin >= 0 for all t"                                         # 결로 노출 0
+      - "humidity <= value_at('humidity', shower_start) + 5 by 1800 after shower_end"
+      - "temperature >= 19.5 for all t"
+    metrics: [humidity_recovery_time, condensation_exposure_s, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: H7
+    tier: 2
+    name: "혹한 건조 — 가습 ↔ 결로 ↔ 난방 (I4 · I12)"
+    duration_s: 21600                    # 18:00 – 24:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262807
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    baseline_a: { auto_appliances: [humidifier] }    # A: 가습기 자체 60 % (결로를 모른다)
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 19.0                # 외출 뒤 막 들어온 차가운 방
+      humidity_pct: 25.0
+      co2_ppm: 600.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 200.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "18:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: -12.0
+      outdoor_rh_pct: 50.0
+    events:
+      - { at_s: 10800, set: { outdoor_temp_c: -14.0 } }
+    pass_criteria:
+      - "dew_margin >= 0 for all t"                                         # 결로 노출 0 (가장 중요)
+      - "humidity >= 33 by 21600 after 0"                                   # 끝날 때 건조 완화 (결로 여유 안에서)
+      - "temperature >= 20.0 by 10800 after 0"
+      - "humidifier + dehumidifier <= 1 for all t"
+    metrics: [condensation_exposure_s, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: H8
+    tier: 2
+    name: "겨울 공부 — 기본 환기 40 m³/h ↔ 난방 (I11)"
+    duration_s: 14400                    # 19:00 – 23:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262808
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: STUDY
+      temperature_c: 21.0
+      humidity_pct: 40.0
+      co2_ppm: 900.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "19:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -8.0
+      outdoor_rh_pct: 55.0
+    pass_criteria:
+      - "base_vent_compliance >= 0.95"                                      # 기본 환기는 지킨다
+      - "temperature >= 20.0 for all t"                                     # 공부 중 추위 없음
+      - "dew_margin >= 0 for all t"
+    metrics: [base_vent_compliance, co2_compliance, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  # ==== Tier 3 — 세 목표 이상 ================================================================
+
+  - id: H9
+    tier: 3
+    name: "빨래 널고 출근 — 건조 ↔ 셋백 ↔ 결로 (I14)"
+    duration_s: 43200
+    log_interval_s: 10               # 긴 시나리오 — 로그 10 s 간격 (판정 해상도 10 s)                    # 08:00 – 20:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262809
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    baseline_a: { auto_appliances: [dehumidifier] }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 45.0
+      co2_ppm: 800.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "08:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: cloudy
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -3.0
+      outdoor_rh_pct: 75.0
+      outdoor_illuminance_lux: 6000.0
+    injections:
+      - { at_s: 0, appliance: washer, label: washer, power_w: 450, duration_s: 600, laundry_moisture_g: 1800 }
+      - { at_s: 2400, door: open_close, label: leave, open_s: 8 }
+      - { at_s: 36000, door: open_close, label: arrive, open_s: 8 }
+    events:
+      - { at_s: 2404, set: { occupancy: false, occupant_zone: none } }
+      - { at_s: 21600, set: { outdoor_temp_c: 1.0 } }
+      - { at_s: 36000, set: { occupancy: true, occupant_zone: room } }
+    pass_criteria:
+      - "dew_margin >= 0 for all t"
+      - "laundry_dry_time_s <= baseline_A2.laundry_dry_time_s"             # v0.4 — 같은 셋백 계열 상용 조절기보다 빨리 (A 는 22 °C 상시 · 다른 일)
+      - "temperature >= 14.0 for all t"
+      - "temperature >= 19.5 by 3600 after arrive_start"
+    metrics: [laundry_dry_time_s, condensation_exposure_s, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: H10
+    tier: 3
+    name: "3일 여행 · 혹한 — 동파 방지 ↔ 절약 ↔ 결로 (72 h)"
+    duration_s: 259200
+    log_interval_s: 10               # 긴 시나리오 — 로그 10 s 간격 (판정 해상도 10 s)
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262810
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: AWAY                    # 사용자가 여행 모드 선택
+      temperature_c: 21.0
+      humidity_pct: 45.0
+      co2_ppm: 700.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: false
+      occupant_zone: none
+      time_of_day: "10:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -5.0
+      outdoor_rh_pct: 60.0
+      outdoor_illuminance_lux: 30000.0
+    events:
+      - { at_s: 25200, set: { outdoor_temp_c: -12.0, outdoor_illuminance_lux: 0.0 } }    # 1일 17:00
+      - { at_s: 75600, set: { outdoor_temp_c: -16.0 } }                                  # 2일 07:00 최저
+      - { at_s: 86400, set: { outdoor_temp_c: -9.0, outdoor_illuminance_lux: 30000.0 } }
+      - { at_s: 111600, set: { outdoor_temp_c: -14.0, outdoor_illuminance_lux: 0.0 } }
+      - { at_s: 162000, set: { outdoor_temp_c: -17.0 } }                                 # 3일 07:00 최저
+      - { at_s: 172800, set: { outdoor_temp_c: -8.0, outdoor_illuminance_lux: 30000.0 } }
+      - { at_s: 198000, set: { outdoor_temp_c: -13.0, outdoor_illuminance_lux: 0.0 } }
+    pass_criteria:
+      - "temperature >= 10.0 for all t"                                     # 동파 하한
+      - "dew_margin >= 0 for all t"
+      - "energy_cost_won <= 0.8 * baseline_A.energy_cost_won"               # 22 °C 켜 둠보다 20 % 이상 싸다
+    metrics: [condensation_exposure_s, gas_kwh, energy_cost_won, min_temp_c, boiler_ignitions]
+
+  - id: H11
+    tier: 3
+    name: "보일러 무응답 — 혹한 저녁 점화 실패 (E17)"
+    duration_s: 10800                    # 18:00 – 21:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262811
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic, heating.hydronic.fault_no_ignition: true }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 19.0
+      humidity_pct: 40.0
+      co2_ppm: 700.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 200.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "18:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: -8.0
+      outdoor_rh_pct: 60.0
+    pass_criteria:
+      - "alert_raised('H_BOILER_FAULT') within 3600 after 0"               # 1시간 안에 사용자에게 알린다
+      - "dew_margin >= 0 for all t"                                         # 차가워지는 방에서 결로를 만들지 않는다
+    metrics: [condensation_exposure_s, cold_discomfort_kh, min_temp_c]
+
+  - id: H12
+    tier: 3
+    name: "사람이 조절기를 직접 올림 — 수동 존중 ↔ 자동 복귀"
+    duration_s: 7200                     # 20:00 – 22:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262812
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 40.0
+      co2_ppm: 700.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "20:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: -6.0
+      outdoor_rh_pct: 60.0
+    injections:
+      - { at_s: 600, manual: { device: boiler, action: "setpoint:24" }, label: manual_up }
+    pass_criteria:
+      - "boiler_setpoint >= 24 by 300 after manual_up_start"                # 사람이 정한 값을 바꾸지 않는다 (5분 뒤)
+      - "boiler_setpoint >= 24 by 1680 after manual_up_start"               # 28분 뒤에도 (보류 30분)
+      - "boiler_setpoint <= 21.5 by 2700 after manual_up_start"             # 보류가 끝나면 자동으로 돌아온다
+      - "dew_margin >= 0 for all t"
+    metrics: [cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: H13
+    tier: 3
+    name: "혹한 + 외기 미세먼지 나쁨 + 요리 — 창문 · 후드 · 급기 · 난방"
+    duration_s: 7200                     # 18:30 – 20:30
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262813
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 40.0
+      co2_ppm: 800.0
+      pm25_ugm3: 20.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: kitchen
+      time_of_day: "18:30"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0
+      appliances: { purifier_level: 1, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 90.0            # 나쁨
+      outdoor_temp_c: -10.0
+      outdoor_rh_pct: 55.0
+    injections:
+      - { at_s: 300, source: cooking, label: cooking, stove: induction_plug, pm_mg_per_min: 2.0,
+          moisture_g_per_h: 500, heat_w: 900, duration_s: 1500 }
+    pass_criteria:
+      - "window_open_ratio == 0 for all t"                                  # 외기 나쁨 · 혹한 — 창문 금지
+      - "pm25 <= 35 by 1800 after cooking_end"
+      - "temperature >= 18.0 by 1800 after cooking_end"                    # v0.3 — 후드 · 급기 손실 > 바닥난방 출력
+      - "dew_margin >= 0 for all t"
+    metrics: [pm25_peak, pm25_recovery_time, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: H14
+    tier: 3
+    name: "외출 '끄기' 설정 + 이상 한파 — 동파 위험 (E16)"
+    duration_s: 86400
+    log_interval_s: 10               # 긴 시나리오 — 로그 10 s 간격 (판정 해상도 10 s)                    # 24 h
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262814
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    user_settings: { away_heating_strategy: "off" }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: AWAY
+      temperature_c: 16.0
+      humidity_pct: 45.0
+      co2_ppm: 600.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 0.0
+      occupancy: false
+      occupant_zone: none
+      time_of_day: "18:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 16.0 } }   # v0.3 — 16 °C 로 지내다 나가며 끔 (평형 시작)
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: -15.0
+      outdoor_rh_pct: 55.0
+    events:
+      - { at_s: 21600, set: { outdoor_temp_c: -19.0 } }
+      - { at_s: 54000, set: { outdoor_temp_c: -12.0 } }
+    pass_criteria:
+      - "temperature >= 10.0 for all t"                                     # 동파 하한
+      - "dew_margin >= 0 for all t"
+    metrics: [gas_kwh, energy_cost_won, min_temp_c]
+
+  # ==== 기존 겨울 시나리오의 난방 제어판 (원본은 scenario_profiles.yaml · A13 경계 조건 그대로) ======
+
+  - id: B9H
+    tier: 1
+    name: "겨울 건조 가습 (B9 난방 제어판)"
+    duration_s: 7200
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262815
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    baseline_a: { auto_appliances: [humidifier] }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 25.0
+      co2_ppm: 600.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "20:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 0.0
+      outdoor_rh_pct: 60.0
+    pass_criteria:
+      - "humidity >= 35 within 7200 after 0"
+      - "dew_margin >= 0 for all t"
+      - "temperature >= 20.0 for all t"
+    metrics: [condensation_exposure_s, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: C6H
+    tier: 2
+    name: "고습 + 저온 결로 대처 (C6 난방 제어판)"
+    duration_s: 7200
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262816
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 20.0
+      humidity_pct: 70.0
+      co2_ppm: 800.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "21:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 5.0
+      outdoor_rh_pct: 80.0
+    pass_criteria:
+      - "dew_margin >= 0 by 1800 after 0"                                   # 30분 안에 결로 해소
+      - "dew_margin >= 0 by 7200 after 0"                                   # 끝날 때까지 다시 생기지 않음
+      - "temperature >= 19.5 for all t"
+    metrics: [condensation_exposure_s, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: C10H
+    tier: 2
+    name: "겨울 가습 ↔ 결로 (C10 난방 제어판)"
+    duration_s: 7200
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262817
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    baseline_a: { auto_appliances: [humidifier] }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 30.0
+      co2_ppm: 600.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 350.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "20:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: -5.0
+      outdoor_rh_pct: 70.0
+    pass_criteria:
+      - "dew_margin >= 0 for all t"
+      - "humidity >= 40 within 7200 after 0"
+      - "humidifier + dehumidifier <= 1 for all t"
+      - "temperature >= 20.0 for all t"
+    metrics: [condensation_exposure_s, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: C19H
+    tier: 2
+    name: "겨울 샤워 · 빨래 + 외기 나쁨 (C19 난방 제어판)"
+    duration_s: 14400
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262818
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    baseline_a: { auto_appliances: [dehumidifier] }
+    initial:
+      thermal_steady: true             # 축열 · 외피 · 바닥 = 시작 조건 72 h 평형 (공기 온도는 아래 값)
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 45.0
+      co2_ppm: 600.0
+      pm25_ugm3: 15.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "20:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 60.0
+      outdoor_temp_c: 2.0
+      outdoor_rh_pct: 70.0
+    injections:
+      - { at_s: 300, source: shower, label: shower, moisture_g: 200, duration_s: 600 }
+      - { at_s: 2100, appliance: washer, label: washer, power_w: 450, duration_s: 300, laundry_moisture_g: 1500 }
+    pass_criteria:
+      - "window_open_ratio == 0 for all t"
+      - "q_net >= -1 for all t"
+      - "pm25 <= 35 for all t"
+      - "humidity <= value_at('humidity', shower_start) + 5 by 1800 after shower_start"
+      - "dew_margin >= 0 for all t"
+      - "temperature >= 19.5 for all t"
+    metrics: [humidity_recovery_time, laundry_dry_time_s, condensation_exposure_s, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+# ---- 변경 기록 (판정 동결 전 개발 실행에서 고친 것) -------------------------------------------
+#  2026-10-28 v0.1 작성
+#  2026-10-28 v0.4 개발 실행 hdev3 — H14 동파 알림 판정 삭제 (12 °C 유지로 위험에 가지 않음 · 결과 판정만) · H9 비교 대상 A → A2
+#                (A 는 22 °C 상시 — 다른 일) · 제어기: 외출 중 빨래 건조는 셋백하지 않음
+#  2026-10-28 v0.3 개발 실행 hdev2 — H5 · H13 온도 판정 → 요리 뒤 30분 18 °C (후드 · 급기 손실 2.6 kW > 바닥난방 출력: 모든 방식 불가) ·
+#                H8 가스 vs A 삭제 (A 는 환기 안 함 — 다른 일을 비교) · H6 샤워 30분 뒤 · H9 건조 → 기준선 A 보다 빠름 · H14 시작 16 °C 평형
+#  2026-10-28 v0.2b 10 h 이상 시나리오는 로그 10 s 간격 (디스크 — 72 h 실행당 약 1 GB)
+#  2026-10-28 v0.2 개발 실행 hdev1 — 바닥이 공기 온도에서 시작해 A(22 °C 켜 둠)까지 처음 몇 시간 식음 → 시작 상태를 72 h 평형으로 (thermal_steady) · mass · envelope 직접 지정 삭제

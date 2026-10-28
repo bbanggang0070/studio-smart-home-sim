@@ -355,6 +355,8 @@ def sensor_topics(obs: dict[str, Any], world: WorldInputs, door_open: bool, extr
 
 def make_model(env_cfg, sc: dict[str, Any]) -> RoomModel:
     ini = sc["initial"]
+    if ini.get("thermal_steady"):                     # [난방 확장] 축열 · 외피 · 바닥을 시작 조건의 평형으로
+        return _steady_model(env_cfg, sc)
     return RoomModel.from_conditions(
         env_cfg,
         temp_c=float(ini["temperature_c"]),
@@ -365,3 +367,26 @@ def make_model(env_cfg, sc: dict[str, Any]) -> RoomModel:
         mass_temp_c=ini.get("mass_temp_c"),           # 선택 — 공기만 데워진 상태 등 (B11)
         envelope_temp_c=ini.get("envelope_temp_c"),
     )
+
+
+def _steady_model(env_cfg, sc: dict[str, Any]) -> RoomModel:
+    """[난방 확장 · 2026-10-28] 시작 전 thermal_steady_h(기본 72 h) 동안 시작 조건(외기 · 초기 가전 · 재실)으로 돌려
+    축열 · 외피 · 바닥 · 공급수 온도를 평형으로 맞춘다. 공기 온도 · 습도 · PM · CO₂ 는 시나리오 값으로 다시 둔다.
+    (바닥이 공기와 같은 온도에서 시작하면 난방 중인 방이 처음 몇 시간 비현실적으로 식는다 — 개발 실행 hdev1 에서 발견)"""
+    ini = sc["initial"]
+    m = RoomModel.from_conditions(env_cfg, temp_c=float(ini["temperature_c"]), rh_pct=float(ini["humidity_pct"]),
+                                  pm25_ugm3=float(ini.get("pm25_ugm3", 12.0)), co2_ppm=float(ini.get("co2_ppm", 600.0)),
+                                  filter_hours=float(ini.get("filter_hours", 0.0)))
+    w = WorldInputs.from_scenario(sc)
+    act = initial_actuators(sc)
+    occ = w.occupancy_model()
+    for _ in range(int(float(ini.get("thermal_steady_h", 72.0)) * 60)):
+        m.step(60.0, act, w.ext, None, occ)
+    s = m.state
+    keep = (s.mass_temp_c, s.envelope_temp_c, s.floor_temp_c, s.supply_temp_c)
+    m = RoomModel.from_conditions(env_cfg, temp_c=float(ini["temperature_c"]), rh_pct=float(ini["humidity_pct"]),
+                                  pm25_ugm3=float(ini.get("pm25_ugm3", 12.0)), co2_ppm=float(ini.get("co2_ppm", 600.0)),
+                                  filter_hours=float(ini.get("filter_hours", 0.0)), mass_temp_c=keep[0], envelope_temp_c=keep[1])
+    if m.hydronic:
+        m.state.floor_temp_c, m.state.supply_temp_c = keep[2], keep[3]
+    return m

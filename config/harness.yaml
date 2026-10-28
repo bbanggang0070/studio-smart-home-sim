@@ -31,6 +31,11 @@ metrics:
   rh_recovery_abs_pct: 60.0       # 지표 #14 — 또는 60 %
   co2_reference_ppm: { study: 800.0, other: 1000.0 }   # 지표 #9 (참값 검증)
   base_vent_tolerance_m3h: 0.5    # 지표 #9 — 기본 환기 충족 판정 허용 오차 (rpm 반올림)
+  heating:                        # [난방 확장 docs/14 §8] hydronic 실행에만 — 요금 · 추위 기준은 draft (출처 확인 · 민감도)
+    gas_won_per_kwh: 81.0         # draft — 도시가스 주택용 약 22.5 원/MJ × 3.6 (서울 · 확인 필요)
+    electric_won_per_kwh: 200.0   # draft — 주택용 누진 중간 구간 근사 (확인 필요)
+    cold_below_c: { default: 20.0, SLEEP: 18.0, NIGHT: 19.0 }   # 재실 중 이 아래를 추위로 센다 (모드 목표 − 1 °C)
+    cold_won_per_kh: 160.0        # draft — 추위 1 K·h 의 원 환산 = 냉방 기대비용 2,000 Wh/K·h × 전기 80 원/kWh 와 같은 크기
   overheat_margin_c: 0.5          # 지표 #1 보조 — 체감온도가 모드 냉방 목표 + 0.5 °C 를 넘은 누적 시간 (overheat_time_s)
   # 지표 #8 — 장치 전환(구동) 횟수: 이산 장치는 값이 바뀔 때마다, 연속 장치는 아래 폭 이상 바뀔 때 1회
   actuation_columns: [act.ac_cool, act.ac_dry, act.ceiling_fan, act.purifier_level, act.range_hood_level,

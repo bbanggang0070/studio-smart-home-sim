@@ -113,9 +113,15 @@ def test_i12_no_humidify_while_warming_up():
     assert any("I12" in r for r in c.reasons())
 
 
-def test_i13_cooking_holds_setpoint():
+def test_cooking_keeps_heating_target():
+    """I13('요리 중 올리지 않음')은 삭제 — 후드 · 급기 손실이 커서 오히려 더 식었다 (H5 개발). 요리 중에도 목표 유지."""
     c = ctrl()
     out = c.step(19 * 3600.0, inbox(temp=20.0, **{T.C_ACTIVITY: "cooking", T.S_APPLIANCE_POWER: json.dumps({"cooktop": 1500.0})}))
-    ev = json.loads(out[T.T_ACTIVE_EVENTS])
-    if "COOKING" in ev:
-        assert boiler(out)["setpoint"] == pytest.approx(20.0)
+    assert boiler(out)["setpoint"] == pytest.approx(21.0)
+
+
+def test_away_off_uses_frost_margin():
+    c = ctrl()
+    c.p.modes["energy"]["away_heating_strategy"] = "off"
+    sp, _ = c.rules.heating.target("AWAY", "NORMAL")
+    assert sp == pytest.approx(12.0)

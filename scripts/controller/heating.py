@@ -2,10 +2,11 @@
 
 장치 'boiler' 의 값 = 룸 온도조절기 설정 °C (0 = 전원 끔). 병합은 다른 장치와 같다 — need 최댓값 · cap 최솟값 · force 최상위.
 
-  사다리 (싼 수단부터)  1 낮 · 맑음 → 블라인드 개방(일사 받기) · 2 밤 → 블라인드 닫기(창 단열) · 3 실링팬 역회전 약 · 4 보일러
+  사다리 (싼 수단부터)  1 낮 · 맑음 → 블라인드 개방(일사 받기) · (2 밤 블라인드 닫기 — 설정으로 끔: 유리가 차가워져 결로 · H7) · 3 실링팬 역회전 약 · 4 보일러
   목표                 모드 heating_setpoint_c · 외출(AWAY) = away_heating 전략(셋백 · 끄기) · 난방 목표 ≤ 냉방 목표 − 데드밴드
+  프리히팅             외출 중 예측 귀가 preheat_quantile 시각 − preheat_lead_min 부터 외출 직전 모드 목표 (E13 과 같은 귀가 모델)
   I11 환기 ↔ 난방      창문이 열려 있으면 보일러를 동파 하한으로 낮춘다 (열린 창으로 데운 공기를 버리지 않는다)
-  I13 후드 ↔ 난방      요리 · 후드 후속 중에는 목표 − cooking_hold_c 까지만 (찬 외기 유입에 바로 올리지 않는다)
+  (I13 후드 ↔ 난방     '요리 중 올리지 않음' 은 삭제 — 후드 · 급기 손실이 바닥난방 출력보다 커 오히려 더 식었다 · H5 개발 2026-10-28)
   I12 가습 ↔ 난방      데우는 중(실내 < 목표 − warmup_no_humidify_c)에는 가습하지 않는다 (차가운 방 = 차가운 창 표면 → 결로)
   I14 빨래 ↔ 난방      E10 빨래 건조 중 목표 + laundry_boost_c (L4.5)
   난방 ⟂ 냉방           냉방 사다리가 켜져 있으면 보일러는 동파 하한만 (L5 cap)
@@ -17,6 +18,8 @@
 from __future__ import annotations
 
 import math
+
+import numpy as np
 
 from controller.event_detector import ActiveEvent
 from controller.params import ControllerParams
@@ -44,7 +47,8 @@ class HeatingLadder:
         if mode == "AWAY":
             en = self.p.modes.get("energy") or {}
             strat = str(en.get("away_heating_strategy", "setback"))
-            sp = float(en.get("away_heating_setback_c", frost)) if strat == "setback" else frost
+            # 끄기 = 동파 방지 여유(frost_alert_c) — 바닥난방은 느려 하한(10 °C)에서 켜면 9.4 °C 까지 내려간다 (H14 개발)
+            sp = float(en.get("away_heating_setback_c", frost)) if strat == "setback" else g("heating.frost_alert_c")
             why = f"외출 난방 {strat} {sp:g} °C"
         else:
             m = self.p.mode(mode if mode in self.p.modes["modes"] else home_mode)
@@ -57,7 +61,7 @@ class HeatingLadder:
         return max(sp, frost), why
 
     def apply(self, o: Observation, mode: str, home_mode: str, ev: dict, devices: set, cooling: bool,
-              add) -> dict:
+              add, energy=None) -> dict:
         if "boiler" not in devices:
             return {}
         g = self.p.get
@@ -73,6 +77,18 @@ class HeatingLadder:
             info["boiler_hold"] = True
             return info
         sp, why = self.target(mode, home_mode)
+        if mode == "AWAY" and energy is not None and o.user_mode != "AWAY":   # 사용자가 고른 여행(AWAY)은 귀가를 예측하지 않는다
+            q = float(np.quantile(energy._arrival_samples(o.tod_s), g("heating.preheat_quantile")))
+            start = q - g("heating.preheat_lead_min") * 60.0
+            if o.tod_s >= start and o.tod_s < q + g("events.precool.timeout_after_pred_min") * 60.0:
+                home_sp, _ = self.target(home_mode, home_mode)
+                if home_sp > sp:
+                    sp, why = home_sp, f"프리히팅 — 귀가 예측 {q / 3600:.2f} h − {g('heating.preheat_lead_min'):g}분"
+                    ev.setdefault("PREHEAT", ActiveEvent("PREHEAT", o.now_s, {"arrival_q": q}))
+            else:
+                ev.pop("PREHEAT", None)
+        else:
+            ev.pop("PREHEAT", None)
         season = (o.outdoor_temp_c <= g("heating.season_max_outdoor_c")) if not math.isnan(o.outdoor_temp_c) \
             else o.temp_c < sp
         info["heating_target_c"] = sp
@@ -94,13 +110,15 @@ class HeatingLadder:
         info["heating_season"] = True
         # -- 보일러 목표 (L3 외출 · L5 쾌적) --
         add("boiler", "need", sp, L3 if mode == "AWAY" else L5, why)
-        if "LAUNDRY_DRYING" in ev and mode != "AWAY":
-            add("boiler", "need", sp + g("heating.laundry_boost_c"), L45, "I14 빨래 건조 — 난방 목표 상향")
+        if "LAUNDRY_DRYING" in ev:
+            if mode != "AWAY":
+                add("boiler", "need", sp + g("heating.laundry_boost_c"), L45, "I14 빨래 건조 — 난방 목표 상향")
+            else:                                         # 외출 중 빨래 — 셋백하지 않고 집 목표 유지 (H9 개발 · 2026-10-28)
+                home_sp, _ = self.target(home_mode, home_mode)
+                add("boiler", "need", home_sp, L45, "I14 빨래 건조 중 외출 — 셋백 대신 집 목표")
         # -- 규칙 --
         if o.window_ratio >= g("heating.vent_pause_window_ratio"):
             add("boiler", "cap", frost, L2, f"I11 창문 {o.window_ratio:.0%} 열림 — 난방 일시 정지")
-        if "COOKING" in ev or "HOOD_POST_RUN" in ev:
-            add("boiler", "cap", max(sp - g("heating.cooking_hold_c"), frost), L2, "I13 요리 · 후드 — 난방 올리지 않음")
         if cooling:
             add("boiler", "cap", frost, L5, "난방 ⟂ 냉방 — 냉방 사다리 동작 중")
         if o.temp_c < sp - g("heating.warmup_no_humidify_c") and mode != "AWAY":

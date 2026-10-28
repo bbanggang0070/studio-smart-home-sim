@@ -44,7 +44,11 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--group", default="files", choices=["files", "controller", "all"])
+    ap.add_argument("--config", help="동결 목록 파일 (기본 config/freeze.yaml · 난방 확장 트랙 = config/freeze_heating.yaml)")
     a = ap.parse_args()
+    global FREEZE
+    if a.config:
+        FREEZE = REPO / a.config
     cfg = yaml.safe_load(FREEZE.read_text(encoding="utf-8"))
     groups = ["files", "controller"] if a.group == "all" else [a.group]
     changed = []

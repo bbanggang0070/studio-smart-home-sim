@@ -246,7 +246,8 @@ class RuleEngine:
         self.ladders.moisture_event = "COOKING" in ev or "HOOD_POST_RUN" in ev or "SHOWER" in ev
         self.info.update(self.ladders.apply(o, mode, blocked, noise, add, saving=saving))
         if "boiler" in self.devices:                       # 난방 확장 (docs/14 §4) — v1.29 프로파일에는 boiler 가 없다
-            self.info.update(self.heating.apply(o, mode, self.home_mode, ev, self.devices, self.ladders.cooling, add))
+            self.info.update(self.heating.apply(o, mode, self.home_mode, ev, self.devices, self.ladders.cooling, add,
+                                                energy=self.energy))
             self.alerts.extend(self.heating.alerts)
             self.heating.alerts = []
         # -- L6 조도 · 조명 --

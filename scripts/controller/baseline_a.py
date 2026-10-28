@@ -23,6 +23,12 @@ from interfaces import topics as T
 BASELINES = Path(__file__).resolve().parents[2] / "config" / "baselines.yaml"
 
 
+def has_boiler(sc: dict) -> bool:
+    """[난방 확장] 시나리오 가전 프로파일에 boiler 가 있나 — 없으면 기준선은 보일러 명령을 내지 않는다 (v1.29 와 같다)."""
+    from controller.params import load_params
+    return "boiler" in load_params().get("appliances.profiles").get(sc.get("appliance_profile", "full"), [])
+
+
 class BaselineA:
     name = "baseline_A"
 
@@ -50,6 +56,7 @@ class BaselineA:
         self.user_lights = bool((sc.get("baseline_a") or {}).get("user_lights", False))
         self._home_since: float | None = None
         self._was_away = False
+        self.heating = has_boiler(sc)
 
     def step(self, now_s: float, inbox: dict[str, Any]) -> dict[str, Any]:
         c = self.cfg
@@ -108,4 +115,6 @@ class BaselineA:
             out[T.C_AC] = json.dumps({"power": ac_run, "mode": "cool", "setpoint": c["ac_setpoint_c"], "fan": "auto"})
         elif self.ac_on:
             out[T.C_AC] = json.dumps({"power": True, "mode": "cool", "setpoint": c["ac_setpoint_c"], "fan": "auto"})
+        if self.heating:                               # [난방 확장] 조절기 22 °C 켜 둠 (사람이 바꾸지 않는다)
+            out[T.C_BOILER] = json.dumps({"power": True, "setpoint": float(c["boiler_fixed_c"])})
         return out

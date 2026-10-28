@@ -69,6 +69,8 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
     sc = run.scenario
     fm = hcfg["fast_mode"]
     dt, log_every = float(fm["dt_s"]), float(fm["log_interval_s"])
+    if sc.get("log_interval_s"):                      # [난방 확장] 긴 시나리오(72 h 등) — 로그 크기 (실행당 ~1 GB → 1/10)
+        log_every = float(sc["log_interval_s"])
     duration = float(sc["duration_s"])
     np.random.seed(run.seed)                      # 이후 노이즈 · 확률 주입이 이 시드를 쓴다
     rng = np.random.default_rng(run.seed)

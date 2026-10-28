@@ -85,6 +85,11 @@ class SmartHomeController:
         us = {**us, **((sc.get("user_settings_by_baseline") or {}).get(self.baseline) or {})}
         if "away_auto_enabled" in us:
             self.modes.away_auto = bool(us["away_auto_enabled"])
+        if "away_heating_strategy" in us:                 # [난방 확장] 외출 중 난방 전략 (H14 — 끄기)
+            modes = copy.deepcopy(self.p.modes)
+            modes.setdefault("energy", {})["away_heating_strategy"] = str(us["away_heating_strategy"])
+            self.p = ControllerParams(self.p.th, modes)
+            self.rules.heating.p = self.p                  # 규칙 엔진은 이미 만들어졌다 — 난방 사다리에 새 설정을 준다
         en = self.p.modes.get("energy") or {}
         strategy = str(us.get("away_strategy", en.get("away_strategy", "auto")))
         strategy = "precool" if strategy == "auto_precool" else strategy

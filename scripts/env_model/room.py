@@ -175,6 +175,8 @@ class RoomModel:
             want = True
         elif t_air > cmd.setpoint_c + hyst:
             want = False
+        if g(h + "fault_no_ignition"):
+            want = False                                 # 고장 — 점화 실패 (전기 = 대기 전력 · 실내로 열 없음)
         if want != self.boiler_burning:
             hold = g(h + "boiler_min_burn_s") if self.boiler_burning else g(h + "boiler_min_off_s")
             if now - self._boiler_change_s >= hold or not cmd.power:   # 전원을 끄면 바로 멈춘다

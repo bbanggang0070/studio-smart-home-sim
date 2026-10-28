@@ -233,3 +233,4 @@ environment_model:
         boiler_min_burn_s: 180.0             # draft — 보일러 자체 잦은 점화 방지 (참값 쪽 · 제어기 L0 와 별개)
         boiler_min_off_s: 300.0
         thermostat_hysteresis_c: 0.5         # draft — 룸 온도조절기 켬/끔 간격 (설정 ± 절반)
+        fault_no_ignition: false             # 고장 주입 (H11) — 조절기는 켜져도 점화하지 않는다 (계량 플러그 = 대기 전력)

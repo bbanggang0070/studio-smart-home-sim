@@ -23,6 +23,8 @@
     alert_raised('E15')              /studio/state/alerts 에 그 코드의 알림이 나온 뒤의 시각
     ac_fan_is('low')                 에어컨이 꺼져 있거나 그 풍량인 시각
     abs(<식>)                         절댓값
+    [난방 확장] 별칭 floor_temp · boiler_burning · boiler_on · boiler_setpoint · boiler_gas_w (hydronic 실행)
+                지표 gas_kwh · electric_kwh · energy_cost_won · cold_discomfort_kh · min_temp_c · boiler_ignitions · expected_cost_heating
     mode_is('SLEEP')                 제어기가 낸 유효 생활 모드(living_mode)가 그 값인 시각
     feasibility_is('DEGRADED')       control_feasibility 가 그 값인 시각
     cmd_* 별칭은 제어기가 낸 명령값 — 내지 않은 주기는 직전 값을 이어 쓴다
@@ -98,6 +100,12 @@ ALIASES = {
     "pm_ac_run": "pm.ac.run",                          # 전력 감시가 판정한 에어컨 상태 (B11)
     "pm_ac_fan_only": "pm.ac.fan_only",
     "ac_manual_detected": "pm.ac.manual",
+    # [난방 확장 docs/14 · heating.mode = hydronic 실행에만 있는 열]
+    "floor_temp": "truth.floor_temp_c",
+    "boiler_burning": "truth.boiler_burning",
+    "boiler_on": "act.boiler_power",                   # 조절기 전원 (L0 뒤 실제)
+    "boiler_setpoint": "act.boiler_setpoint",
+    "boiler_gas_w": "truth.boiler_gas_w",
 }
 
 PASS, FAIL, PENDING, ERROR, NA = "PASS", "FAIL", "PENDING", "ERROR", "N/A"
@@ -383,6 +391,33 @@ def compute_metrics(df: pd.DataFrame, anchors: dict[str, float], sources: dict[s
     out["budget_violation_count"] = _budget_violations(
         df, ctx.get("budgets") or {}, list(bc.get("noise_exempt_events") or []),
         max(1, int(round(float(bc.get("min_duration_s", 30.0)) / dt_s))))
+    if "truth.floor_temp_c" in df.columns:               # [난방 확장] hydronic 실행에만 — v1.29 실행의 지표 열은 그대로
+        out.update(_heating_metrics(df, t, dt_s, cfg_metrics.get("heating") or {}, occ))
+    return out
+
+
+def _heating_metrics(df: pd.DataFrame, t: np.ndarray, dt_s: float, hc: dict[str, Any], occ: np.ndarray) -> dict[str, float]:
+    """난방 지표 (docs/14 §8) — 가스 · 전기 · 비용(원) · 재실 중 추위 K·h · 최저 실내 · 보일러 점화 횟수."""
+    out: dict[str, float] = {}
+    gas_kwh = float(df["energy_wh.boiler_gas"].iloc[-1]) / 1000.0 if "energy_wh.boiler_gas" in df.columns else 0.0
+    elec_cols = [c for c in df.columns if c.startswith("energy_wh.") and c != "energy_wh.boiler_gas"]
+    elec_kwh = float(sum(df[c].iloc[-1] for c in elec_cols)) / 1000.0
+    out["gas_kwh"] = gas_kwh
+    out["electric_kwh"] = elec_kwh
+    out["energy_cost_won"] = gas_kwh * float(hc.get("gas_won_per_kwh", math.nan)) + elec_kwh * float(hc.get("electric_won_per_kwh", math.nan))
+    temp = df["truth.temperature_c"].to_numpy()
+    cold = np.full(len(df), float((hc.get("cold_below_c") or {}).get("default", 20.0)))
+    if T.T_LIVING_MODE in df.columns:
+        for mode, thr in (hc.get("cold_below_c") or {}).items():
+            if mode != "default":
+                m = df[T.T_LIVING_MODE].astype(str).str.contains(f'"mode": "{mode}"', regex=False).to_numpy()
+                cold[m] = float(thr)
+    deficit = np.clip(cold - temp, 0.0, None) * occ
+    out["cold_discomfort_kh"] = float(deficit.sum() * dt_s / 3600.0)
+    out["min_temp_c"] = float(temp.min())
+    b = df["truth.boiler_burning"].astype(float).to_numpy()
+    out["boiler_ignitions"] = float(((b[1:] > 0.5) & (b[:-1] < 0.5)).sum())
+    out["expected_cost_heating"] = out["energy_cost_won"] + float(hc.get("cold_won_per_kh", math.nan)) * out["cold_discomfort_kh"]
     return out
 
 

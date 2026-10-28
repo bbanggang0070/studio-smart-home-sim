@@ -1,0 +1,41 @@
+# ============================================================================
+#  난방 확장 트랙 동결 목록 (docs/14 · docs/15 §6–§7 · 브랜치 heating) — v1.29 의 config/freeze.yaml 과 별개
+#  tools/check_freeze.py --config config/freeze_heating.yaml --group all
+#  files: 난방 시나리오 · 판정 문법 · 지표 설정 · 기준선 명세 · 참값 모델
+#  controller: 제어기 v1.30-H 코드 · 계수 · 학습 산출물 · 하네스 (고치면 새 보류 묶음으로 다시 평가)
+# ============================================================================
+frozen_at: '2026-10-28'
+files:
+- path: config/scenarios_heating.yaml
+  sha256: 74b7d8c78ae93f1e8b7ef145d533329c9a6a920694757be084a7a9c0d47b7954
+- path: scripts/harness/criteria.py
+  sha256: 7cc7d637789fa13acadd0338d18d754d2a3463389e9b93c57399ddacf6a3675a
+- path: config/harness.yaml
+  yaml_key: metrics
+  sha256: 4fe5e84eba112b2fe7e43a64bed0f49fa0263b927c8eb79749000baacdc2dbee
+- path: config/harness.yaml
+  yaml_key: appliance_profiles
+  sha256: 5e4535b8f9e3affbe5ceb75333df1192a8a6e33bb72d629528e0189aedf341a5
+- path: config/baselines.yaml
+  sha256: 08f2bcde23bbd6d1eb9f15e43a75682aed7ae7d9765fd57e2526c8b5aa8a0234
+- path: config/environment_model.yaml
+  sha256: 20d815dd51e6b8e8cf82183d2a67831581ac943f876b63e34f3b9d4b17ed563a
+- glob: scripts/env_model/*.py
+  sha256: df03396f2c3f452fc5ed47149615c1c6667c30ce54f8ec62fdedc7070a156105
+controller:
+- glob: scripts/controller/*.py
+  sha256: e825b2f151c887543d92416af700722fbbb4c83e7a0a1e80ebfadd9b3398dd37
+- glob: scripts/sensors/*.py
+  sha256: 55c6f57b749da7a19a35619ac17d5498c4075f82b39f8309432b2bf10beb6e34
+- glob: scripts/actuators/*.py
+  sha256: 73e5c9244133909ba103dc9904e9efdc02d059fdee83b28f4d78aa76ef5515d4
+- path: config/thresholds.yaml
+  sha256: d0ba4a54edbaf1379429cf668361776187db338f58ed94574c1a4aa02b1045a0
+- path: config/user_modes.yaml
+  sha256: 998a1c1e531b38ecadd7b44a3cce35c3790bf5943de26d6d945de96fd35cfd17
+- glob: models/*
+  sha256: 6b33ecbacbc9885e060e51731c85e171ec5c0f71841064fa2bff70bd1f7a6364
+- path: scripts/harness/fast_world.py
+  sha256: 3065a2b995312be52dc7d4f3eacb2019ba0626e404ab881d2695b71be01b9d74
+- path: scripts/harness/runner.py
+  sha256: 798bf30188e45459bff1d0683835baa06134207339810e7c70b06519c7ed6f13

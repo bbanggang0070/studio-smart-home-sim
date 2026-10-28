@@ -37,6 +37,9 @@ energy:
   away_strategy: auto              # auto(T* 기반 셋백/끄기) | setback | off
   progressive_tariff_guard: false  # 하계 누진 구간 방어 (선택)
   power_limit_w: 3000.0            # 우리 집 전력 한도 — 계약전력 · 차단기에 맞게
+  # [난방 확장 docs/14 §4.5] 외출 중 난방 — setback(셋백 온도 유지) | off(동파 하한만) · draft
+  away_heating_strategy: setback
+  away_heating_setback_c: 16.0
 
 # ---- 소음 등급 → 장치별 상한 ------------------------------------------------
 #  모드는 장치별 상한 대신 등급 하나만 지정한다. N3은 이벤트(요리) 전용.
@@ -82,6 +85,7 @@ modes:
     label: "일반"
     lighting: { target: ceiling, lux: 400.0, cct_k: 4000.0 }
     cooling_setpoint_c: 26.0
+    heating_setpoint_c: 21.0             # [난방 확장 docs/14] draft — boiler 가 있는 가전 프로파일에서만 쓴다
     humidity_range_pct: [40.0, 60.0]
     base_vent_m3h: 25.0            # [v3.4] 재실 기본 환기 (1인 기준) — CO2 상한 대체
     noise_grade: N2
@@ -93,6 +97,7 @@ modes:
     label: "공부"
     lighting: { target: desk, lux: 600.0, cct_k: 5500.0, ceiling_lux: 300.0 }
     cooling_setpoint_c: 25.0
+    heating_setpoint_c: 21.0             # [난방 확장 docs/14] draft — boiler 가 있는 가전 프로파일에서만 쓴다
     humidity_range_pct: [40.0, 60.0]
     base_vent_m3h: 40.0            # 집중 — 800 ppm 상당 (Satish et al. 2012)
     noise_grade: N2
@@ -104,6 +109,7 @@ modes:
     label: "야간"
     lighting: { target: room, lux: 150.0, cct_k: 3000.0 }
     cooling_setpoint_c: 26.0
+    heating_setpoint_c: 20.0             # [난방 확장 docs/14] draft — boiler 가 있는 가전 프로파일에서만 쓴다
     humidity_range_pct: [40.0, 60.0]
     base_vent_m3h: 25.0
     noise_grade: N1
@@ -115,6 +121,7 @@ modes:
     label: "수면"
     lighting: { target: room, lux: 30.0, cct_k: 2700.0, off_after_min: 15.0 }
     cooling_setpoint_c: 27.0
+    heating_setpoint_c: 19.0             # [난방 확장 docs/14] draft — boiler 가 있는 가전 프로파일에서만 쓴다
     ceiling_fan: { direction: forward, speed: low }   # 냉방 시즌에만
     humidity_range_pct: [45.0, 60.0]
     base_vent_m3h: 16.0            # N0 흡기 상한 안 · 미달 시 E4 (thresholds.yaml)
@@ -127,6 +134,7 @@ modes:
     label: "외출"
     lighting: { target: none, lux: 0.0, cct_k: 0.0 }
     cooling_setpoint_c: null       # 냉방 정지 (귀가 예약 시 precool_before_arrival_min 전 기동)
+    heating_setpoint_c: null             # [난방 확장] 외출은 away_heating 전략이 정한다
     humidity_range_pct: [null, 70.0]   # 곰팡이 방지 상한만
     base_vent_m3h: 0.0             # 무재실 — 결로 · 곰팡이 방지만
     noise_grade: null
@@ -160,6 +168,9 @@ schedule:
 editable_ranges:
   cooling_setpoint_c: [24.0, 28.0]
   sleep_cooling_setpoint_c: [25.0, 28.0]
+  heating_setpoint_c: [18.0, 24.0]        # [난방 확장] draft
+  sleep_heating_setpoint_c: [16.0, 22.0]
+  away_heating_setback_c: [10.0, 20.0]    # 하한 = 동파 하한 (thresholds heating.frost_min_c)
   base_vent_m3h: [15.0, 50.0]      # [v3.4] 하한 15는 thresholds.yaml base_ventilation.hard_min_m3h
   humidity_low_pct: [30.0, 50.0]
   humidity_high_pct: [50.0, 65.0]  # 가습은 결로 규칙 I4가 추가로 제한

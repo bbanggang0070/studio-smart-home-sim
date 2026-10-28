@@ -30,11 +30,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", help="결과 폴더 (기본: results/)")
     ap.add_argument("--list", action="store_true", help="실행 조합만 출력")
     ap.add_argument("--extra-baselines", default="", help="A 를 돌리는 시나리오에서 함께 돌릴 기준선 (예: A2)")
+    ap.add_argument("--scenario-file", help="시나리오 파일 (기본: harness.yaml paths.scenarios) — 예: config/scenarios_heating.yaml (난방 확장)")
     args = ap.parse_args(argv)
 
     ids = args.scenarios.split(",") if args.scenarios else None
     bls = args.baselines.split(",") if args.baselines else None
     hcfg = load_harness_config()
+    if args.scenario_file:                             # 난방 확장 등 — 동결 시나리오 파일 대신 이 파일 (run_batch 도 이 경로를 읽는다)
+        hcfg["paths"]["scenarios"] = args.scenario_file
 
     if args.list:
         runs = expand_runs(load_scenarios(REPO / hcfg["paths"]["scenarios"]), ids, bls, args.reps)

@@ -1,0 +1,27 @@
+# 자동 생성 — 손으로 고치지 말 것
+generated_by: tools/energy/train_heating_model.py
+structure: 3-node (air · mass · floor) — 참값 4R4C 와 다름
+train:
+  weather: ASOS
+  start: '2021-01-08'
+  days: 14
+  rmse_c: 0.166
+test_2024:
+- start: '2024-12-17'
+  rmse_c: 0.401
+- start: '2024-02-29'
+  rmse_c: 0.585
+- start: '2024-02-26'
+  rmse_c: 0.657
+heating_3node:
+  ca: 238.571
+  cm: 9358.95
+  cf: 3436.7
+  rim: 0.0011052
+  rao: 0.0213417
+  rmo: 0.299271
+  rfa: 0.000326522
+  qb: 6364.72
+  gs: 0.999999
+  go: 181.224
+  q0: 0.1

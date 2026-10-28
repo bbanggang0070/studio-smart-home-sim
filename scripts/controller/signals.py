@@ -58,6 +58,7 @@ class Observation:
     safety_state: str = "NORMAL"           # 창문 안전 계층 (W10) — SAFETY_HOLD · LOCKED_* 이면 창문을 못 쓴다
     ac_l0_hold: bool = False               # 가전 브릿지 L0 압축기 보호가 지금 명령을 미루는 중 (state/ac l0_hold) — E9 판정은 이 동안 세지 않는다
     sky: str = "clear"                     # 날씨 API 하늘 상태 — 주광의 직사광 비율 (common/daylight.py · v3.4.21)
+    boiler: dict | None = None             # [난방 확장] 룸 온도조절기 상태 (state/boiler JSON) — 없으면 None
 
     @property
     def tod_s(self) -> float:
@@ -103,6 +104,7 @@ def parse_inbox(now_s: float, inbox: dict[str, Any]) -> Observation:
         desk_pct=float(inbox.get(T.T_DESK_LIGHT, 0.0)),
         appliance_states=json.loads(inbox.get(T.T_APPLIANCE_STATES) or "{}"),
         safety_state=str(inbox.get(T.T_SAFETY_STATE, "NORMAL") or "NORMAL"),
+        boiler=json.loads(inbox[T.T_BOILER]) if inbox.get(T.T_BOILER) else None,
     )
 
 

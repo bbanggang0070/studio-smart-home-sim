@@ -1,0 +1,41 @@
+# ============================================================================
+#  난방 확장 트랙 시나리오 (docs/14 §6 · 브랜치 heating) — v1.29 동결 파일(scenario_profiles.yaml)과 분리
+#  H0 = 개발용 동작 확인 (등록 대상 아님) · H1–H10 은 3주차에 작성 · 판정 동결 후 사전 등록 (docs/15)
+#  참값 모델은 environment_overrides 로 heating.mode = hydronic (보일러 + 온수 바닥난방)
+# ============================================================================
+scenarios:
+  - id: H0
+    tier: 1
+    name: "난방 동작 확인 — 겨울 저녁 18 °C 에서 시작"
+    duration_s: 21600
+    repeat: 1
+    baselines: [proposed]
+    seed: 20261290
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      user_mode: NORMAL
+      temperature_c: 18.0
+      humidity_pct: 35.0
+      co2_ppm: 600.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "18:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: false, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: -5.0
+      outdoor_rh_pct: 60.0
+    pass_criteria:
+      - "temperature >= 20.5 within 21600 after 0"   # 2026-10-28 결과를 본 뒤 3 h · 20 °C → 6 h · 20.5 °C (바닥난방 속도 · 개발용 · 등록 대상 아님)
+      - "dew_margin >= 0 for all t"
+    metrics: [energy_wh, condensation_exposure_s]

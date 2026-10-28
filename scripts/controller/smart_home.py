@@ -42,10 +42,11 @@ DEVICE_TOPIC = {
     "ceiling_light": (T.C_CEILING_LIGHT, float, "ceiling_light"),
     "desk_light": (T.C_DESK_LIGHT, float, "desk_lamp"),
     "desk_cct": (T.C_DESK_LIGHT_CCT, float, "desk_lamp"),
+    "boiler": (T.C_BOILER, None, "boiler"),             # [난방 확장] JSON — 값 = 설정 °C (0 = 끔) · 프로파일에 boiler 가 있을 때만
 }
 # 아무 요구가 없을 때의 값 — 요구가 사라지면 끈다 (블라인드 · 실링팬은 요구가 있을 때만 움직인다)
 DEFAULTS = {"window": 0.0, "exhaust": 0.0, "intake": 0.0, "hood": 0.0, "purifier": 0.0,
-            "dehumidifier": 0.0, "humidifier": 0.0, "ac": 0.0}
+            "dehumidifier": 0.0, "humidifier": 0.0, "ac": 0.0, "boiler": 0.0}
 
 
 class SmartHomeController:
@@ -128,6 +129,11 @@ class SmartHomeController:
                 if ac_action != "send":
                     continue                           # E12 보류 · E9 무응답 — 명령을 내지 않는다
                 out[topic] = self._ac_command(d.value > 0)
+            elif dev == "boiler":
+                if self.rules.info.get("boiler_hold"):
+                    continue                           # 조절기 직접 조작 — 보류 동안 명령하지 않는다
+                out[topic] = json.dumps({"power": d.value > 0, "setpoint": round(float(d.value), 1) if d.value > 0
+                                         else self.rules.info.get("heating_target_c", 0.0)})
             else:
                 out[topic] = cast(round(d.value) if cast is int else d.value)
             self._reasons.append(f"{dev}={out[topic]} ← {' / '.join(d.reasons)}")

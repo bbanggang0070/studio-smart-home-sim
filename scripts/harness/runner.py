@@ -109,6 +109,7 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
         scfg = yaml.safe_load((REPO / "config" / "sensor_models.yaml").read_text(encoding="utf-8"))
         frng = np.random.default_rng(run.seed + 31337) if hcfg["fast_mode"].get("sensor_faults", False) else None
         sens = SensorSuite(scfg, np.random.default_rng(run.seed + 104729), frng)   # frng — 센서 결함 (A1 · 기본 꺼짐)
+        sens.boiler_rng = np.random.default_rng(run.seed + 60013)                    # [난방 확장] 보일러 플러그 전용
 
     controller.reset({"scenario": sc, "baseline": run.baseline, "seed": run.seed, "rng": rng})
     user_cmds: dict[str, Any] = {T.C_MODE: world.user_mode}
@@ -168,6 +169,8 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
         # 계량 플러그 = 플러그가 달린 가전 + 발생원 (물리 모드와 같은 범위 — 팬 · 조명 등은 측정하지 않는다, docs/08 §3)
         plug_power = (sens.plug_power(obs, extra_power, dt) if sens else
                       {**{d: obs["appliance_power_w"].get(d, 0.0) for d in PLUG_DEVICES}, **extra_power})
+        if not sens and "boiler" in obs["appliance_power_w"]:          # [난방 확장] 보일러 플러그 (참값에 있을 때만)
+            plug_power["boiler"] = obs["appliance_power_w"]["boiler"]
         app_states = pmon.update(now, plug_power)
 
         inbox = sensor_topics(obs, world, contact, extra_power,
@@ -210,6 +213,9 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
             row["act.ac_setpoint"] = ac.setpoint_c
             row["act.ac_fan"] = acts.ac_fan
             row["act.cooktop_power"] = acts.cooktop_relay
+            if "boiler" in acts.allowed_devices:          # [난방 확장] 조절기 실제 명령 (L0 뒤)
+                row["act.boiler_power"] = acts.actual.boiler.power
+                row["act.boiler_setpoint"] = acts.actual.boiler.setpoint_c
             row["act.desk_cct"] = acts.desk_cct
             row["bridge.ir_tx_ac"] = acts.ir_tx["ac"]
             row["pm.ac.state"] = app_states.get("ac", {}).get("state", "")

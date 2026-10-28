@@ -14,9 +14,10 @@ import math
 from dataclasses import dataclass, replace
 from typing import Any
 
-from actuators.l0_protect import CompressorGuard, FanDirectionGuard, dehum_hum_mutex
+from actuators.l0_protect import BoilerGuard, CompressorGuard, FanDirectionGuard, dehum_hum_mutex
 
 from env_model import AcCommand, ActuatorCommands, ExternalConditions, Occupancy, RoomModel
+from env_model.room import BoilerCommand
 from interfaces import topics as T
 
 # 명령 토픽 → ActuatorCommands 필드 (스칼라만; AC 는 JSON 으로 따로 처리)
@@ -138,6 +139,8 @@ def initial_actuators(sc: dict[str, Any]) -> ActuatorCommands:
         ceiling_fan=int(app.get("ceiling_fan", 0)),
         ceiling_light_pct=float(app.get("ceiling_light_pct", 0.0)),
         desk_light_pct=float(app.get("desk_light_pct", 0.0)),
+        boiler=BoilerCommand(power=bool((app.get("boiler") or {}).get("power", False)),          # [난방 확장]
+                             setpoint_c=float((app.get("boiler") or {}).get("setpoint", 21.0))),
     )
 
 
@@ -171,6 +174,10 @@ class FastActuators:
         self.t = 0.0
         self.l0: dict[str, CompressorGuard] = {}
         self.l0_held: dict[str, int] = {"ac": 0, "dehumidifier": 0}   # 보호로 명령을 미룬 횟수 (진단용)
+        # [난방 확장] Wi-Fi 룸 온도조절기 — 프로파일에 boiler 가 있을 때만 (actual · target 을 따로 둔다)
+        self.actual.boiler, self.target.boiler = replace(initial.boiler), replace(initial.boiler)
+        self.boiler_guard: BoilerGuard | None = None
+        self.boiler_manual = False                    # 사람이 조절기를 직접 바꾼 직후 한 번 state/boiler 에 알린다
 
     def l0_setup(self, appliances: dict) -> None:
         for dev, on in (("ac", self.target.ac.power), ("dehumidifier", bool(self.target.dehumidifier))):
@@ -180,6 +187,10 @@ class FastActuators:
         self.fan_guard = FanDirectionGuard(appliances["ceiling_fan"]["direction_change_wait_s"])
         self.fan_guard.level = int(self.target.ceiling_fan)
         self.fan_guard._last_dir = (self.fan_guard.level > 0) - (self.fan_guard.level < 0)
+        if "boiler" in self.allowed_devices and "boiler" in appliances:   # [난방 확장] L0 보일러 보호
+            b = appliances["boiler"]
+            self.boiler_guard = BoilerGuard(b["min_power_toggle_s"], b["min_setpoint_change_s"], b["setpoint_range_c"],
+                                            b["setpoint_step_c"], self.target.boiler.power, self.target.boiler.setpoint_c)
 
     def command(self, cmds: dict[str, Any], now: float = 0.0) -> None:
         for topic, value in cmds.items():
@@ -221,6 +232,14 @@ class FastActuators:
                 else:
                     self.rejected[topic] = self.rejected.get(topic, 0) + 1
                 continue
+            if topic == T.C_BOILER:                   # [난방 확장] 룸 온도조절기 (Wi-Fi — 수신 실패 없음)
+                if "boiler" in self.allowed_devices:
+                    d = json.loads(value) if isinstance(value, str) else dict(value)
+                    self.target.boiler = BoilerCommand(power=bool(d.get("power", False)),
+                                                       setpoint_c=float(d.get("setpoint", self.target.boiler.setpoint_c)))
+                else:
+                    self.rejected[topic] = self.rejected.get(topic, 0) + 1
+                continue
             if topic == T.C_AC:
                 field_name = "ac"
             elif topic in CMD_TO_FIELD:
@@ -241,6 +260,14 @@ class FastActuators:
     def manual(self, device: str, action: str) -> None:
         """사용자가 리모컨 · 스위치로 직접 조작 (제어기를 거치지 않는다)."""
         on = action == "on"
+        if device == "boiler":                         # [난방 확장] 조절기 직접 조작 — "on" · "off" · "setpoint:24"
+            sp = float(action.split(":", 1)[1]) if action.startswith("setpoint:") else self.target.boiler.setpoint_c
+            pw = True if action.startswith("setpoint:") else on
+            self.target.boiler = self.actual.boiler = BoilerCommand(power=pw, setpoint_c=sp)
+            if self.boiler_guard:
+                self.boiler_guard.power, self.boiler_guard.setpoint = pw, sp
+            self.boiler_manual = True
+            return
         if device == "ac":
             self.target.ac = replace(self.target.ac, power=on)
             self.actual.ac = replace(self.target.ac)
@@ -277,6 +304,9 @@ class FastActuators:
             if dehum != prev_dh and self.l0["dehumidifier"].since == self.t:
                 self.cmd_log.append(("dehumidifier", self.t, dehum))
             self.actual.ceiling_fan = self.fan_guard.apply(int(self.target.ceiling_fan), self.t)
+        if self.boiler_guard is not None:             # [난방 확장] L0 — 잦은 켬/끔 · 설정 변경 보류
+            pw, sp = self.boiler_guard.apply(self.target.boiler.power, self.target.boiler.setpoint_c, self.t)
+            self.actual.boiler = BoilerCommand(power=pw, setpoint_c=sp)
 
     def state_topics(self) -> dict[str, Any]:
         out: dict[str, Any] = {topic: getattr(self.actual, name) for name, topic in FIELD_TO_STATE.items()}
@@ -284,6 +314,11 @@ class FastActuators:
         out[T.T_AC] = json.dumps({"power": ac.power, "mode": ac.mode, "setpoint": ac.setpoint_c,
                                   "confidence": "CONFIRMED",    # 고속 모드 v0.1: IR 역확인 없음
                                   "l0_hold": bool(self.l0["ac"].held) if self.l0 else False})   # 물리 모드 브릿지와 같은 필드
+        if "boiler" in self.allowed_devices:          # [난방 확장] state/boiler — 조절기가 알려 주는 상태
+            b = self.actual.boiler
+            out[T.T_BOILER] = json.dumps({"power": b.power, "setpoint": b.setpoint_c, "manual": self.boiler_manual,
+                                          "l0_hold": bool(self.boiler_guard.held) if self.boiler_guard else False})
+            self.boiler_manual = False
         return out
 
 

@@ -65,12 +65,20 @@ class SensorSuite:
         fl = (cfg.get("faults") or {}) if frng is not None else {}
         self.models = {name: SensorModel(s[name], rng, fl.get(name), frng) for name in TRUTH_SENSORS}
         self.plug = {d: SensorModel(s["appliance_power"], rng, fl.get("appliance_power"), frng) for d in PLUG_DEVICES}
+        # [난방 확장] 보일러 전원 계량 플러그 — 참값에 보일러가 있을 때만 · 별도 난수열 (v1.29 잡음 난수열을 건드리지 않는다)
+        self._spec, self._fl, self._frng = s["appliance_power"], fl.get("appliance_power"), frng
+        self.boiler_rng: np.random.Generator | None = None
+        self._boiler_plug: SensorModel | None = None
 
     def measure(self, obs: dict, dt: float) -> dict[str, float]:
         return {name: self.models[name].measure(float(obs[key]), dt) for name, key in TRUTH_SENSORS.items()}
 
     def plug_power(self, obs: dict, extra_power: dict[str, float], dt: float) -> dict[str, float]:
         p = {d: self.plug[d].measure(float(obs["appliance_power_w"].get(d, 0.0)), dt) for d in PLUG_DEVICES}
+        if "boiler" in obs["appliance_power_w"]:
+            if self._boiler_plug is None:
+                self._boiler_plug = SensorModel(self._spec, self.boiler_rng or np.random.default_rng(0), self._fl, self._frng)
+            p["boiler"] = self._boiler_plug.measure(float(obs["appliance_power_w"]["boiler"]), dt)
         p.update({k: round(float(v), 1) for k, v in extra_power.items()})
         return p
 

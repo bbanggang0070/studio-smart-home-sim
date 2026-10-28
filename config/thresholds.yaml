@@ -433,6 +433,20 @@ smart_home_controller:
         summer_tiers_kwh: [300.0, 450.0]
         guard_setpoint_relax_c: 0.5
 
+    # ---- 난방 사다리 · 규칙 — [난방 확장 docs/14 §4] draft (boiler 가 가전 프로파일에 있을 때만 쓴다) ----
+    heating:
+      season_max_outdoor_c: 15.0       # 외기가 이 이하일 때만 난방 사다리
+      cooling_deadband_c: 2.0          # 난방 목표 ≤ 냉방 목표 − 이 값 (난방 ⟂ 냉방 · docs/14 F5)
+      frost_min_c: 10.0                # E16 동파 하한 — 어떤 모드에서도 이 아래로 설정하지 않는다
+      frost_alert_c: 12.0              # E16 — 실내가 이 아래면 사용자 알림 + 하한 강제
+      cooking_hold_c: 1.0              # I13 — 요리 · 후드 중에는 목표 − 이 값까지만 (찬 외기 유입에 바로 올리지 않는다)
+      warmup_no_humidify_c: 1.0        # I12 — 실내가 난방 목표 − 이 값보다 낮으면(데우는 중) 가습하지 않는다 (차가운 방 = 차가운 창 → 결로 · H0 에서 발견)
+      laundry_boost_c: 1.5             # I14 — 빨래 건조 중 목표 + 이 값 (L4.5 허용 손실 예산 안)
+      vent_pause_window_ratio: 0.05    # I11 — 창문이 이 이상 열려 있으면 보일러 일시 정지 (동파 하한은 유지)
+      fan_reverse_above_c: 0.0         # 사다리 3 — 난방 중 실링팬 역회전 약 (재실 · 소음 등급 허용 시) · 목표 − 이 값 아래일 때
+      blind_open_daylight_lux: 2000.0  # 사다리 1 — 낮 · 외부 조도 이상이면 블라인드 개방 요구 (일사 받기)
+      blind_close_night: true          # 사다리 2 — 해진 뒤 블라인드 닫기 요구 (창 단열)
+
     # ---- 열 · 건조 모델 — [신설 v3.1] (계수는 environment_model.yaml, W08 확정) ----
     thermal_model:
       structure: '2R2C'                  # 공기 노드 + 축열 질량 노드 — 셋백 vs 끄기 실험의 전제
@@ -622,6 +636,18 @@ smart_home_controller:
         std:  [ceiling_light, desk_lamp, exhaust_fan, blind, window, ac, range_hood, cooktop_plug]
         full: [ceiling_light, desk_lamp, exhaust_fan, blind, window,
                ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood, cooktop_plug]
+        # [난방 확장 docs/14] full + 보일러(Wi-Fi 룸 온도조절기) — 난방 시나리오만 쓴다 (기본 프로파일은 그대로 full)
+        full_heating: [ceiling_light, desk_lamp, exhaust_fan, blind, window,
+                       ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood, cooktop_plug, boiler]
+      boiler:                          # [난방 확장 docs/14 §2 · §4.6] Wi-Fi 룸 온도조절기 (H-a) — draft
+        interface: 'wifi_thermostat'
+        setpoint_range_c: [10.0, 28.0]
+        setpoint_step_c: 0.5           # 조절기 설정 단위
+        min_power_toggle_s: 300.0      # L0 — 전원 켬/끔 최소 간격 (보일러 자체 보호와 별개)
+        min_setpoint_change_s: 120.0   # L0 — 설정 변경 최소 간격 (조절기 · 보일러 잦은 점화 방지)
+        fault_confirm_s: 1800.0        # E17 — 연소 요구가 이만큼 이어졌는데
+        fault_burn_w_min: 40.0         #       보일러 전력이 이 아래이고
+        fault_temp_rise_c: 0.3         #       실내 온도도 이만큼 못 올랐으면 이상
       ac:
         interface: 'ir'
         setpoint_range_c: [18.0, 30.0]

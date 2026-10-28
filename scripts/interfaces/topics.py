@@ -91,6 +91,12 @@ STATE_TOPICS = (
 
 ALL_TOPICS = SENSOR_TOPICS + COMMAND_TOPICS + STATE_TOPICS
 
+# ---- 난방 확장 트랙 (docs/14 §5 · 브랜치 heating) — 계약 55개(ALL_TOPICS)에는 넣지 않는다 ----------------
+#  보일러 전원 계량 플러그 전력은 기존 S_APPLIANCE_POWER JSON 의 "boiler" 키로 온다 (새 센서 토픽 없음)
+C_BOILER = f"{P}/cmd/boiler"                             # String(JSON {"power","setpoint","seq"}) — Wi-Fi 룸 온도조절기
+T_BOILER = f"{P}/state/boiler"                           # String(JSON {"power","setpoint","burning","l0_hold","manual"})
+HEATING_TOPICS = (C_BOILER, T_BOILER)
+
 # ---- 메시지 타입 · QoS (docs/02 §6 표 · W06 리스크) -----------------------------
 #  std_msgs 타입 이름. 고속 모드는 쓰지 않는다 — ROS 노드(scripts/nodes · scripts/sim)가 쓴다.
 F32, BOOL, STR, I8 = "Float32", "Bool", "String", "Int8"
@@ -107,6 +113,7 @@ TYPES: dict[str, str] = {
     T_INTAKE_FAN_RPM: F32, T_PURIFIER_LEVEL: I8, T_RANGE_HOOD_LEVEL: I8, T_ACTIVE_EVENTS: STR, T_AIR_BALANCE: F32,
     T_DEW_MARGIN: F32, T_APPLIANCE_STATES: STR, T_VENTILATION: STR, T_OCCUPANCY_BASIS: STR, T_ENERGY_FORECAST: STR,
     T_ALERTS: STR,
+    C_BOILER: STR, T_BOILER: STR,
 }
 
 

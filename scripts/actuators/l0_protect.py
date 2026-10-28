@@ -3,6 +3,7 @@
   압축기(에어컨 · 제습기)  최소 OFF compressor_min_off_s · 최소 ON compressor_min_on_s — 그 전에는 직전 상태 유지
   실링팬                  방향 전환은 정지 후 direction_change_wait_s 뒤에 (모터 보호)
   제습 ⟂ 가습             둘 다 켜라는 지령이면 가습을 끈다 (규칙 I1 의 마지막 방어선)
+  보일러(룸 온도조절기)   [난방 확장 docs/14 §4.6] 전원 켬/끔 최소 간격 · 설정 변경 최소 간격 · 설정 범위 · 단위
 """
 
 from __future__ import annotations
@@ -44,6 +45,33 @@ class FanDirectionGuard:
         if want_dir != 0:
             self._last_dir = want_dir
         return self.level
+
+
+class BoilerGuard:
+    """룸 온도조절기 명령 (전원, 설정 °C) → 실제로 보낼 명령. 잦은 켬/끔 · 설정 변경은 직전 값을 유지한다."""
+
+    def __init__(self, min_toggle_s: float, min_change_s: float, setpoint_range: tuple[float, float], step_c: float,
+                 power: bool = False, setpoint: float = 21.0):
+        self.min_toggle, self.min_change = min_toggle_s, min_change_s
+        self.lo, self.hi, self.step = float(setpoint_range[0]), float(setpoint_range[1]), step_c
+        self.power, self.setpoint = power, setpoint
+        self._toggled_at = self._changed_at = -1e9
+        self.held = False
+
+    def apply(self, want_power: bool, want_setpoint: float, now: float) -> tuple[bool, float]:
+        self.held = False
+        sp = min(max(round(want_setpoint / self.step) * self.step, self.lo), self.hi)
+        if want_power != self.power:
+            if now - self._toggled_at >= self.min_toggle:
+                self.power, self._toggled_at = want_power, now
+            else:
+                self.held = True
+        if sp != self.setpoint:
+            if now - self._changed_at >= self.min_change:
+                self.setpoint, self._changed_at = sp, now
+            else:
+                self.held = True
+        return self.power, self.setpoint
 
 
 def dehum_hum_mutex(dehum: bool, hum: bool) -> tuple[bool, bool]:

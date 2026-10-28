@@ -17,6 +17,7 @@ from collections import deque
 from controller.arbiter import Candidate
 from controller.energy import EnergyPlanner, daylight_fn
 from controller.event_detector import GRADE_ORDER, ActiveEvent, _History, own_load_w
+from controller.heating import HeatingLadder
 from controller.ladders import ComfortLadders
 from controller.lighting import Lighting
 from controller.params import ControllerParams
@@ -50,6 +51,7 @@ class RuleEngine:
         self.alerts: list[str] = []
         self.info: dict = {}
         self.ladders = ComfortLadders(p, psy, self, hysteresis)
+        self.heating = HeatingLadder(p, hysteresis)        # 난방 확장 — 가전 프로파일에 boiler 가 있을 때만 후보를 낸다
         self.hysteresis = hysteresis
         self._pm_level = 0                          # 실내 PM 청정기 단 (히스테리시스 상태)
         self._pm_avg: float | None = None           # 청정기 판단용 PM 이동평균
@@ -243,6 +245,10 @@ class RuleEngine:
         self.info["saving"] = saving
         self.ladders.moisture_event = "COOKING" in ev or "HOOD_POST_RUN" in ev or "SHOWER" in ev
         self.info.update(self.ladders.apply(o, mode, blocked, noise, add, saving=saving))
+        if "boiler" in self.devices:                       # 난방 확장 (docs/14 §4) — v1.29 프로파일에는 boiler 가 없다
+            self.info.update(self.heating.apply(o, mode, self.home_mode, ev, self.devices, self.ladders.cooling, add))
+            self.alerts.extend(self.heating.alerts)
+            self.heating.alerts = []
         # -- L6 조도 · 조명 --
         if "ceiling_light" in self.devices or "desk_lamp" in self.devices:
             li = self.lighting.apply(o, mode, saving, self.ladders.cooling, add)

@@ -403,6 +403,21 @@ heldout:
 #  연결: 제어기 출력 에어컨 명령 → 냉방 설정온도(켜짐 = 설정 · 꺼짐 = ac_off_setpoint_k) · 난방은 테스트 케이스 기본값(모든 방식 공통)
 #  테스트 케이스에 없는 신호(실내 습도 · PM · 조도 · 후드 온도)는 고정값 — 냉방 판단만 비교된다 (습도 · 환기 · 차광 사다리는 쉰다)
 #  재실 = 테스트 케이스 일정(8–18시 2명) · 제어기는 1 Hz 로 부르고 BOPTEST 는 step_s 마다 진행
+boptest_heating:                  # [난방 확장 docs/15 · 2026-10-28] tools/boptest/run_twozone_hydronic.py
+  url: http://127.0.0.1:5002
+  testcase: twozone_apartment_hydronic
+  periods: [typical_heat_day, peak_heat_day]
+  electricity_price: constant
+  step_s: 60.0
+  controller_dt_s: 10.0           # 2구역 FMU 가 무거워 제어 주기 10 s (난방 판단은 분 단위)
+  occupied_from_h: 20.0           # 재실 = 월–금 20시 ~ 다음 날 08시 (테스트 케이스 문서 · 발열 신호는 덮어쓰기 때 고정돼 못 씀)
+  occupied_until_h: 8.0
+  off_setpoint_c: 10.0            # 전원 끔 = 동파 하한 수준
+  assumed: { humidity_pct: 40.0, pm25_ugm3: 10.0, illuminance_lux: 200.0 }
+  devices: [boiler]
+  methods: [boptest_baseline, A, A2, B, proposed]
+  out_dir: results/boptest_heating
+
 boptest:
   url: http://127.0.0.1:5000
   testcase: bestest_air

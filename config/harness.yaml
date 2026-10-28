@@ -172,6 +172,14 @@ exp1_setback:                    # EXP-1 셋백 vs 끄기 (docs/08 §5.4 · W12 
   strategies: ['setback', 'off', 'precool']   # 따옴표 필수 — YAML 은 off 를 거짓(False)으로 읽는다
   after_arrival_min: 60.0        # 귀가 후 이만큼까지 비용을 센다 (planner after_arrival_horizon_min 과 같게)
 
+away_strategy_check:             # 한계 15 확인 — 동결 제어기 v1.29 의 외출 전략 auto vs off (tools/energy/away_strategy_check.py · 2026-10-28)
+  template: C16                  # EXP-1 과 같은 틀 · 같은 비용 정의
+  strategies: ['auto', 'off', 'setback']   # auto = 제어기 기본값 (기대비용 계획기)
+  grid: { outdoor_c: [28.0, 32.0, 35.0], away_h: [0.5, 1.0, 2.0, 4.0, 8.0] }   # A: 외기 고정
+  measured: { years: [2024], months: [6, 7, 8, 9], days: 20, away_h: [1.0, 2.0, 4.0, 8.0], seed: 20261028 }   # B: 실측 기상
+  bootstrap: 5000
+  workers: 30
+
 exp4_identification:             # EXP-4 (docs/08 §5.3-1 · §5.8) — tools/energy/exp4_identification.py · draft
   train_days: [7, 14, 28]        # 학습 기록 길이 (1 · 2 · 4주)
   seeds: [1, 2, 3]               # 학습 기록 시드 반복 (energy_training.seed + k)

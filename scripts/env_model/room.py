@@ -34,6 +34,13 @@ class AcCommand:
 
 
 @dataclass
+class BoilerCommand:
+    """룸 온도조절기 명령 (난방 확장 트랙 · heating.mode = hydronic 에서만 쓴다). 켬/끔 판단은 조절기가 한다."""
+    power: bool = False
+    setpoint_c: float = 21.0
+
+
+@dataclass
 class ActuatorCommands:
     """액추에이터의 실제 동작값. 창문 개방률은 0–1 비율이다."""
 
@@ -49,6 +56,7 @@ class ActuatorCommands:
     ceiling_fan: int = 0              # −2…+2 (부호 = 방향, 음수 = 역회전)
     ceiling_light_pct: float = 0.0
     desk_light_pct: float = 0.0
+    boiler: BoilerCommand = field(default_factory=BoilerCommand)
 
 
 @dataclass
@@ -96,6 +104,8 @@ class RoomState:
     condensate_g: float = 0.0
     time_s: float = 0.0
     energy_wh: dict[str, float] = field(default_factory=dict)
+    floor_temp_c: float | None = None      # 온수 바닥난방 슬래브 (hydronic 만)
+    supply_temp_c: float | None = None     # 보일러 공급수 (hydronic 만)
 
 
 # ---- 모델 ----------------------------------------------------------------------
@@ -110,6 +120,15 @@ class RoomModel:
         self._b = cfg.get("condensation.magnus_b")
         self._c = cfg.get("condensation.magnus_c")
         self._laundry_k_m3h = self._calibrate_laundry()
+        # 난방 확장 트랙 — boundary(기본)는 v1.29 와 같다
+        self.hydronic = cfg.get("heating.mode") == "hydronic"
+        self.boiler_burning = False
+        self._boiler_change_s = -1e9
+        if self.hydronic:
+            if state.floor_temp_c is None:
+                state.floor_temp_c = state.temp_c
+            if state.supply_temp_c is None:
+                state.supply_temp_c = state.floor_temp_c
 
     @classmethod
     def from_conditions(
@@ -136,6 +155,42 @@ class RoomModel:
             filter_hours=filter_hours,
         )
         return cls(cfg, state)
+
+    # -- 온수 바닥난방 (난방 확장 트랙 · docs/14 §3) --
+
+    def _hydronic(self, cmd: BoilerCommand, t_air: float, dt: float) -> tuple[float, float, float]:
+        """룸 온도조절기 → 보일러 연소 → 공급수 → 바닥 슬래브 → 실내. → (실내로 가는 열 W, 전기 W, 가스 W).
+
+        조절기: 설정 ± 히스테리시스/2 로 켬/끔 · 보일러 자체 최소 연소 · 정지 시간 (참값 쪽 · 제어기 L0 와 별개).
+        바닥 → 실내: EN 1264 특성식 q = c·|ΔT|^n (부호 유지) · 바닥 → 아래층: 컨덕턴스 · 배관 → 바닥: K_p·(공급수 − 바닥)."""
+        g = self.cfg.get
+        h = "heating.hydronic."
+        s = self.state
+        now = s.time_s
+        hyst = g(h + "thermostat_hysteresis_c") / 2.0
+        want = self.boiler_burning
+        if not cmd.power:
+            want = False
+        elif t_air < cmd.setpoint_c - hyst:
+            want = True
+        elif t_air > cmd.setpoint_c + hyst:
+            want = False
+        if want != self.boiler_burning:
+            hold = g(h + "boiler_min_burn_s") if self.boiler_burning else g(h + "boiler_min_off_s")
+            if now - self._boiler_change_s >= hold or not cmd.power:   # 전원을 끄면 바로 멈춘다
+                self.boiler_burning, self._boiler_change_s = want, now
+        target = g(h + "supply_temp_c") if self.boiler_burning else s.floor_temp_c
+        k = 1.0 - math.exp(-dt / g(h + "supply_time_constant_s"))
+        s.supply_temp_c += (target - s.supply_temp_c) * k
+        q_pipe = 0.0
+        if self.boiler_burning:
+            q_pipe = min(g(h + "boiler_max_output_w"), max(0.0, g(h + "pipe_conductance_w_per_k") * (s.supply_temp_c - s.floor_temp_c)))
+        d = s.floor_temp_c - t_air
+        q_air = g(h + "floor_area_m2") * g(h + "en1264_coefficient") * math.copysign(abs(d) ** g(h + "en1264_exponent"), d)
+        q_below = g(h + "floor_below_conductance_w_per_k") * (s.floor_temp_c - g(h + "below_temp_c"))
+        s.floor_temp_c += (q_pipe - q_air - q_below) * dt / (g(h + "floor_capacity_wh_per_k") * WH_TO_J)
+        p_el = g(h + "boiler_electric_on_w") if self.boiler_burning else g(h + "boiler_electric_standby_w")
+        return q_air, p_el, q_pipe / g(h + "boiler_efficiency")
 
     # -- 빨래 --
 
@@ -368,9 +423,11 @@ class RoomModel:
         # CO₂ 참값 — V·dC/dt (ppm·m³/h)
         dco2 = (co2_gen + q_oa * (g("co2.outdoor_ppm") - s.co2_ppm)) / v
 
-        # 난방 — 경계 조건 (가정 A13)
+        # 난방 — 경계 조건 (가정 A13) · 확장 트랙은 온수 바닥난방
         h_heat = 0.0
-        if ext.heating_setpoint_c >= 0:
+        if self.hydronic:
+            h_heat, p_boiler, gas_w = self._hydronic(act.boiler, t, dt)
+        elif ext.heating_setpoint_c >= 0:
             h_heat = min(g("heating.capacity_w"),
                          max(0.0, g("heating.modulation_w_per_k") * (ext.heating_setpoint_c - t)))
 
@@ -415,6 +472,10 @@ class RoomModel:
             "intake_fan": p_intake, "exhaust_fan": p_exhaust, "purifier": p_pur,
             "range_hood": p_hood, "lighting": p_light,
         }
+        if self.hydronic:
+            power["boiler"] = p_boiler                       # 보일러 전원 계량 플러그 (전기)
+            s.energy_wh["boiler_gas"] = s.energy_wh.get("boiler_gas", 0.0) + gas_w * hrs   # 가스 (전기 합계와 따로)
+            self._last_gas_w = gas_w
         for k, p_w in power.items():
             s.energy_wh[k] = s.energy_wh.get(k, 0.0) + p_w * hrs
 
@@ -442,7 +503,7 @@ class RoomModel:
         perceived = 0.0
         if fan_lv > 0:
             perceived = g("appliances.ceiling_fan.perceived_cooling_c")["low" if fan_lv == 1 else "high"]
-        return {
+        obs = {
             "time_s": s.time_s,
             "temperature_c": s.temp_c,
             "humidity_pct": rh,
@@ -474,3 +535,7 @@ class RoomModel:
             "appliance_power_w": dict(power),
             "energy_wh": dict(s.energy_wh),
         }
+        if self.hydronic:                                 # 확장 트랙만 — boundary 출력 열은 v1.29 와 같다
+            obs.update({"floor_temp_c": s.floor_temp_c, "supply_temp_c": s.supply_temp_c,
+                        "boiler_burning": self.boiler_burning, "boiler_gas_w": getattr(self, "_last_gas_w", 0.0)})
+        return obs

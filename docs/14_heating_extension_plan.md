@@ -275,6 +275,7 @@
 | F7 | 명령 구조 | `ActuatorCommands` 에 보일러 없음 · 고속 L0 는 `FastActuators.l0_setup` | `BoilerCommand` 추가 · 고속 · 물리 브릿지 둘 다 L0 보일러 보호 |
 | F8 | BOPTEST | 로컬에 `bestest_hydronic` · `bestest_hydronic_heat_pump` · **`twozone_apartment_hydronic`** FMU 있음 | 아파트 케이스를 주 외부 검증으로 · 어댑터 신설 |
 | F10 | **바닥 열용량 가정 오류** | v0.1 의 4–8 kWh/K 는 재료 물성으로 다시 계산하면 10배 과대 (0.4–0.6 kWh/K) | §3.1 정정 · 바닥 열류는 EN 1264 특성식 |
+| F11 | **참값 모델 구현 (H1 주)** | `heating.mode: hydronic` 일 때만 바닥 슬래브 · 룸 조절기 · 보일러(최소 연소 180 s · 정지 300 s) · 가스 · 전기 — −10 °C 에서 21 °C ± 0.3 유지 · 18 → 20.3 °C 3시간 · 하루 가스 20.8 kWh (약 2 m³) | 단위 테스트 6개 · **v1.29 회귀: 겨울 · 여름 시나리오 7종 42회가 지표 · 판정 · 상태 모두 같음** (C16 은 기준선 3개 모두 돌려야 판정이 나온다) |
 | F9 | 동결 파일 | `config/scenario_profiles.yaml` · `harness.yaml` metrics · 제어 코드가 v1.29 동결 대상 | H 시나리오는 **별도 파일** `config/scenarios_heating.yaml` · 동결은 `config/freeze_heating.yaml` · main 의 `freeze.yaml` 은 건드리지 않는다 |
 
 ## 14. 원래 '실행 전 결정' 목록 (보관)
@@ -288,5 +289,6 @@
 ## 변경 이력
 | 날짜 | 버전 | 내용 |
 |---|---|---|
+| 2026-10-28 | v0.3 | H1 참값 모델 구현 · 회귀 확인 (F11) |
 | 2026-10-28 | v0.2 | 실행 결정 · 착수 점검 F1–F9 (ERA5 −2 °C 편차 발견 → 난방 트랙 기상은 ASOS) |
 | 2026-10-28 | v0.1 | 계획안 초판 — 실행 전 · 사용자 결정 대기 |

@@ -212,3 +212,24 @@ environment_model:
     heating:
       capacity_w: 3000.0               # draft — 원룸 보일러 · 바닥난방 등가 출력
       modulation_w_per_k: 2000.0       # draft — 설정온도 편차 1 K 당 출력
+      #  [2026-10-28 · 난방 확장 트랙 docs/14] mode — boundary: 위 경계 조건 (v1.29 · 가정 A13) /
+      #  hydronic: 보일러 + 온수 바닥난방을 제어 대상으로 (바닥 슬래브 노드 · 룸 온도조절기 · 가스 · 전기 사용량).
+      #  boundary 에서는 아래 hydronic 값을 읽지 않는다 — v1.29 계산 · 출력과 같다.
+      mode: 'boundary'
+      hydronic:
+        floor_area_m2: 17.5                  # 바닥 = 방 면적 (3.5 × 5 m)
+        floor_capacity_wh_per_k: 500.0       # draft — 모르타르 5–7 cm × 2,000 kg/m³ × 0.84 kJ/kgK ≈ 0.4–0.6 kWh/K (docs/14 F10)
+        en1264_coefficient: 8.92             # 바닥 → 실내 q = c·(θF − θi)^n [W/m²] (EN 1264 특성식 — 원문 확인 후 인용)
+        en1264_exponent: 1.1
+        floor_below_conductance_w_per_k: 9.0 # draft — 아래층(난방 중) 쪽 손실 0.5 W/m²K × 17.5 m²
+        below_temp_c: 18.0                   # draft — 아래층 실내 (경계 조건)
+        pipe_conductance_w_per_k: 75.0       # draft — 배관 → 바닥 (공급수 40 °C 대 바닥 25 °C 에서 약 1.1 kW)
+        supply_temp_c: 45.0                  # draft — 보일러 난방 공급수 설정
+        supply_time_constant_s: 180.0        # draft — 연소 시작 뒤 공급수가 설정에 다가가는 1차 지연
+        boiler_max_output_w: 12000.0         # draft — 소형 가스보일러 (실제 전달은 배관 · 바닥이 제한)
+        boiler_efficiency: 0.87              # draft — 일반형 0.85 · 콘덴싱 0.90 사이
+        boiler_electric_on_w: 90.0           # draft — 연소 · 순환펌프 전력 (계량 플러그에 보이는 값)
+        boiler_electric_standby_w: 5.0       # draft — 대기 전력
+        boiler_min_burn_s: 180.0             # draft — 보일러 자체 잦은 점화 방지 (참값 쪽 · 제어기 L0 와 별개)
+        boiler_min_off_s: 300.0
+        thermostat_hysteresis_c: 0.5         # draft — 룸 온도조절기 켬/끔 간격 (설정 ± 절반)

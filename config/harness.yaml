@@ -309,6 +309,29 @@ randomization:
     outdoor_rh_pct: { offset: [-5.0, 5.0], clip: [5.0, 100.0] }
     outdoor_illuminance_lux: { scale: [0.8, 1.2] }
   profiles:                         # --profile <이름> — 위 truth_params · external · out_dir 를 이 값으로 바꿔 돌린다
+    heating:                        # [난방 확장 docs/15 §3 · 2026-10-28] 난방 시나리오 18개 × 반복 · 참값 계수(바닥 · 배관 · 보일러 · 침기 · U값 · 열용량 · COP) · 외기
+      out_dir: results/randomized_heating
+      scenario_file: config/scenarios_heating.yaml
+      exclude_ids: [H0]             # 개발용 동작 확인 (등록 대상 아님)
+      freeze_config: config/freeze_heating.yaml   # 실행 전 난방 트랙 동결(판정 · 제어기) 점검
+      truth_params:
+        air_balance.base_infiltration_ach: { uniform: [0.2, 0.4] }
+        window.glazing_u_w_m2k: { uniform: [2.4, 3.2] }
+        thermal.air_capacity_wh_per_k: { scale: [0.8, 1.2] }
+        thermal.mass_capacity_wh_per_k: { scale: [0.8, 1.2] }
+        thermal.envelope_capacity_wh_per_k: { scale: [0.8, 1.2] }
+        appliances.ac.cop_values: { scale: [0.85, 1.15] }
+        appliances.range_hood.capture_efficiency: { uniform: [0.5, 0.7] }
+        heating.hydronic.floor_capacity_wh_per_k: { scale: [0.8, 1.2] }      # 0.4–0.6 kWh/K 범위 (docs/14 F10)
+        heating.hydronic.pipe_conductance_w_per_k: { scale: [0.8, 1.2] }
+        heating.hydronic.boiler_efficiency: { uniform: [0.82, 0.92] }
+        heating.hydronic.en1264_coefficient: { scale: [0.9, 1.1] }
+        heating.hydronic.floor_below_conductance_w_per_k: { scale: [0.5, 1.5] }
+        heating.hydronic.supply_temp_c: { uniform: [40.0, 50.0] }
+      external:
+        outdoor_temp_c: { offset: [-1.5, 1.5] }
+        outdoor_rh_pct: { offset: [-5.0, 5.0], clip: [5.0, 100.0] }
+        outdoor_illuminance_lux: { scale: [0.8, 1.2] }
     sensor_faults:                  # [2026-10-26] A1 — 기본 무작위 반복(참값 계수 · 외기)과 같은 조건에 센서 결함만 더한다 (같은 시드 → 짝 비교)
       out_dir: results/randomized_faults
       harness_overrides: { fast_mode: { sensor_faults: true } }

@@ -8,6 +8,8 @@ frozen_at: '2026-10-28'
 files:
 - path: config/scenarios_heating.yaml
   sha256: 74b7d8c78ae93f1e8b7ef145d533329c9a6a920694757be084a7a9c0d47b7954
+- path: config/heldout_heating_r1.yaml
+  sha256: 954fc2e0d7b9f8b3d5e870eca753b2af18b32d5a126278f5458588efbc2c75ff
 - path: scripts/harness/criteria.py
   sha256: 7cc7d637789fa13acadd0338d18d754d2a3463389e9b93c57399ddacf6a3675a
 - path: config/harness.yaml

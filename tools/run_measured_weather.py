@@ -34,6 +34,16 @@ from harness.scenario import Run, load_scenarios, scenario_baselines  # noqa: E4
 _SERIES: pd.DataFrame | None = None
 
 
+def opt_cfg(hcfg: dict, opts: dict) -> dict:
+    """[난방 확장] 기상 파일 접두사 · 결과 폴더 (opts: site · out_dir)."""
+    cfg = dict(hcfg["weather"])
+    if opts.get("site"):
+        cfg["site"] = {**cfg["site"], "name": opts["site"]}
+    if opts.get("out_dir"):
+        cfg["out_dir"] = opts["out_dir"]
+    return cfg
+
+
 def series(cfg: dict) -> pd.DataFrame:
     global _SERIES
     if _SERIES is None:
@@ -42,12 +52,12 @@ def series(cfg: dict) -> pd.DataFrame:
 
 
 def one(args):
-    sid, rep, start_iso, scale, keep_raw, extra, only = args
+    sid, rep, start_iso, scale, keep_raw, extra, only, opts = args
     hcfg = load_harness_config()
-    cfg = hcfg["weather"]
+    cfg = opt_cfg(hcfg, opts)
     env_cfg = load_config(REPO / hcfg["paths"]["environment_model"])
     eff = float(env_cfg.get("thermal.solar_luminous_efficacy_lm_per_w"))
-    sc0 = next(s for s in load_scenarios(REPO / hcfg["paths"]["scenarios"]) if s["id"] == sid)
+    sc0 = next(s for s in load_scenarios(REPO / (opts.get("scenario_file") or hcfg["paths"]["scenarios"])) if s["id"] == sid)
     start = pd.Timestamp(start_iso)
     sc = W.apply_to_scenario(sc0, series(cfg), start, cfg, eff)
     out = REPO / cfg["out_dir"] / "raw"
@@ -89,12 +99,22 @@ def main() -> None:
     ap.add_argument("--extra-baselines", default="")   # 예: A2 — A 를 돌리는 시나리오에서 A2 도 (harness extra_baselines · 2026-10-26)
     ap.add_argument("--only", default="")              # 이 기준선만 돌린다 (예: A,A2 — 제안 · B 는 이미 있는 결과와 짝 비교)
     ap.add_argument("--out-suffix", default="")        # 결과 폴더 뒤에 붙인다 (예: _a2)
+    # [난방 확장 docs/15 §3] 난방 시나리오 · 기상청 ASOS · 난방 동결
+    ap.add_argument("--scenario-file", default="")
+    ap.add_argument("--site", default="", help="기상 파일 접두사 (기본 seoul = ERA5 · asos_seoul = 기상청 ASOS)")
+    ap.add_argument("--freeze-config", default="")
+    ap.add_argument("--exclude", default="")
+    ap.add_argument("--out-dir", default="")
     a = ap.parse_args()
-    chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py")], capture_output=True, text=True)
+    opts = {"scenario_file": a.scenario_file, "site": a.site, "out_dir": a.out_dir}
+    cfg = opt_cfg(hcfg, opts)
+    fz = ["--config", a.freeze_config, "--group", "all"] if a.freeze_config else []
+    chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py"), *fz], capture_output=True, text=True)
     print(chk.stdout.strip())
     if chk.returncode != 0:
         sys.exit("동결된 판정 · 지표가 바뀌었다 — docs/12 동결 개정을 먼저 기록할 것")
-    scen = [s for s in load_scenarios(REPO / hcfg["paths"]["scenarios"]) if s["run_mode"] == "fast"]
+    scen = [s for s in load_scenarios(REPO / (a.scenario_file or hcfg["paths"]["scenarios"])) if s["run_mode"] == "fast"]
+    scen = [s for s in scen if s["id"] not in a.exclude.split(",")]
     if a.ids:
         scen = [s for s in scen if s["id"] in a.ids.split(",")]
     ser = series(cfg)
@@ -106,7 +126,7 @@ def main() -> None:
         starts, scale = W.match_starts(ser, s, cfg, a.samples, rng)
         widen = "" if scale == 1.0 else f" (허용 차이 ×{scale:g})"
         print(f"{s['id']}: {', '.join(t.strftime('%m-%d') for t in starts)}{widen}")
-        jobs += [(s["id"], k + 1, t.isoformat(), scale, not a.no_raw, extra, only) for k, t in enumerate(starts)]
+        jobs += [(s["id"], k + 1, t.isoformat(), scale, not a.no_raw, extra, only, opts) for k, t in enumerate(starts)]
     print(f"시나리오 {len(scen)}개 × 날 {a.samples} = {len(jobs)}묶음 · 평가 연도 {cfg['years']['eval']} · 병렬 {a.workers}", flush=True)
     rows = []
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
@@ -116,7 +136,8 @@ def main() -> None:
     out = REPO / (cfg["out_dir"] + a.out_suffix)
     out.mkdir(parents=True, exist_ok=True)
     df.to_csv(out / "summary.csv", index=False)
-    write_manifest(out, {"kind": "measured_weather", "samples": a.samples, "eval_years": cfg["years"]["eval"], "runs": len(df)})
+    write_manifest(out, {"kind": "measured_weather", "samples": a.samples, "eval_years": cfg["years"]["eval"], "runs": len(df),
+                         "site": cfg["site"]["name"], "scenario_file": a.scenario_file or hcfg["paths"]["scenarios"]})
     p = df[df.baseline == "proposed"]
     print(f"실행 {len(df)}회 · 제안 판정 통과 {int((p.status == 'PASS').sum())}/{len(p)}")
 

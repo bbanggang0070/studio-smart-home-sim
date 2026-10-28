@@ -30,8 +30,10 @@ def main() -> None:
     ap.add_argument("--scenarios", default="")
     ap.add_argument("--tag", default="")
     ap.add_argument("--extra-baselines", default="")   # 예: A2 (기준선 A′ · 2026-10-26)
+    ap.add_argument("--freeze-config", default="")     # [난방 확장] config/freeze_heating.yaml
     a = ap.parse_args()
-    chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py"), "--group", "all"],
+    fz = ["--config", a.freeze_config] if a.freeze_config else []
+    chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py"), "--group", "all", *fz],
                          capture_output=True, text=True)
     print(chk.stdout.strip())
     if chk.returncode != 0:

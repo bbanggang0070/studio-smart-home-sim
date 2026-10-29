@@ -41,6 +41,8 @@ def opt_cfg(hcfg: dict, opts: dict) -> dict:
         cfg["site"] = {**cfg["site"], "name": opts["site"]}
     if opts.get("out_dir"):
         cfg["out_dir"] = opts["out_dir"]
+    if opts.get("eval_years"):                        # [v1.32-H] 검증 연도 바꾸기 (예: 2025 — 학습 · 평가에 쓰지 않은 해)
+        cfg["years"] = {**cfg["years"], "eval": [int(y) for y in str(opts["eval_years"]).split(",")]}
     return cfg
 
 
@@ -105,8 +107,9 @@ def main() -> None:
     ap.add_argument("--freeze-config", default="")
     ap.add_argument("--exclude", default="")
     ap.add_argument("--out-dir", default="")
+    ap.add_argument("--eval-years", default="", help="평가 연도 (기본 harness weather.years.eval) — 예: 2025")
     a = ap.parse_args()
-    opts = {"scenario_file": a.scenario_file, "site": a.site, "out_dir": a.out_dir}
+    opts = {"scenario_file": a.scenario_file, "site": a.site, "out_dir": a.out_dir, "eval_years": a.eval_years}
     cfg = opt_cfg(hcfg, opts)
     fz = ["--config", a.freeze_config, "--group", "all"] if a.freeze_config else []
     chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py"), *fz], capture_output=True, text=True)

@@ -436,3 +436,9 @@ boptest:
   methods: [boptest_baseline, A, B, proposed]
   baseline_a: { auto_appliances: [ac], user_ac_away: true }   # 사람이 켜고 끄는 에어컨 (C16 과 같은 사용자 모델)
   out_dir: results/boptest
+
+# ---- [v1.32-H · 2026-10-29] 건물 프리셋 — 보류 시나리오 · EXP-H · 보정 도구(tools/energy/building_calibration.py)가 함께 쓴다 ----
+#  basic = 기본 참값 (중간층 · 복층유리 · v1.29 와 같음) / old = 노후 원룸 (v1.31-H 보류 3 · 4차 · EXP-H 의 &old 와 같은 값)
+building_presets:
+  basic: {}
+  old: { air_balance.base_infiltration_ach: 0.7, window.glazing_u_w_m2k: 4.2, thermal.envelope_outdoor_conductance_w_per_k: 6.6 }

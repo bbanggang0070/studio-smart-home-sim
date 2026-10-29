@@ -1,38 +1,14 @@
 {
- "2021": {
+ "2025": {
   "rows": 8760,
   "raw_items": 8760,
   "missing_before_fill": {
    "temperature_2m": 0,
    "relative_humidity_2m": 0,
-   "shortwave_radiation": 3969,
-   "precipitation": 7811,
-   "cloud_cover": 2,
-   "wind_speed_10m": 2
-  }
- },
- "2022": {
-  "rows": 8760,
-  "raw_items": 8760,
-  "missing_before_fill": {
-   "temperature_2m": 0,
-   "relative_humidity_2m": 0,
-   "shortwave_radiation": 3969,
-   "precipitation": 7821,
+   "shortwave_radiation": 3978,
+   "precipitation": 7609,
    "cloud_cover": 0,
    "wind_speed_10m": 0
-  }
- },
- "2023": {
-  "rows": 8760,
-  "raw_items": 8760,
-  "missing_before_fill": {
-   "temperature_2m": 0,
-   "relative_humidity_2m": 0,
-   "shortwave_radiation": 3979,
-   "precipitation": 7673,
-   "cloud_cover": 0,
-   "wind_speed_10m": 37
   }
  }
 }

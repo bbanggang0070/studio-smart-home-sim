@@ -1,19 +1,21 @@
 # ============================================================================
 #  난방 확장 트랙 동결 목록 (docs/14 · docs/15 §6–§7 · 브랜치 heating) — v1.29 의 config/freeze.yaml 과 별개
 #  tools/check_freeze.py --config config/freeze_heating.yaml --group all
-#  files: 난방 시나리오 · 판정 문법 · 지표 설정 · 기준선 명세 · 참값 모델
-#  controller: 제어기 v1.30-H 코드 · 계수 · 학습 산출물 · 하네스 (고치면 새 보류 묶음으로 다시 평가)
+#  files: 난방 시나리오 · 보류 1–3차 · 판정 문법 · 지표 설정 · 무작위 범위 · 기준선 명세 · 참값 모델 · 주 비교 분석
+#  controller: 제어기 v1.31-H 코드 (v1.30-H 동결 2026-10-28 → v1.31-H 재동결 2026-10-29 · docs/15 §10) · 계수 · 학습 산출물 · 하네스 (고치면 새 보류 묶음으로 다시 평가)
 # ============================================================================
-frozen_at: '2026-10-28'
+frozen_at: '2026-10-29'
 files:
 - path: config/scenarios_heating.yaml
-  sha256: 74b7d8c78ae93f1e8b7ef145d533329c9a6a920694757be084a7a9c0d47b7954
+  sha256: 305d6a2a7c830f5e4ca18ce43bbbed8be69baa493684e1d363b7694fb7566a5a
 - path: config/heldout_heating_r1.yaml
   sha256: 954fc2e0d7b9f8b3d5e870eca753b2af18b32d5a126278f5458588efbc2c75ff
 - path: config/heldout_heating_r2.yaml
   sha256: 2b0c0dc53eab2e7b85fb96ddab71a33175f5f72991dc8a84c9064e7cf63dc876
+- path: config/heldout_heating_r3.yaml
+  sha256: 56bfdba635b5fc56977f41ea2a97fb92763c14fa3ab7548a2ae3b40a362e1f8d
 - path: scripts/harness/criteria.py
-  sha256: 7cc7d637789fa13acadd0338d18d754d2a3463389e9b93c57399ddacf6a3675a
+  sha256: 4efa7da59b89a0db6e2fcb4c077a5f2325026e5ba3047ba8dbf06b173b104ccc
 - path: config/harness.yaml
   yaml_key: metrics
   sha256: 4fe5e84eba112b2fe7e43a64bed0f49fa0263b927c8eb79749000baacdc2dbee
@@ -21,20 +23,27 @@ files:
   yaml_key: appliance_profiles
   sha256: 5e4535b8f9e3affbe5ceb75333df1192a8a6e33bb72d629528e0189aedf341a5
 - path: config/baselines.yaml
-  sha256: 08f2bcde23bbd6d1eb9f15e43a75682aed7ae7d9765fd57e2526c8b5aa8a0234
+  sha256: 8062c8e11925ec4eb1d4881ba41ee1abdc995264cb74782de48928ea4104f91b
 - path: config/environment_model.yaml
-  sha256: 20d815dd51e6b8e8cf82183d2a67831581ac943f876b63e34f3b9d4b17ed563a
+  sha256: 8a20bf448f65cc74070979ed1667be9b350f099f64b2dc9a83b99d73c1c0be18
 - glob: scripts/env_model/*.py
-  sha256: df03396f2c3f452fc5ed47149615c1c6667c30ce54f8ec62fdedc7070a156105
+  sha256: d72173653cb7a40b2882f7ca1327582259474220fa788007668252eb8ae17759
+- path: config/harness.yaml
+  yaml_key: randomization
+  sha256: b3cf9e8555041d384d0dbd122649d8f73eee9ddb07726ca7c4e617cba28e65f4
+- path: tools/analysis/heating_primary.py
+  sha256: 286d6f1d4dbfab3255fc67f979a7ca0deeed8eddbbb6718ebf76c973b520ed05
+- path: tools/analysis/criteria_classes.py
+  sha256: 67cb057bb30b19c599f7e70e337ad04d8732d52e916cc1804596e5e1394fc4af
 controller:
 - glob: scripts/controller/*.py
-  sha256: e825b2f151c887543d92416af700722fbbb4c83e7a0a1e80ebfadd9b3398dd37
+  sha256: 7612b139d94833134b062b3577341ad9c1affdb96432421fcab7b3ab05d17b7d
 - glob: scripts/sensors/*.py
   sha256: 55c6f57b749da7a19a35619ac17d5498c4075f82b39f8309432b2bf10beb6e34
 - glob: scripts/actuators/*.py
   sha256: 73e5c9244133909ba103dc9904e9efdc02d059fdee83b28f4d78aa76ef5515d4
 - path: config/thresholds.yaml
-  sha256: d0ba4a54edbaf1379429cf668361776187db338f58ed94574c1a4aa02b1045a0
+  sha256: 945bc9f8ca1f1417e71c6e2321b782f5fc6cbfeb45a8e60e9bc78a8220386dd2
 - path: config/user_modes.yaml
   sha256: 998a1c1e531b38ecadd7b44a3cce35c3790bf5943de26d6d945de96fd35cfd17
 - glob: models/*
@@ -42,4 +51,4 @@ controller:
 - path: scripts/harness/fast_world.py
   sha256: 3065a2b995312be52dc7d4f3eacb2019ba0626e404ab881d2695b71be01b9d74
 - path: scripts/harness/runner.py
-  sha256: 798bf30188e45459bff1d0683835baa06134207339810e7c70b06519c7ed6f13
+  sha256: e136ac8b75aa86e1f2a8e40681878b9996a48208c277ef60592621cabf25221f

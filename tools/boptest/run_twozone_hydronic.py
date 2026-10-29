@@ -42,6 +42,14 @@ from run_bestest_air import Client  # noqa: E402
 K0 = 273.15
 
 
+def official_occupancy(bc: dict):
+    """테스트 케이스 Resources/occupancy.csv (거실 Occupancy[Day]) → 시각 s 의 재실 여부 (앞 표본 유지)."""
+    f = REPO / "external" / "boptest" / "testcases" / bc["testcase"] / "models" / "Resources" / "occupancy.csv"
+    d = pd.read_csv(f, comment="#")
+    ts, occ = d["time"].to_numpy(float), d["Occupancy[Day]"].to_numpy(float) > 0.5
+    return lambda t: occ[max(0, int(np.searchsorted(ts, t, side="right")) - 1)]
+
+
 def make_ours(method: str, hcfg: dict, bc: dict):
     spec = hcfg["controllers"][method]
     ctrl = make_controller(spec)
@@ -60,6 +68,7 @@ def run(method: str, period: str, cli: Client, hcfg: dict, bc: dict) -> tuple[di
     y = cli.put("/scenario", {"time_period": period, "electricity_price": bc["electricity_price"],
                                "temperature_uncertainty": None, "solar_uncertainty": None, "seed": None})["time_period"]
     ours = method != "boptest_baseline"
+    occ_at = official_occupancy(bc) if bc.get("official_occupancy") else None
     ctrl = make_ours(method, hcfg, bc) if ours else None
     b = th["appliances"]["boiler"]
     l0 = BoilerGuard(b["min_power_toggle_s"], b["min_setpoint_change_s"], b["setpoint_range_c"], b["setpoint_step_c"],
@@ -76,7 +85,10 @@ def run(method: str, period: str, cli: Client, hcfg: dict, bc: dict) -> tuple[di
         t = float(y["time"])
         q = float(y["dayZon_reaPowQint_y"])
         day, h = int(t // 86400) % 7, (t % 86400.0) / 3600.0      # 0 = 월 (1월 1일 = 월요일 — 기준 실행 발열로 확인)
-        occ = (day <= 4 and h >= bc["occupied_from_h"]) or (1 <= day <= 5 and h < bc["occupied_until_h"])
+        # [2026-10-30] 공식 재실 일정 파일 그대로 (testcase Resources/occupancy.csv · 15분 간격 · 날짜마다 0–8시 · 20–24시) — 전에는 '월–금 20시 ~
+        # 다음 날 8시' 로 읽어 월요일 0–8시(공식 재실)를 비재실로 넣었다 (v1.30-H 부터 · docs/15 §14 · KPI tdis 는 공식 일정으로 계산된다)
+        occ = bool(occ_at(t)) if occ_at is not None else (
+            (day <= 4 and h >= bc["occupied_from_h"]) or (1 <= day <= 5 and h < bc["occupied_until_h"]))
         to, tz = y["weatherStation_reaWeaTDryBul_y"] - K0, y["dayZon_reaTRooAir_y"] - K0
         p_hp = float(y["hydronicSystem_reaPeleHeaPum_y"]) + float(y["hydronicSystem_reaPPum_y"])
         if ours:

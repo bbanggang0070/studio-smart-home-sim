@@ -493,6 +493,7 @@ boptest_heating:                  # [난방 확장 docs/15 · 2026-10-28] tools/
   controller_dt_s: 10.0           # 2구역 FMU 가 무거워 제어 주기 10 s (난방 판단은 분 단위)
   occupied_from_h: 20.0           # 재실 = 월–금 20시 ~ 다음 날 08시 (테스트 케이스 문서 · 발열 신호는 덮어쓰기 때 고정돼 못 씀)
   occupied_until_h: 8.0
+  official_occupancy: true        # [2026-10-30] 재실 = 테스트 케이스 occupancy.csv 그대로 (위 두 값은 파일이 없을 때만 · 월요일 0–8시 해석 오류 수정)
   off_setpoint_c: 10.0            # 전원 끔 = 동파 하한 수준
   assumed: { humidity_pct: 40.0, pm25_ugm3: 10.0, illuminance_lux: 200.0 }
   devices: [boiler]

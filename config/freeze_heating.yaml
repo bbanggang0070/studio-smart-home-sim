@@ -75,4 +75,4 @@ controller:
 - path: scripts/harness/controllers.py
   sha256: a7a0ea2eca99260e156a58ec0da2df24e770490eacaf89872caa684f5d7cbff1
 - path: tools/boptest/run_twozone_hydronic.py
-  sha256: ed4ddc4d6d83bd872ecf3cec7108e4012963a2473396b0a98c40d4d1ee0ebbb6
+  sha256: 3ad611f8d40d3c247f22dbbabc422462dee560326324b45fa436107b9803dfdc

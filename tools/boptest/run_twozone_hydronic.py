@@ -9,7 +9,9 @@
     처음엔 거실 실내 발열(reaPowQint 0 / 201 W)로 판정했으나, 조절기 설정을 덮어쓰면 발열이 201 W 로 고정돼(BOPTEST 모델 특성)
     쓸 수 없었다 (2026-10-28 · 기준 실행에서 1월 1일 = 월요일 확인)
   보일러 계량 플러그 = 히트펌프 + 순환펌프 전력 (E17 확인용 — 이 건물에선 '보일러' = 히트펌프)
-방식: boptest_baseline (내장 조절기 21/16 °C) · A (22 °C 켜 둠) · A2 (스마트 조절기 재실 · 밤) · B · proposed (v1.30-H 코드 그대로 · 장치 = 보일러만)
+방식: boptest_baseline (내장 조절기 21/16 °C) · A (22 °C 켜 둠) · A2 (스마트 조절기 재실 · 밤) · A2V (= A2 — 이 건물엔 환기 장치가 없다) · B · proposed ·
+      proposed_v131 (v1.31-H 재현 변형 · v1.32-H 짝) — 장치 = 보일러만
+    uv run python tools/boptest/run_twozone_hydronic.py --tag _v132 --methods boptest_baseline,A,A2,A2V,B,proposed,proposed_v131
 KPI: BOPTEST 표준 tdis_tot · ener_tot · cost_tot · 재실 중 실내 온도 분포
 설정: config/harness.yaml boptest_heating · 결과 results/boptest_heating/ · results/tables/boptest_heating_kpis.md
 """
@@ -101,7 +103,9 @@ def run(method: str, period: str, cli: Client, hcfg: dict, bc: dict) -> tuple[di
                  "thermostatNigZon_oveTsetZon_u": sp + K0, "thermostatNigZon_oveTsetZon_activate": 1}
         rows.append({"time_s": t, "qint_w": q, "zone_temp_c": tz, "night_temp_c": y["nigZon_reaTRooAir_y"] - K0, "outdoor_temp_c": to,
                      "occupied": occ, "p_hp_w": p_hp, "setpoint_c": (l0.setpoint if l0.power else bc["off_setpoint_c"]) if ours else None,
-                     "events": ctrl_state.get(T.T_ACTIVE_EVENTS, "") if ours else ""})
+                     "events": ctrl_state.get(T.T_ACTIVE_EVENTS, "") if ours else "",
+                     "mode": ctrl_state.get(T.T_LIVING_MODE, "") if ours else "",          # [v1.32-H] 진단용 — 모드 · 보일러 결정 사유
+                     "boiler_reason": next((r for r in (ctrl.reasons() if ours and hasattr(ctrl, "reasons") else []) if r.startswith("boiler=")), "")})
         y = cli.post("/advance", u)
     return cli.get("/kpis"), pd.DataFrame(rows)
 
@@ -113,10 +117,11 @@ def main() -> None:
     ap.add_argument("--periods", default=",".join(bc["periods"]))
     ap.add_argument("--methods", default=",".join(bc["methods"]))
     ap.add_argument("--url", default=bc["url"])
+    ap.add_argument("--tag", default="", help="결과 폴더 · 표 접미사 (예: _v132 — 이전 버전 결과와 섞지 않는다)")
     a = ap.parse_args()
     cli = Client(a.url)
     assert cli.get("/name")["name"] == bc["testcase"], "서버의 테스트 케이스가 설정과 다르다"
-    out = REPO / bc["out_dir"]
+    out = REPO / (bc["out_dir"] + a.tag)
     out.mkdir(parents=True, exist_ok=True)
     tab = REPO / "results" / "tables"
     tab.mkdir(parents=True, exist_ok=True)
@@ -136,7 +141,7 @@ def main() -> None:
                   f"히트펌프 {row['hp_kwh']:.1f} kWh · 재실 평균 {row['occ_temp_mean_c']:.2f} °C · 재실 비율 {row['occ_ratio']:.2f} · "
                   f"{row['wall_s']:.0f}s", flush=True)
     df = pd.DataFrame(rows)
-    kp = tab / "boptest_heating_kpis.csv"                # 다른 서버로 돌린 기간 결과와 합친다 (저장 직전에 다시 읽는다)
+    kp = tab / f"boptest_heating_kpis{a.tag}.csv"                # 다른 서버로 돌린 기간 결과와 합친다 (저장 직전에 다시 읽는다)
     if kp.exists():
         old = pd.read_csv(kp)
         old = old[~old.set_index(["period", "method"]).index.isin(df.set_index(["period", "method"]).index)]
@@ -148,8 +153,8 @@ def main() -> None:
     for _, r in df.iterrows():
         lines.append(f"| {r.period} | {r.method} | {r.tdis_tot:.1f} | {r.ener_tot:.3f} | {r.cost_tot:.4f} | {r.hp_kwh:.1f} | "
                      f"{r.occ_temp_mean_c:.2f} | {r.occ_under_20_ratio * 100:.0f} % |")
-    (tab / "boptest_heating_kpis.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    write_manifest(out, {"kind": "boptest_heating", "periods": a.periods, "methods": a.methods, "url": a.url})
+    (tab / f"boptest_heating_kpis{a.tag}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_manifest(out, {"kind": "boptest_heating", "periods": a.periods, "methods": a.methods, "url": a.url, "tag": a.tag})
     print("\n".join(lines))
 
 

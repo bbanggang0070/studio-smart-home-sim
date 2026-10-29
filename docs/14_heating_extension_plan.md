@@ -303,6 +303,7 @@
 | F15 | 동결 점검 (`--group all`) | 이 브랜치는 제어 코드 · thresholds · user_modes · models · 하네스가 v1.29 동결과 다르다 (의도된 차이 — v1.30-H) · 기본 점검(판정 · 지표 12개)은 유지 | main 은 그대로 · 난방 트랙 동결은 3주차 `config/freeze_heating.yaml` · **main 병합 전 반드시 별도 동결 · 회귀** |
 | F16 | **3주차 개발 실행 (hdev1–2)** | 시작 상태 · 로그 크기(디스크 부족) · 프리히팅 · 밤 블라인드 결로 · I13 역효과 · 끄기 12 °C · 판정 5건 (불가능 · 부당 비교) | docs/15 §8 에 9건 기록 · 시나리오 v0.3 |
 | F17 | **3주차 동결** | `config/freeze_heating.yaml` (시나리오 · 판정 · 지표 · 기준선 · 참값 · 제어기) · `tools/check_freeze.py --config` · 이 브랜치에서 v1.29 동결과 다른 판정 파일은 `criteria.py` · `harness.yaml metrics` (난방 별칭 · 지표 **추가**만 — 회귀 249회 지표 · 판정 · 상태 · 열 구성 일치) | main 병합 때 v1.29 동결 개정으로 기록 |
+| F18 | **M3 물리 모드 보일러 연결 확인** (HP0 · 30분 · Isaac 실시간) | 판정 통과 · 보일러 명령 → 브릿지 → 참값 · 계량 플러그 92 W · 로거 보일러 열 · **고속 ↔ 물리: 실내 온도 최대 0.07 °C · 바닥 0.00 · 가스 같음** | 앞으로 물리 모드 난방 실행 가능 (`STUDIO_SCENARIO_FILE` · `PHYS_DIR`) |
 | F9 | 동결 파일 | `config/scenario_profiles.yaml` · `harness.yaml` metrics · 제어 코드가 v1.29 동결 대상 | H 시나리오는 **별도 파일** `config/scenarios_heating.yaml` · 동결은 `config/freeze_heating.yaml` · main 의 `freeze.yaml` 은 건드리지 않는다 |
 
 ## 14. 원래 '실행 전 결정' 목록 (보관)

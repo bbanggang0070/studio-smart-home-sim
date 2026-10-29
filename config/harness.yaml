@@ -313,7 +313,7 @@ randomization:
     heating:                        # [난방 확장 docs/15 §3 · 2026-10-28] 난방 시나리오 18개 × 반복 · 참값 계수(바닥 · 배관 · 보일러 · 침기 · U값 · 열용량 · COP) · 외기
       out_dir: results/randomized_heating_v131
       scenario_file: config/scenarios_heating.yaml
-      exclude_ids: [H0]             # 개발용 동작 확인 (등록 대상 아님)
+      exclude_ids: [H0, HP0]        # 개발용 동작 확인 · 물리 연결 확인 (등록 대상 아님)
       freeze_config: config/freeze_heating.yaml   # 실행 전 난방 트랙 동결(판정 · 제어기) 점검
       truth_params:                 # [v1.31-H R2 · 2026-10-29] 노후 원룸까지 — 침기 0.2–0.8 회/h · 창 U 1.5(복층 신축)–4.5(단창 알루미늄) · 외벽 ×0.7–2.0
         air_balance.base_infiltration_ach: { uniform: [0.2, 0.8] }        #  가장 새는 조합에서도 −15 °C 에서 21 °C 유지 확인 (하루 가스 33.5 kWh)

@@ -43,6 +43,46 @@ scenarios:
       - "dew_margin >= 0 for all t"
     metrics: [energy_wh, condensation_exposure_s]
 
+  - id: HP0
+    tier: 1
+    name: "물리 모드 연결 확인 — 겨울 요리 30분 (보일러 · 후드 · 흡기 · 블라인드) · 등록 대상 아님"
+    duration_s: 1800
+    repeat: 1
+    baselines: [proposed]
+    seed: 20261291
+    run_mode: physics
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true
+      user_mode: NORMAL
+      temperature_c: 20.0
+      humidity_pct: 40.0
+      co2_ppm: 800.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: kitchen
+      time_of_day: "19:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -5.0
+      outdoor_rh_pct: 60.0
+    injections:
+      - { at_s: 300, source: cooking, label: cooking, stove: induction_plug, pm_mg_per_min: 1.5,
+          moisture_g_per_h: 400, heat_w: 800, duration_s: 900 }
+    pass_criteria:
+      - "boiler_on == 1 within 600 after 0"                                 # 보일러 명령이 물리 모드 브릿지를 지나 참값까지 간다
+      - "dew_margin >= 0 for all t"
+    metrics: [cold_discomfort_kh, gas_kwh]
+
   # ==== Tier 1 — 단일 목표 ===================================================================
 
   - id: H1

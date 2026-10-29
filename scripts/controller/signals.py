@@ -59,6 +59,7 @@ class Observation:
     ac_l0_hold: bool = False               # 가전 브릿지 L0 압축기 보호가 지금 명령을 미루는 중 (state/ac l0_hold) — E9 판정은 이 동안 세지 않는다
     sky: str = "clear"                     # 날씨 API 하늘 상태 — 주광의 직사광 비율 (common/daylight.py · v3.4.21)
     boiler: dict | None = None             # [난방 확장] 룸 온도조절기 상태 (state/boiler JSON) — 없으면 None
+    weekday: int | None = None             # [v1.33-H C9-1] 오늘 요일 (0 = 월) — 제어기 달력 (시나리오 initial.weekday · 실제 집 = 시스템 시계) · 모르면 None
 
     @property
     def tod_s(self) -> float:

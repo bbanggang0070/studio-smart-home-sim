@@ -62,14 +62,20 @@ class HeatingLadder:
         timeout = g("events.precool.timeout_after_pred_min") * 60.0
         q = float(np.quantile(energy._arrival_samples(o.tod_s), g(h + "preheat_quantile")))
         home_sp, _ = self.target(home_mode, home_mode)
+        # [v1.33-H C9-3] 요일을 알면 — 출근일(월–금)에 놓친 귀가 = 여행 (그 외출 동안 그만) · 주말에 놓친 귀가는 여행이 아니다 (주말 외박 뒤
+        # 월요일 귀가를 데운다 · BOPTEST 월요일 16.6 °C) · 외출 24 h 초과 규칙은 주말에만 (출근일엔 '놓친 귀가' 가 여행을 가린다)
+        aware = g(h + "preheat_weekday_aware") and o.weekday is not None
+        workday = aware and o.weekday < 5
         if self._pre_started is not None:
             if o.now_s - self._pre_started > g(h + "preheat_lead_max_min") * 60.0 + timeout:
-                self._pre_started, self._pre_missed = None, True          # 귀가를 놓쳤다 — 이 외출 동안 그만
+                self._pre_started = None                                   # 귀가를 놓쳤다
+                self._pre_missed = workday or not aware                    # 출근일(또는 요일 모름)이면 이 외출 동안 그만
                 ev.pop("PREHEAT", None)
                 return sp, why
             ev.setdefault("PREHEAT", ActiveEvent("PREHEAT", self._pre_started, {"arrival_q": q}))
             return max(sp, home_sp), "프리히팅 (시작 뒤 유지)"
-        if self._pre_missed or o.now_s - self._away_since > g(h + "preheat_trip_after_h") * 3600.0:
+        long_away = o.now_s - self._away_since > g(h + "preheat_trip_after_h") * 3600.0
+        if self._pre_missed or (long_away and not workday):
             ev.pop("PREHEAT", None)
             return sp, why
         deficit = home_sp - o.temp_c

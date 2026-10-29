@@ -79,6 +79,9 @@ class SmartHomeController:
         if sc.get("appliance_profile"):
             self.rules.devices = set(self.p.get("appliances.profiles")[sc["appliance_profile"]])
         self.rules.filter_hours = float((sc.get("initial") or {}).get("filter_hours", 0.0))
+        # [v1.33-H C9-1] 달력 — 시작 요일(0 = 월)을 알면 경과 일수로 오늘 요일을 센다 · 모르면 None (v1.32-H 와 같다: 귀가 GBM 은 수 고정)
+        wd = (sc.get("initial") or {}).get("weekday")
+        self._weekday0 = int(wd) if wd is not None else None
         # 사용자 설정 (user_modes.yaml 의 switching 값을 시나리오가 바꿀 수 있다 — 예: B4 외출 자동 전환 끔)
         us = sc.get("user_settings") or {}
         # 기준선별 사용자 설정 (C16 — B 는 셋백 유지)
@@ -109,6 +112,10 @@ class SmartHomeController:
 
     def step(self, now_s: float, inbox: dict[str, Any]) -> dict[str, Any]:
         o = parse_inbox(now_s, inbox)
+        if getattr(self, "_weekday0", None) is not None:
+            o.weekday = (self._weekday0 + int(now_s // 86400.0)) % 7
+            if self.rules.energy is not None and self.p.get("energy.arrival_gbm.use_calendar"):
+                self.rules.energy.weekday = o.weekday          # [C9-2] 귀가 GBM 특성 = 오늘 요일 (전: default_weekday 고정)
         if self._last_t is not None and o.intake_rpm > 0:
             self.rules.filter_hours += (now_s - self._last_t) / 3600.0
         self._last_t = now_s

@@ -45,7 +45,8 @@ K0 = 273.15
 def make_ours(method: str, hcfg: dict, bc: dict):
     spec = hcfg["controllers"][method]
     ctrl = make_controller(spec)
-    sc = {"appliance_profile": "full_heating", "initial": {"appliances": {"boiler": {"power": True, "setpoint": 21.0}}}}
+    # [v1.33-H] 달력 — BOPTEST 시각 0 = 1월 1일 0시 = 월요일 (기준 실행 발열로 확인) · 제어기 now = BOPTEST 시각
+    sc = {"appliance_profile": "full_heating", "initial": {"weekday": 0, "appliances": {"boiler": {"power": True, "setpoint": 21.0}}}}
     ctrl.reset({"scenario": sc, "baseline": method, "seed": 0, "rng": np.random.default_rng(0)})
     if hasattr(ctrl, "rules"):
         ctrl.rules.devices = set(bc["devices"])

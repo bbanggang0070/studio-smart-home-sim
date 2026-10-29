@@ -406,6 +406,7 @@ smart_home_controller:
         learning_rate: 0.05
         min_samples_leaf: 5
         default_weekday: 2               # 시뮬레이션 시각에 요일이 없다 — 평일 대표(수) draft
+        use_calendar: true               # [v1.33-H C9-2] 제어기가 요일을 알면(시나리오 initial.weekday) 그 요일을 특성으로 (모르면 위 기본값)
       learned_model_file: 'models/energy_commuter.yaml'   # [v3.4.6] tools/energy/train_energy_model.py 산출물
       planner:                           # [v3.4.6] 기대비용 격자 탐색 (docs/08 §5.3) — draft
         sim_step_s: 300.0                # 2R2C 예측 적분 보폭
@@ -446,6 +447,7 @@ smart_home_controller:
       preheat_recover_min_per_k: 75.0  # draft — 바닥난방 회복 속도 (H0: 18 → 20.3 °C 3 h) · 시작 = 부족 K × 이 값 전
       preheat_lead_max_min: 180.0      # 시작 상한
       preheat_trip_after_h: 24.0       # 외출이 이보다 길면 여행으로 보고 프리히팅하지 않는다
+      preheat_weekday_aware: true      # [v1.33-H C9-3] 요일을 알면 출근일에 놓친 귀가 = 여행 · 주말은 24 h 초과만 그날 안 함 (BOPTEST 주말 외박 · docs/14 §17)
       condensation_staged: true        # [v1.32-H C7] 난방 중 E2 '위험' 의 제습 · 간헐 환기는 지금 여유 < 위험 기준일 때만 (블라인드 · 역회전 · 가습 금지는 래치 유지)
       humidify_heating_target: true    # [v1.32-H C6] 난방 중 가습 목표 = 하한 + 아래 값 · 실링팬 상한 확장은 결로 상한이 그 목표를 막을 때만
       humidify_target_above_lo_pct: 5.0   # [v1.32-H C6] 난방 중 가습 정지 목표 = 모드 하한 + 이 값 (40 → 45 %) · 결로 상한(I4)은 그대로

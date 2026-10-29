@@ -257,3 +257,48 @@ def test_c8_fault_detected_even_if_room_warms_from_mass():
         out = c.step(8 * 3600.0 + t, inbox(temp=19.0 + min(1.0, k * 0.02), **kw))
         alerts += json.loads(out.get(T.T_ALERTS, "[]"))
     assert any(a["code"] == "H_BOILER_FAULT" for a in alerts)
+
+
+# ---- [v1.33-H] C9 달력 · 여행 판정 (docs/14 §17) ----
+
+def _wobs(t, temp, wd0):
+    o = _obs(t, temp)
+    o.weekday = (wd0 + int(t // 86400.0)) % 7
+    return o
+
+
+def _away_weekend_then_monday(h, wd0):
+    """토 08:00 출발 (시작 = 토 0시 · wd0 = 5) → 토 · 일 저녁을 지나 월 저녁 예측 귀가. 월요일 17:00 의 설정을 돌려준다."""
+    ev = {}
+    for t in range(int(8 * 3600), int(2 * 86400 + 17 * 3600) + 1, 600):
+        sp, why = h._preheat(_wobs(float(t), 17.0, wd0), "AWAY", "NORMAL", ev, _Arrive(), 16.0, "셋백")
+    return sp, why
+
+
+def test_c9_monday_preheat_after_weekend_away():
+    """주말 외박(60 h) 뒤 월요일 예측 귀가 전에 데운다 — 요일을 모르면(v1.32-H) 24 h 초과 = 여행으로 데우지 않는다."""
+    sp, why = _away_weekend_then_monday(HeatingLadder(load_params()), 5)
+    assert sp == 21.0, why
+    h = HeatingLadder(load_params())
+    ev = {}
+    for t in range(int(8 * 3600), int(2 * 86400 + 17 * 3600) + 1, 600):
+        sp, _ = h._preheat(_obs(float(t), 17.0), "AWAY", "NORMAL", ev, _Arrive(), 16.0, "셋백")   # weekday = None
+    assert sp == 16.0
+
+
+def test_c9_workday_missed_arrival_is_trip():
+    """출근일(수)에 예측 귀가를 놓치면 여행 — 다음 날(목) 저녁에도 데우지 않는다 (HH207 그대로)."""
+    h = HeatingLadder(load_params())
+    ev = {}
+    for t in range(int(8 * 3600), int(86400 + 17 * 3600) + 1, 600):
+        sp, _ = h._preheat(_wobs(float(t), 17.0, 2), "AWAY", "NORMAL", ev, _Arrive(), 16.0, "셋백")
+    assert h._pre_missed and sp == 16.0
+
+
+def test_c9_controller_counts_weekday():
+    c = ctrl(initial={"weekday": 4})                     # 금 0시 시작
+    c.step(10.0, inbox())
+    assert c._weekday0 == 4
+    from controller.signals import parse_inbox as _p
+    o = _p(3 * 86400.0 + 10.0, inbox())
+    assert (c._weekday0 + int(o.now_s // 86400)) % 7 == 0   # 3일 뒤 = 월

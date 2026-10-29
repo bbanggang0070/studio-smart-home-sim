@@ -139,3 +139,21 @@ class BaselineAPrime:
             sp = b["away_c"] if away else b["night_c"] if night else b["home_c"]
             out[T.C_BOILER] = json.dumps({"power": True, "setpoint": float(sp)})
         return out
+
+
+class BaselineAPrimeVent(BaselineAPrime):
+    """A′V — A′ + 24시간 환기장치 (2026-10-29 · docs/15 §2). 흡기팬으로 vent_m3h 를 상시 공급 (A′ 의 흡기 요구와 큰 쪽)."""
+    name = "baseline_A2V"
+
+    def __init__(self, path: str | Path = BASELINES):
+        super().__init__(path)
+        with open(path, encoding="utf-8") as f:
+            self.vcfg = yaml.safe_load(f)["baseline_a2v"]
+        from controller.params import load_params
+        p = load_params()
+        self._vent_rpm = self.vcfg["vent_m3h"] / p.get("appliances.intake_fan.max_m3h") * p.get("appliances.intake_fan.max_rpm")
+
+    def step(self, now_s: float, inbox: dict[str, Any]) -> dict[str, Any]:
+        out = super().step(now_s, inbox)
+        out[T.C_INTAKE_FAN_RPM] = max(float(out.get(T.C_INTAKE_FAN_RPM, 0.0)), self._vent_rpm)
+        return out

@@ -92,6 +92,7 @@ controllers:
   B: "controller.smart_home:SmartHomeController"   # docs/03 §6 — 같은 제어기, baseline=B 이면 히스테리시스 · 자동 전환 대기 0
   proposed: "controller.smart_home:SmartHomeController"   # W09 v1 — 규칙 + 모드 + 이벤트 · 6계층 중재
   proposed_np: "controller.smart_home:SmartHomeController"   # Proposed−P (docs/03 C15) — 우선 목표(L4.5) 비활성
+  A2V: "controller.baseline_a2:BaselineAPrimeVent"   # [2026-10-29] A′ + 24시간 환기장치 (v1.31-H 결과 보기 전 · baselines.yaml baseline_a2v)
   A2: "controller.baseline_a2:BaselineAPrime"   # [2026-10-26] A′ — 상용 스마트홈 허브 수준 규칙 자동화 (docs/11 권장 7 · baselines.yaml baseline_a2)
 
 extra_baselines: {}                   # [2026-10-26] {추가: 짝} — 짝 기준선을 돌리는 시나리오에서 추가 기준선도 (도구 --extra-baselines A2 → {A2: A})
@@ -310,15 +311,16 @@ randomization:
     outdoor_illuminance_lux: { scale: [0.8, 1.2] }
   profiles:                         # --profile <이름> — 위 truth_params · external · out_dir 를 이 값으로 바꿔 돌린다
     heating:                        # [난방 확장 docs/15 §3 · 2026-10-28] 난방 시나리오 18개 × 반복 · 참값 계수(바닥 · 배관 · 보일러 · 침기 · U값 · 열용량 · COP) · 외기
-      out_dir: results/randomized_heating
+      out_dir: results/randomized_heating_v131
       scenario_file: config/scenarios_heating.yaml
       exclude_ids: [H0]             # 개발용 동작 확인 (등록 대상 아님)
       freeze_config: config/freeze_heating.yaml   # 실행 전 난방 트랙 동결(판정 · 제어기) 점검
-      truth_params:
-        air_balance.base_infiltration_ach: { uniform: [0.2, 0.4] }
-        window.glazing_u_w_m2k: { uniform: [2.4, 3.2] }
+      truth_params:                 # [v1.31-H R2 · 2026-10-29] 노후 원룸까지 — 침기 0.2–0.8 회/h · 창 U 1.5(복층 신축)–4.5(단창 알루미늄) · 외벽 ×0.7–2.0
+        air_balance.base_infiltration_ach: { uniform: [0.2, 0.8] }        #  가장 새는 조합에서도 −15 °C 에서 21 °C 유지 확인 (하루 가스 33.5 kWh)
+        window.glazing_u_w_m2k: { uniform: [1.5, 4.5] }
+        thermal.envelope_outdoor_conductance_w_per_k: { scale: [0.7, 2.0] }
         thermal.air_capacity_wh_per_k: { scale: [0.8, 1.2] }
-        thermal.mass_capacity_wh_per_k: { scale: [0.8, 1.2] }
+        thermal.mass_capacity_wh_per_k: { scale: [0.6, 1.4] }
         thermal.envelope_capacity_wh_per_k: { scale: [0.8, 1.2] }
         appliances.ac.cop_values: { scale: [0.85, 1.15] }
         appliances.range_hood.capture_efficiency: { uniform: [0.5, 0.7] }

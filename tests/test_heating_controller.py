@@ -125,3 +125,67 @@ def test_away_off_uses_frost_margin():
     c.p.modes["energy"]["away_heating_strategy"] = "off"
     sp, _ = c.rules.heating.target("AWAY", "NORMAL")
     assert sp == pytest.approx(12.0)
+
+
+# ---- v1.31-H C1 · C2 · C3 ------------------------------------------------------------------------
+
+from controller.heating import HeatingLadder  # noqa: E402
+from controller.params import load_params  # noqa: E402
+from controller.signals import parse_inbox  # noqa: E402
+
+
+class _Arrive:
+    """귀가 예측 고정 — 18:00 (분위와 무관하게 같은 값)."""
+    def _arrival_samples(self, tod):
+        import numpy as np
+        return np.full(50, 18 * 3600.0)
+
+
+def _obs(t, temp, out=-5.0, **kw):
+    return parse_inbox(t, inbox(temp=temp, out=out, occupied=False, **kw))
+
+
+def test_preheat_skipped_when_room_still_warm():
+    h = HeatingLadder(load_params())
+    sp, why = h._preheat(_obs(17 * 3600.0, temp=20.8), "AWAY", "NORMAL", {}, _Arrive(), 16.0, "셋백")
+    assert sp == 16.0                                     # 21 − 20.8 = 0.2 ≤ 0.5 — 데울 필요 없음
+
+
+def test_preheat_lead_scales_with_deficit():
+    p = load_params()
+    h = HeatingLadder(p)
+    # 부족 2 K × 75 분/K = 150분 → 15:30 부터
+    sp, _ = h._preheat(_obs(15 * 3600.0, temp=19.0), "AWAY", "NORMAL", {}, _Arrive(), 16.0, "셋백")
+    assert sp == 16.0
+    h2 = HeatingLadder(p)
+    sp, _ = h2._preheat(_obs(15.6 * 3600.0, temp=19.0), "AWAY", "NORMAL", {}, _Arrive(), 16.0, "셋백")
+    assert sp == 21.0
+
+
+def test_preheat_not_repeated_after_missed_arrival():
+    h = HeatingLadder(load_params())
+    ev = {}
+    t0 = 16 * 3600.0
+    h._preheat(_obs(t0, temp=18.0), "AWAY", "NORMAL", ev, _Arrive(), 16.0, "셋백")
+    assert h._pre_started is not None
+    # 귀가하지 않은 채 상한 + 시간 초과가 지나면 그만 · 다음 날 같은 시각에도 다시 하지 않는다
+    sp, _ = h._preheat(_obs(t0 + 5 * 3600.0, temp=21.0), "AWAY", "NORMAL", ev, _Arrive(), 16.0, "셋백")
+    assert sp == 16.0 and h._pre_missed
+    sp, _ = h._preheat(_obs(t0 + 86400.0 - 3600, temp=18.0), "AWAY", "NORMAL", ev, _Arrive(), 16.0, "셋백")
+    assert sp == 16.0
+
+
+def test_preheat_skipped_on_long_trip():
+    h = HeatingLadder(load_params())
+    h._preheat(_obs(10 * 3600.0, temp=20.0), "AWAY", "NORMAL", {}, _Arrive(), 16.0, "셋백")     # 외출 시작 기록
+    sp, _ = h._preheat(_obs(10 * 3600.0 + 25 * 3600.0 + 6.5 * 3600, temp=17.0), "AWAY", "NORMAL", {}, _Arrive(), 16.0, "셋백")
+    assert sp == 16.0                                     # 24 h 넘음 — 여행
+
+
+def test_night_blind_only_when_condensation_safe():
+    c = ctrl()
+    dry = c.step(22 * 3600.0, inbox(temp=19.0, out=0.0, **{T.S_HUMIDITY: 30.0}))
+    assert any("사다리 2" in r for r in c.reasons())
+    c = ctrl()
+    wet = c.step(22 * 3600.0, inbox(temp=19.0, out=-12.0, **{T.S_HUMIDITY: 55.0}))
+    assert not any("사다리 2" in r for r in c.reasons())

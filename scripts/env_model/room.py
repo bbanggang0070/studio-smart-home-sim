@@ -79,6 +79,7 @@ class SourceRates:
     moisture_g_per_h: float = 0.0          # 요리 · 샤워(욕실 문 유입) 등
     sensible_heat_w: float = 0.0           # 요리 이외의 현열
     cooking_heat_w: float = 0.0            # 조리 열 — 실내 열 + 후드 아래 온도 플룸
+    shower_active: bool = False            # [난방 확장 R1] 샤워 중 — 온수 겸용 보일러는 온수 우선 (hydronic 만 영향)
 
 
 @dataclass
@@ -158,7 +159,7 @@ class RoomModel:
 
     # -- 온수 바닥난방 (난방 확장 트랙 · docs/14 §3) --
 
-    def _hydronic(self, cmd: BoilerCommand, t_air: float, dt: float) -> tuple[float, float, float]:
+    def _hydronic(self, cmd: BoilerCommand, t_air: float, dt: float, shower: bool = False) -> tuple[float, float, float]:
         """룸 온도조절기 → 보일러 연소 → 공급수 → 바닥 슬래브 → 실내. → (실내로 가는 열 W, 전기 W, 가스 W).
 
         조절기: 설정 ± 히스테리시스/2 로 켬/끔 · 보일러 자체 최소 연소 · 정지 시간 (참값 쪽 · 제어기 L0 와 별개).
@@ -181,18 +182,24 @@ class RoomModel:
             hold = g(h + "boiler_min_burn_s") if self.boiler_burning else g(h + "boiler_min_off_s")
             if now - self._boiler_change_s >= hold or not cmd.power:   # 전원을 끄면 바로 멈춘다
                 self.boiler_burning, self._boiler_change_s = want, now
-        target = g(h + "supply_temp_c") if self.boiler_burning else s.floor_temp_c
+        dhw_w = 0.0
+        if shower and g(h + "combi"):                    # [R1] 온수 겸용 — 샤워 중엔 온수 우선, 난방 공급 정지 (국내 원룸 보일러 대부분)
+            dhw_w = min(g(h + "boiler_max_output_w"),
+                        g(h + "dhw_flow_lpm") / 60.0 * 4186.0 * (g(h + "dhw_temp_c") - g(h + "cold_water_temp_c")))
+        heating_on = self.boiler_burning and dhw_w == 0.0
+        target = g(h + "supply_temp_c") if heating_on else s.floor_temp_c
         k = 1.0 - math.exp(-dt / g(h + "supply_time_constant_s"))
         s.supply_temp_c += (target - s.supply_temp_c) * k
         q_pipe = 0.0
-        if self.boiler_burning:
+        if heating_on:
             q_pipe = min(g(h + "boiler_max_output_w"), max(0.0, g(h + "pipe_conductance_w_per_k") * (s.supply_temp_c - s.floor_temp_c)))
         d = s.floor_temp_c - t_air
         q_air = g(h + "floor_area_m2") * g(h + "en1264_coefficient") * math.copysign(abs(d) ** g(h + "en1264_exponent"), d)
         q_below = g(h + "floor_below_conductance_w_per_k") * (s.floor_temp_c - g(h + "below_temp_c"))
         s.floor_temp_c += (q_pipe - q_air - q_below) * dt / (g(h + "floor_capacity_wh_per_k") * WH_TO_J)
-        p_el = g(h + "boiler_electric_on_w") if self.boiler_burning else g(h + "boiler_electric_standby_w")
-        return q_air, p_el, q_pipe / g(h + "boiler_efficiency")
+        p_el = g(h + "boiler_electric_on_w") if (self.boiler_burning or dhw_w > 0) else g(h + "boiler_electric_standby_w")
+        self.dhw_w = dhw_w
+        return q_air, p_el, (q_pipe + dhw_w) / g(h + "boiler_efficiency")
 
     # -- 빨래 --
 
@@ -428,7 +435,7 @@ class RoomModel:
         # 난방 — 경계 조건 (가정 A13) · 확장 트랙은 온수 바닥난방
         h_heat = 0.0
         if self.hydronic:
-            h_heat, p_boiler, gas_w = self._hydronic(act.boiler, t, dt)
+            h_heat, p_boiler, gas_w = self._hydronic(act.boiler, t, dt, src.shower_active)
         elif ext.heating_setpoint_c >= 0:
             h_heat = min(g("heating.capacity_w"),
                          max(0.0, g("heating.modulation_w_per_k") * (ext.heating_setpoint_c - t)))

@@ -9,6 +9,7 @@
 #  1) Isaac 액추에이터 브릿지 기동 (tools/isaac/run.sh)  2) ROS 런치 (월드 · 센서 · 제어기 · 로거)
 #  3) 시나리오가 끝나고 로거가 파일을 닫으면 컨테이너를 정리  4) scripts/physics_eval.py 로 채점
 #  결과: results/physics/raw/<id>_<baseline>_<rep>.csv · results/physics/summary.csv · results/physics/logs/
+#  STUDIO_SCENARIO_FILE=config/scenarios_heating.yaml PHYS_DIR=physics_heating tools/run_physics.sh H5   # 난방 확장 (2026-10-29)
 #  PHYS_RANDOM=1 PHYS_DIR=physics_random tools/run_physics.sh B3 proposed 2   # 조건 무작위화 — 반복마다 참값 계수 · 외기 · 잡음 시드 (2026-10-26)
 # ============================================================================
 set -uo pipefail
@@ -20,7 +21,8 @@ LOGS="$REPO/$PD/logs"; mkdir -p "$LOGS"
 DUR=$(uv run python -c "
 import sys; sys.path.insert(0,'scripts')
 from harness.scenario import load_scenarios
-print(int(next(s for s in load_scenarios('config/scenario_profiles.yaml') if s['id']=='$SC')['duration_s']))")
+import os
+print(int(next(s for s in load_scenarios(os.environ.get('STUDIO_SCENARIO_FILE') or 'config/scenario_profiles.yaml') if s['id']=='$SC')['duration_s']))")
 echo "물리 모드 실행: $SC · $BASE · 반복 $REP · ${DUR} s (실시간)"
 
 docker rm -f studio-isaac >/dev/null 2>&1; tools/ros/run.sh stop

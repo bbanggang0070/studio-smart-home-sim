@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import os
+
 import argparse
 import sys
 from pathlib import Path
@@ -35,7 +37,7 @@ def main() -> None:
     a = ap.parse_args()
     hcfg = load_harness_config()
     env_cfg = load_config(REPO / hcfg["paths"]["environment_model"])
-    scen = load_scenarios(REPO / hcfg["paths"]["scenarios"])
+    scen = load_scenarios(REPO / (os.environ.get("STUDIO_SCENARIO_FILE") or hcfg["paths"]["scenarios"]))   # 난방 확장 (2026-10-29)
     runs = expand_runs(scen, a.scenarios.split(","), a.baselines.split(","), a.reps)
     raw = REPO / a.dir / "raw"
     results: list[RunResult] = []

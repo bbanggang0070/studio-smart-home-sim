@@ -441,12 +441,17 @@ smart_home_controller:
       frost_alert_c: 12.0              # E16 — 실내가 이 아래면 사용자 알림 + 하한 강제
       warmup_no_humidify_c: 1.0        # I12 — 실내가 난방 목표 − 이 값보다 낮으면(데우는 중) 가습하지 않는다 (차가운 방 = 차가운 창 → 결로 · H0 에서 발견)
       preheat_quantile: 0.2            # 귀가 전 프리히팅 — 예측 귀가 분포의 이 분위 시각 (E13 프리쿨링과 같은 귀가 모델)
-      preheat_lead_min: 120.0          # draft — 그 시각보다 이만큼 먼저 집 목표로 (바닥난방 회복 2 h 가정 · EXP-H 에서 계획기와 비교)
+      # [v1.31-H C1 · C2 · 2026-10-29] 필요 기반 · 외출 한 번에 한 번 (v1.30-H 의 '고정 120분' 대체 — EXP-H · HH207)
+      preheat_need_margin_c: 0.5       # 실내가 집 목표 − 이 값보다 따뜻하면 프리히팅하지 않는다
+      preheat_recover_min_per_k: 75.0  # draft — 바닥난방 회복 속도 (H0: 18 → 20.3 °C 3 h) · 시작 = 부족 K × 이 값 전
+      preheat_lead_max_min: 180.0      # 시작 상한
+      preheat_trip_after_h: 24.0       # 외출이 이보다 길면 여행으로 보고 프리히팅하지 않는다
       laundry_boost_c: 1.5             # I14 — 빨래 건조 중 목표 + 이 값 (L4.5 허용 손실 예산 안)
       vent_pause_window_ratio: 0.05    # I11 — 창문이 이 이상 열려 있으면 보일러 일시 정지 (동파 하한은 유지)
       fan_reverse_above_c: 0.0         # 사다리 3 — 난방 중 실링팬 역회전 약 (재실 · 소음 등급 허용 시) · 목표 − 이 값 아래일 때
       blind_open_daylight_lux: 2000.0  # 사다리 1 — 낮 · 외부 조도 이상이면 블라인드 개방 요구 (일사 받기)
-      blind_close_night: false         # 사다리 2 (밤 블라인드 닫기) — 끔: 실내 블라인드가 유리를 가려 창 표면이 12.9 → 6.2 °C · 결로 (H7 개발 · 2026-10-28)
+      blind_close_night: true          # 사다리 2 (밤 블라인드 닫기) — [v1.31-H C3] 닫았을 때 결로 여유가 아래 값 이상일 때만 (v1.30-H 는 결로로 꺼 둠 · H7)
+      night_blind_dew_guard_c: 3.0     # draft — 닫힘 상태 유리 표면 결로 여유 (제어기 추정) 하한
 
     # ---- 열 · 건조 모델 — [신설 v3.1] (계수는 environment_model.yaml, W08 확정) ----
     thermal_model:

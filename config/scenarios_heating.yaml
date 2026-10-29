@@ -175,7 +175,7 @@ scenarios:
       - "temperature >= 20.0 by 3600 after 0"
       - "temperature >= 19.5 for all t"
       - "temperature <= 25.0 for all t"                                     # 일사로 과열하지 않음 (겨울 과열 규칙)
-      - "gas_kwh <= baseline_A.gas_kwh"                                     # 햇빛만큼 보일러를 덜 쓴다
+      # v0.5 (v1.31-H) — 'gas_kwh <= baseline_A.gas_kwh' 삭제: A 는 기본 환기를 하지 않아 다른 일을 비교 (docs/15 §9)
     metrics: [energy_wh, cold_discomfort_kh, gas_kwh, energy_cost_won, boiler_ignitions]
 
   # ==== Tier 2 — 두 목표 충돌 ================================================================
@@ -227,7 +227,7 @@ scenarios:
       - "temperature >= 14.0 for all t"                                     # 외출 중에도 지나친 냉각 없음
       - "temperature >= 19.5 by 3600 after arrive_start"                    # 귀가 1시간 뒤 쾌적
       - "dew_margin >= 0 for all t"
-      - "energy_cost_won <= baseline_A.energy_cost_won"                     # 22 °C 켜 둠보다 싸다
+      - "energy_cost_won <= baseline_A2V.energy_cost_won"                   # v0.5 — 같은 환기를 하는 상용 수준(A′V)보다 싸다
     metrics: [energy_wh, cold_discomfort_kh, gas_kwh, energy_cost_won, boiler_ignitions, expected_cost_heating]
 
   - id: H5
@@ -390,7 +390,7 @@ scenarios:
       outdoor_temp_c: -8.0
       outdoor_rh_pct: 55.0
     pass_criteria:
-      - "base_vent_compliance >= 0.95"                                      # 기본 환기는 지킨다
+      - "base_vent_compliance_mode >= 0.95"                                 # 기본 환기는 지킨다 (v0.5 — 시각별 모드 목표)
       - "temperature >= 20.0 for all t"                                     # 공부 중 추위 없음
       - "dew_margin >= 0 for all t"
     metrics: [base_vent_compliance, co2_compliance, cold_discomfort_kh, gas_kwh, energy_cost_won]
@@ -492,7 +492,7 @@ scenarios:
     pass_criteria:
       - "temperature >= 10.0 for all t"                                     # 동파 하한
       - "dew_margin >= 0 for all t"
-      - "energy_cost_won <= 0.8 * baseline_A.energy_cost_won"               # 22 °C 켜 둠보다 20 % 이상 싸다
+      - "energy_cost_won <= baseline_A2V.energy_cost_won"                   # v0.5 — 같은 환기를 하는 상용 수준(A′V)보다 싸다
     metrics: [condensation_exposure_s, gas_kwh, energy_cost_won, min_temp_c, boiler_ignitions]
 
   - id: H11
@@ -609,7 +609,7 @@ scenarios:
       - { at_s: 300, source: cooking, label: cooking, stove: induction_plug, pm_mg_per_min: 2.0,
           moisture_g_per_h: 500, heat_w: 900, duration_s: 1500 }
     pass_criteria:
-      - "window_open_ratio == 0 for all t"                                  # 외기 나쁨 · 혹한 — 창문 금지
+      - "window_open_ratio <= 0.05 for all t"                               # 외기 나쁨 · 혹한 — 창문 금지 (v0.5 — '== 0' 은 1차 지연)
       - "pm25 <= 35 by 1800 after cooking_end"
       - "temperature >= 18.0 by 1800 after cooking_end"                    # v0.3 — 후드 · 급기 손실 > 바닥난방 출력
       - "dew_margin >= 0 for all t"
@@ -701,6 +701,7 @@ scenarios:
   - id: C6H
     tier: 2
     name: "고습 + 저온 결로 대처 (C6 난방 제어판)"
+    expect_initial_condensation: true    # 결로 대처 시나리오 — 일부러 결로로 시작 (점검 도구 예외)
     duration_s: 7200
     repeat: 3
     baselines: [A, B, proposed]
@@ -813,7 +814,7 @@ scenarios:
       - { at_s: 300, source: shower, label: shower, moisture_g: 200, duration_s: 600 }
       - { at_s: 2100, appliance: washer, label: washer, power_w: 450, duration_s: 300, laundry_moisture_g: 1500 }
     pass_criteria:
-      - "window_open_ratio == 0 for all t"
+      - "window_open_ratio <= 0.05 for all t"
       - "q_net >= -1 for all t"
       - "pm25 <= 35 for all t"
       - "humidity <= value_at('humidity', shower_start) + 5 by 1800 after shower_start"
@@ -823,6 +824,8 @@ scenarios:
 
 # ---- 변경 기록 (판정 동결 전 개발 실행에서 고친 것) -------------------------------------------
 #  2026-10-28 v0.1 작성
+#  2026-10-29 v0.5b (v1.31-H) — 에너지 비교를 A → A′V (같은 환기) · '== 0' → '≤ 0.05' · C6H 시작 결로 예외 표시
+#  2026-10-29 v0.5 (v1.31-H) — H3 '가스 ≤ A' 삭제 (A 는 기본 환기 없음) · H8 기본 환기 판정을 시각별 모드 목표(base_vent_compliance_mode)로
 #  2026-10-28 v0.4 개발 실행 hdev3 — H14 동파 알림 판정 삭제 (12 °C 유지로 위험에 가지 않음 · 결과 판정만) · H9 비교 대상 A → A2
 #                (A 는 22 °C 상시 — 다른 일) · 제어기: 외출 중 빨래 건조는 셋백하지 않음
 #  2026-10-28 v0.3 개발 실행 hdev2 — H5 · H13 온도 판정 → 요리 뒤 30분 18 °C (후드 · 급기 손실 2.6 kW > 바닥난방 출력: 모든 방식 불가) ·

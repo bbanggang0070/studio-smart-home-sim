@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+import os
+
 import argparse
 import time
 from pathlib import Path
@@ -42,7 +44,7 @@ def main() -> None:
     sc = {}
     if args.scenario:                                   # 고속 모드와 같은 reset — 프로파일이 다르면 쓸 수 있는 가전이 다르다 (X2 P-core)
         from harness.scenario import load_scenarios
-        sc = next(s for s in load_scenarios(Path(__file__).resolve().parents[2] / "config" / "scenario_profiles.yaml")
+        sc = next(s for s in load_scenarios(Path(__file__).resolve().parents[2] / (os.environ.get("STUDIO_SCENARIO_FILE") or "config/scenario_profiles.yaml"))
                   if s["id"] == args.scenario)
     ctrl.reset({"baseline": args.baseline, "scenario": sc})
     rclpy.init()

@@ -44,5 +44,6 @@ exec docker run --rm --init --label studio=ros "${TTY_ARGS[@]}" \
   -e ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-7}" -e RMW_IMPLEMENTATION=rmw_fastrtps_cpp \
   -e FASTDDS_BUILTIN_TRANSPORTS=UDPv4 \
   -e PYTHONPATH=/workspace/studio/scripts -e PYTHONUNBUFFERED=1 \
+  -e STUDIO_SCENARIO_FILE="${STUDIO_SCENARIO_FILE:-}" \
   -v "$REPO:/workspace/studio:rw" -w /workspace/studio \
   "$IMAGE" bash -c 'source /opt/ros/jazzy/setup.bash && exec "$@"' _ "${CMD[@]}"

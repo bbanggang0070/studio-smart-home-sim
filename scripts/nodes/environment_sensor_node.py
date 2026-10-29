@@ -66,6 +66,10 @@ def main() -> None:
             return
         sample((T.S_PM25, T.S_HOOD_TEMPERATURE), 1.0)
         power = {d: plug[d].measure(float(truth["obs"]["appliance_power_w"].get(d, 0.0)), 1.0) for d in PLUG_DEVICES}
+        if "boiler" in truth["obs"]["appliance_power_w"]:                # [난방 확장] 보일러 플러그 — 별도 난수열 (v1.29 잡음 그대로)
+            if "boiler" not in plug:
+                plug["boiler"] = SensorModel(S["appliance_power"], np.random.default_rng(cfg["seed"] + 60013 + 1000 * args.seed_offset))
+            power["boiler"] = plug["boiler"].measure(float(truth["obs"]["appliance_power_w"]["boiler"]), 1.0)
         power.update({k: round(float(v), 1) for k, v in truth.get("extra_power_w", {}).items()})
         ros_io.publish(pubs[T.S_APPLIANCE_POWER], T.S_APPLIANCE_POWER, json.dumps(power, sort_keys=True))
         t, e = truth["t"], truth["ext"]

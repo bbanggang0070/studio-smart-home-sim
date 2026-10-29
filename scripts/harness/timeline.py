@@ -75,6 +75,7 @@ class Timeline:
                     power["cooktop"] = power.get("cooktop", 0.0) + float(s.get("heat_w", 0.0))
             elif iv.kind == "shower":
                 src.moisture_g_per_h += float(s["moisture_g"]) / float(s["duration_s"]) * 3600.0
+                src.shower_active = True                   # [난방 확장 R1] 온수 겸용 보일러 (hydronic 참값만 쓴다)
             elif iv.kind == "pm_no_heat":
                 src.other_pm_mg_per_min += float(s.get("pm_mg_per_min", 0.0))
         for iv in self.intervals:

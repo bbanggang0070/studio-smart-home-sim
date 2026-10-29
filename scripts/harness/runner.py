@@ -336,7 +336,7 @@ def run_batch(ids: list[str] | None = None, baselines: list[str] | None = None, 
             except Exception as exc:
                 r = RunResult(run, C.ERROR, spec, notes=[f"{type(exc).__name__}: {exc}"])
             r.wall_s = time.perf_counter() - t0
-            if r.df is not None:
+            if r.df is not None and hcfg.get("keep_raw", True):   # --no-raw — 디스크 (72 h 실행당 ~1 GB · 2026-10-28 디스크 가득 참)
                 r.df.to_csv(out / "raw" / f"{run.run_id}.csv", index=False)
         progress(f"[{i}/{len(runs)}] {run.run_id} · 제어기 {spec} · {r.wall_s:.1f}s")
         results.append(r)

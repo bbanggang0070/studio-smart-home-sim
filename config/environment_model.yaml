@@ -233,4 +233,8 @@ environment_model:
         boiler_min_burn_s: 180.0             # draft — 보일러 자체 잦은 점화 방지 (참값 쪽 · 제어기 L0 와 별개)
         boiler_min_off_s: 300.0
         thermostat_hysteresis_c: 0.5         # draft — 룸 온도조절기 켬/끔 간격 (설정 ± 절반)
+        combi: true                          # [R1 · 2026-10-29] 온수 겸용 보일러 — 샤워 중 온수 우선 · 난방 공급 정지 (국내 원룸 대부분 · draft)
+        dhw_flow_lpm: 7.0                    # draft — 샤워 온수 유량
+        dhw_temp_c: 40.0                     # draft — 샤워 온수 온도
+        cold_water_temp_c: 10.0              # draft — 겨울 상수도 수온
         fault_no_ignition: false             # 고장 주입 (H11) — 조절기는 켜져도 점화하지 않는다 (계량 플러그 = 대기 전력)

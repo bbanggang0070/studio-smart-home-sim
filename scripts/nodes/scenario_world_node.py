@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import math
 from pathlib import Path
@@ -31,6 +32,7 @@ from harness.scenario import load_scenarios
 from harness.timeline import build_timeline
 from interfaces import ros_io
 from interfaces import topics as T
+from env_model.room import BoilerCommand
 from env_model.config import load_config
 from env_model.psychro import dew_point_c
 from env_model.room import AcCommand
@@ -62,7 +64,8 @@ def main() -> None:
     args, _ = ap.parse_known_args()
 
     hcfg = yaml.safe_load((REPO / "config" / "harness.yaml").read_text(encoding="utf-8"))   # harness.runner 는 pandas 가 필요해 직접 읽는다
-    sc = next(s for s in load_scenarios(REPO / hcfg["paths"]["scenarios"]) if s["id"] == args.scenario)
+    sc = next(s for s in load_scenarios(REPO / (os.environ.get("STUDIO_SCENARIO_FILE") or hcfg["paths"]["scenarios"]))
+              if s["id"] == args.scenario)                         # 난방 확장 — STUDIO_SCENARIO_FILE (2026-10-29)
     env_cfg = load_config(REPO / hcfg["paths"]["environment_model"])
     if sc.get("environment_overrides"):
         env_cfg = env_cfg.with_overrides(sc["environment_overrides"])
@@ -99,6 +102,9 @@ def main() -> None:
             d = json.loads(v)
             actual.ac = AcCommand(power=bool(d.get("power")), mode=str(d.get("mode", "cool")),
                                   setpoint_c=float(d.get("setpoint", 26.0)))
+        elif topic == T.T_BOILER:                                # [난방 확장] 가전 브릿지의 조절기 상태 (L0 뒤)
+            d = json.loads(v)
+            actual.boiler = BoilerCommand(power=bool(d.get("power")), setpoint_c=float(d.get("setpoint", 21.0)))
         else:
             name, cast = STATE_FIELDS[topic]
             setattr(actual, name, cast(v))
@@ -109,9 +115,9 @@ def main() -> None:
         if args.fast_actuators:
             acts.command({topic: v}, state["t"])
 
-    for tp in list(STATE_FIELDS) + [T.T_AC]:
+    for tp in list(STATE_FIELDS) + [T.T_AC, T.T_BOILER]:
         ros_io.subscribe(node, tp, on_state)
-    for tp in T.COMMAND_TOPICS:
+    for tp in list(T.COMMAND_TOPICS) + [T.C_BOILER]:
         if tp not in T.USER_COMMAND_TOPICS:
             ros_io.subscribe(node, tp, on_cmd)
     rel = ros_io.qos(T.C_MODE)
@@ -124,7 +130,7 @@ def main() -> None:
     pub_user_window = ros_io.publisher(node, T.C_WINDOW_OPEN_RATIO)     # 사용자 앱의 수동 창문 명령 (X4 — MANUAL)
     ini_act = initial_actuators(sc)
     pubs = {tp: ros_io.publisher(node, tp) for tp in (T.T_AIR_BALANCE, T.C_MODE, T.C_ACTIVITY)}
-    fast_pubs = {tp: ros_io.publisher(node, tp) for tp in list(FIELD_TO_STATE.values()) + [T.T_AC]} if args.fast_actuators else {}
+    fast_pubs = {tp: ros_io.publisher(node, tp) for tp in list(FIELD_TO_STATE.values()) + [T.T_AC, T.T_BOILER]} if args.fast_actuators else {}
 
     state = {"t": 0.0, "was_present": world.occupancy, "arrived_at": None, "ready": False, "wait": 0}
     # 시험 물체 배치 확인 (2026-10-27) — 보내고 확인하지 않으면 브릿지 구독 연결 전에 보낸 명령이 사라진다 (물리 무작위 X4 rep 2:

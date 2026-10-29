@@ -1,7 +1,7 @@
 # ============================================================================
 #  난방 확장 트랙 동결 목록 (docs/14 · docs/15 §6–§7 · 브랜치 heating) — v1.29 의 config/freeze.yaml 과 별개
 #  tools/check_freeze.py --config config/freeze_heating.yaml --group all
-#  files: 난방 시나리오 · 보류 1–3차 · 판정 문법 · 지표 설정 · 무작위 범위 · 기준선 명세 · 참값 모델 · 주 비교 분석
+#  files: 난방 시나리오 · 보류 1–4차 · 판정 문법 · 지표 설정 · 무작위 범위 · 기준선 명세 · 참값 모델 · 주 비교 분석
 #  controller: 제어기 v1.31-H 코드 (v1.30-H 동결 2026-10-28 → v1.31-H 재동결 2026-10-29 · docs/15 §10) · 계수 · 학습 산출물 · 하네스 (고치면 새 보류 묶음으로 다시 평가)
 # ============================================================================
 frozen_at: '2026-10-29'
@@ -14,6 +14,8 @@ files:
   sha256: 2b0c0dc53eab2e7b85fb96ddab71a33175f5f72991dc8a84c9064e7cf63dc876
 - path: config/heldout_heating_r3.yaml
   sha256: 56bfdba635b5fc56977f41ea2a97fb92763c14fa3ab7548a2ae3b40a362e1f8d
+- path: config/heldout_heating_r4.yaml
+  sha256: 943be51b2007123d560ce17099d3724d8add7876e387d03775467eb5c1b24fce
 - path: scripts/harness/criteria.py
   sha256: 4efa7da59b89a0db6e2fcb4c077a5f2325026e5ba3047ba8dbf06b173b104ccc
 - path: config/harness.yaml

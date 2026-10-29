@@ -2,7 +2,7 @@
 
 장치 'boiler' 의 값 = 룸 온도조절기 설정 °C (0 = 전원 끔). 병합은 다른 장치와 같다 — need 최댓값 · cap 최솟값 · force 최상위.
 
-  사다리 (싼 수단부터)  1 낮 · 맑음 → 블라인드 개방(일사 받기) · (2 밤 블라인드 닫기 — 설정으로 끔: 유리가 차가워져 결로 · H7) · 3 실링팬 역회전 약 · 4 보일러
+  사다리 (싼 수단부터)  1 낮 · 맑음 → 블라인드 개방(일사 받기) · 2 밤 블라인드 닫기 (결로 여유 충분할 때 · v1.31-H C3) · (3 실링팬 역회전 — v1.32-H C5 끔) · 4 보일러
   목표                 모드 heating_setpoint_c · 외출(AWAY) = away_heating 전략(셋백 · 끄기) · 난방 목표 ≤ 냉방 목표 − 데드밴드
   프리히팅             외출 중 예측 귀가 preheat_quantile 시각 − preheat_lead_min 부터 외출 직전 모드 목표 (E13 과 같은 귀가 모델)
   I11 환기 ↔ 난방      창문이 열려 있으면 보일러를 동파 하한으로 낮춘다 (열린 창으로 데운 공기를 버리지 않는다)
@@ -36,6 +36,7 @@ class HeatingLadder:
         self._demand_since: float | None = None
         self._demand_t0 = math.nan
         self._demand_max_w = 0.0
+        self._demand_has_w = False
         self._frost_alerted = False
         self._manual_until = -math.inf
         self._away_since: float | None = None
@@ -169,7 +170,9 @@ class HeatingLadder:
                     if margin >= g("heating.night_blind_dew_guard_c"):
                         add("blind", "need", g("setpoints.blind_shade_angle_deg"), L5,
                             f"난방 사다리 2 — 밤 창 단열 (닫힘 결로 여유 {margin:.1f} °C)")
-            if o.temp_c < sp - g("heating.fan_reverse_above_c") and "ceiling_fan" in devices:
+            # [v1.32-H C5] 바닥난방은 수직 온도차가 작아 역회전 이득이 작다 · 참값은 공기 1노드 — 상시 30 W 만 쓴다 (HH402 · docs/14 §16 D1)
+            if (g("heating.fan_reverse_rung") and o.temp_c < sp - g("heating.fan_reverse_above_c")
+                    and "ceiling_fan" in devices):
                 add("ceiling_fan", "need", -1, L5, "난방 사다리 3 — 실링팬 역회전 (천장 열 섞기)")
         # -- E17 보일러 이상 --
         self._fault_check(o, sp)
@@ -178,18 +181,23 @@ class HeatingLadder:
     def _fault_check(self, o: Observation, sp: float) -> None:
         g = self.p.get
         b = o.boiler or {}
-        demand = bool(b.get("power")) and o.temp_c < float(b.get("setpoint", sp)) - 1.0
+        # [v1.32-H C8] 참값 조절기는 설정 − 0.25 °C 에서 점화 요구 — 설정 − 1 °C · 30분은 너무 늦다 (H11 · HH308 · docs/14 §16 D4)
+        demand = bool(b.get("power")) and o.temp_c < float(b.get("setpoint", sp)) - g("appliances.boiler.fault_demand_below_c")
         if not demand:
             self._demand_since, self._demand_max_w = None, 0.0
             return
         w = float(o.power_w.get("boiler", math.nan))
         if self._demand_since is None:
-            self._demand_since, self._demand_t0, self._demand_max_w = o.now_s, o.temp_c, 0.0
+            self._demand_since, self._demand_t0, self._demand_max_w, self._demand_has_w = o.now_s, o.temp_c, 0.0, False
         if not math.isnan(w):
             self._demand_max_w = max(self._demand_max_w, w)
-        if (not self.fault and o.now_s - self._demand_since >= g("appliances.boiler.fault_confirm_s")
-                and self._demand_max_w < g("appliances.boiler.fault_burn_w_min")
-                and o.temp_c - self._demand_t0 < g("appliances.boiler.fault_temp_rise_c")):
+            self._demand_has_w = True
+        # [v1.32-H C8′] 계량 플러그 전력이 있으면 전력만 본다 — 연소(팬 · 펌프 ≈ 90 W)가 직접 증거 · 실내 온도는 축열 · 일사 · 요리로도
+        # 오른다 (H11: 고장인데 구조체 21 °C 가 공기를 19 → 20 °C 로 데워 '온도 상승' 으로 오판 · 개발 실행 docs/14 §16). 전력을 모르면 온도 상승
+        low_w = self._demand_max_w < g("appliances.boiler.fault_burn_w_min")
+        no_rise = o.temp_c - self._demand_t0 < g("appliances.boiler.fault_temp_rise_c")
+        no_heat = (low_w if self._demand_has_w else no_rise) if g("appliances.boiler.fault_power_decides") else (low_w and no_rise)
+        if not self.fault and o.now_s - self._demand_since >= g("appliances.boiler.fault_confirm_s") and no_heat:
             self.fault = True
             self.alerts.append({"code": "H_BOILER_FAULT", "level": "critical", "t": o.now_s,
                                 "msg": "보일러 무응답 — 난방 요구 중 연소 전력 · 온도 상승 없음 (점검 필요)"})

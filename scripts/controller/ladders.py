@@ -282,6 +282,13 @@ class ComfortLadders:
         # 결로 상한에 딱 붙으면 끄는 지연 동안 여유가 상한 아래로 내려간다 — 상한 − guard 에서 멈춘다 (보류 H9)
         target = min(hi - g("comfort_ladders.humidify_target_below_hi_pct") if hi is not None else 100.0,
                      cap - g("comfort_ladders.humidify_cap_guard_pct"))
+        # [v1.32-H C6] 난방 중(보일러 · 외기 ≤ 난방 계절 기준)에는 하한 + 5 %p 까지만 — 상한 − 3 %p(≈ 57 %)는 겨울에 결로 위험 · 증발 잠열로
+        # 가스가 늘고 샤워 뒤 가습을 다시 켠다 (HH402 평균 54 % · H6 · docs/14 §16 D2). v1.29(보일러 없음)는 그대로
+        heating_rh = (g("heating.humidify_heating_target") and lo is not None and "boiler" in self.rules.devices
+                      and not math.isnan(o.outdoor_temp_c)
+                      and o.outdoor_temp_c <= g("heating.season_max_outdoor_c"))
+        if heating_rh:
+            target = min(target, lo + g("heating.humidify_target_above_lo_pct"))
         info["humidify_cap_pct"] = round(cap, 1)
         if lo is None:
             self.humidifying = False
@@ -306,8 +313,10 @@ class ComfortLadders:
                 self._hum_paused = False
             if not self._hum_paused and not self.dehumidifying:     # 제습 중에는 가습하지 않는다 (상충 점검 R5)
                 add("humidifier", "need", 1, L5, f"가습 (유효 상한 {target:.0f} %)")
+            # [v1.32-H C6] 난방 중에는 결로 상한이 그 목표(하한 + 5 %p)를 실제로 막을 때만 역회전으로 확장 (H7 — 모드 상한 기준이면 내내 30 W)
+            cap_need = (target + g("comfort_ladders.humidify_cap_guard_pct")) if heating_rh else hi
             if (g("comfort_ladders.cap_extension_by_ceiling_fan") and hi is not None and season == "winter"
-                    and self._humidify_cap(o, self.psy.r_si["default"]) < hi and "ceiling_fan" in self.rules.devices):
+                    and self._humidify_cap(o, self.psy.r_si["default"]) < cap_need and "ceiling_fan" in self.rules.devices):
                 add("ceiling_fan", "need", -1, L5, "I4 상한 확장 — 실링팬 역회전")
         info["humidifying"] = self.humidifying
 

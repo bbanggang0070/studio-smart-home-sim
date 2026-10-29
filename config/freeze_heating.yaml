@@ -2,12 +2,12 @@
 #  난방 확장 트랙 동결 목록 (docs/14 · docs/15 §6–§7 · 브랜치 heating) — v1.29 의 config/freeze.yaml 과 별개
 #  tools/check_freeze.py --config config/freeze_heating.yaml --group all
 #  files: 난방 시나리오 · 보류 1–4차 · 판정 문법 · 지표 설정 · 무작위 범위 · 기준선 명세 · 참값 모델 · 주 비교 분석
-#  controller: 제어기 v1.31-H 코드 (v1.30-H 동결 2026-10-28 → v1.31-H 재동결 2026-10-29 · docs/15 §10) · 계수 · 학습 산출물 · 하네스 (고치면 새 보류 묶음으로 다시 평가)
+#  controller: 제어기 v1.32-H 코드 (v1.30-H 2026-10-28 → v1.31-H 2026-10-29 → v1.32-H 사후 개선판 2026-10-29 · docs/15 §10 · §12) · 계수 · 학습 산출물 · 하네스 (고치면 새 보류 묶음으로 다시 평가)
 # ============================================================================
 frozen_at: '2026-10-29'
 files:
 - path: config/scenarios_heating.yaml
-  sha256: 305d6a2a7c830f5e4ca18ce43bbbed8be69baa493684e1d363b7694fb7566a5a
+  sha256: 69a44ddc794145bbcd53974c5273aa164cde12ad17415235b4d0706bd7322635
 - path: config/heldout_heating_r1.yaml
   sha256: 954fc2e0d7b9f8b3d5e870eca753b2af18b32d5a126278f5458588efbc2c75ff
 - path: config/heldout_heating_r2.yaml
@@ -17,7 +17,7 @@ files:
 - path: config/heldout_heating_r4.yaml
   sha256: 497734cb9807ccd87edf125941b50883eadbc34758512f0f9012dd97bbf53b03
 - path: scripts/harness/criteria.py
-  sha256: 4efa7da59b89a0db6e2fcb4c077a5f2325026e5ba3047ba8dbf06b173b104ccc
+  sha256: 4ccb703b792c88f443493246298e82ac8f09ece015e257fba02620a94d9728d4
 - path: config/harness.yaml
   yaml_key: metrics
   sha256: 4fe5e84eba112b2fe7e43a64bed0f49fa0263b927c8eb79749000baacdc2dbee
@@ -29,23 +29,32 @@ files:
 - path: config/environment_model.yaml
   sha256: 7f1ffadef2d7458f46dbbacd9593218a4290ed9c00c544f9aecb8f5884063107
 - glob: scripts/env_model/*.py
-  sha256: d72173653cb7a40b2882f7ca1327582259474220fa788007668252eb8ae17759
+  sha256: 08312510b0ddb15e34790b9ae6a6bd8c9f38da07cd862bcd71cf4e38f2dfb702
 - path: config/harness.yaml
   yaml_key: randomization
-  sha256: b3cf9e8555041d384d0dbd122649d8f73eee9ddb07726ca7c4e617cba28e65f4
+  sha256: 6c34cd974c40f74816672a0eb4ef0322d890d82bf701abf1efde9ce6882ec06c
 - path: tools/analysis/heating_primary.py
   sha256: 286d6f1d4dbfab3255fc67f979a7ca0deeed8eddbbb6718ebf76c973b520ed05
 - path: tools/analysis/criteria_classes.py
-  sha256: 67cb057bb30b19c599f7e70e337ad04d8732d52e916cc1804596e5e1394fc4af
+  sha256: 8a103c6838abf70367fcc92b1d2b0906c87ca67b9f1b49c4a30b9ebec5d304cb
+- path: config/harness.yaml
+  yaml_key: controller_variants
+  sha256: 6a74df39d9a18e9b310bcdf6df2bc4a1397c2bf2cafe1b339b2909ba93b7ccea
+- path: config/harness.yaml
+  yaml_key: building_presets
+  sha256: ce2c090f1b3eaad673d58997a56a5794fb009ce5488db1a99538c29a17170615
+- path: config/harness.yaml
+  yaml_key: controllers
+  sha256: bcf9018778dfc8e19cc0a8c73761a9ee74bb60397ba81ee818813f7097115d22
 controller:
 - glob: scripts/controller/*.py
-  sha256: 7612b139d94833134b062b3577341ad9c1affdb96432421fcab7b3ab05d17b7d
+  sha256: b666b2bc16fef47857254ade92d824a7efc67a0b47932f61bb2e1b363aab7808
 - glob: scripts/sensors/*.py
   sha256: 55c6f57b749da7a19a35619ac17d5498c4075f82b39f8309432b2bf10beb6e34
 - glob: scripts/actuators/*.py
   sha256: 73e5c9244133909ba103dc9904e9efdc02d059fdee83b28f4d78aa76ef5515d4
 - path: config/thresholds.yaml
-  sha256: 945bc9f8ca1f1417e71c6e2321b782f5fc6cbfeb45a8e60e9bc78a8220386dd2
+  sha256: a1ad75dcd2793467515d528de883d51f334ff880add1fb47cd0720d98937a267
 - path: config/user_modes.yaml
   sha256: 998a1c1e531b38ecadd7b44a3cce35c3790bf5943de26d6d945de96fd35cfd17
 - glob: models/*
@@ -54,3 +63,7 @@ controller:
   sha256: bfc67c54f5a38aa58bf0549930e76126df9fbeb1e544e1a7d4d942cd85c739bd
 - path: scripts/harness/runner.py
   sha256: e136ac8b75aa86e1f2a8e40681878b9996a48208c277ef60592621cabf25221f
+- path: tools/energy/building_calibration.py
+  sha256: 5c2c9249c1f1c6bc7a215ddab27ceebdf7774395e2298d9855db8c954bad21bd
+- path: scripts/harness/controllers.py
+  sha256: a7a0ea2eca99260e156a58ec0da2df24e770490eacaf89872caa684f5d7cbff1

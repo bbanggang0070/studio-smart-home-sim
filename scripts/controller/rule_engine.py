@@ -210,8 +210,14 @@ class RuleEngine:
             add("blind", "force", g("condensation.blind_slat_on_critical_deg"), L2, "E2 결로 위험 블라인드 개방")
             add("humidifier", "force", 0, L2, "E2 결로 위험 가습 금지")
             add("ceiling_fan", "need", -1, L2, "E2 결로 위험 실링팬 역회전")
-            add("dehumidifier", "need", 1, L2, "E2 결로 위험 제습")
-            self._pulse_vent(o, cond, blocked, add)
+            # [v1.32-H C7] 난방 중에는 비싼 수단(제습 · 간헐 환기 · 배기)을 '지금 여유' 가 위험 기준 아래일 때만 — 블라인드만 열어도
+            # 0 → 6 °C 로 회복되는데 래치된 '위험' 으로 10분 동안 제습 · 창 20 % · 배기 → I11 보일러 정지 · 가습 되돌림 (H6 · docs/14 §16 D3)
+            now_m = cond.info.get("margin_now", cond.info.get("margin", -math.inf))
+            staged = (g("heating.condensation_staged") and "boiler" in self.devices and not math.isnan(o.outdoor_temp_c)
+                      and o.outdoor_temp_c <= g("heating.season_max_outdoor_c"))
+            if not staged or now_m < g("condensation.critical_margin_c"):
+                add("dehumidifier", "need", 1, L2, "E2 결로 위험 제습")
+                self._pulse_vent(o, cond, blocked, add)
 
         # -- L4.5 우선 목표 (E10 빨래 건조) · L1 전력 한도 (E11) --
         self._laundry(o, ev, mode, noise, add)

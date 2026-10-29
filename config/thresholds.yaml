@@ -446,8 +446,12 @@ smart_home_controller:
       preheat_recover_min_per_k: 75.0  # draft — 바닥난방 회복 속도 (H0: 18 → 20.3 °C 3 h) · 시작 = 부족 K × 이 값 전
       preheat_lead_max_min: 180.0      # 시작 상한
       preheat_trip_after_h: 24.0       # 외출이 이보다 길면 여행으로 보고 프리히팅하지 않는다
+      condensation_staged: true        # [v1.32-H C7] 난방 중 E2 '위험' 의 제습 · 간헐 환기는 지금 여유 < 위험 기준일 때만 (블라인드 · 역회전 · 가습 금지는 래치 유지)
+      humidify_heating_target: true    # [v1.32-H C6] 난방 중 가습 목표 = 하한 + 아래 값 · 실링팬 상한 확장은 결로 상한이 그 목표를 막을 때만
+      humidify_target_above_lo_pct: 5.0   # [v1.32-H C6] 난방 중 가습 정지 목표 = 모드 하한 + 이 값 (40 → 45 %) · 결로 상한(I4)은 그대로
       laundry_boost_c: 1.5             # I14 — 빨래 건조 중 목표 + 이 값 (L4.5 허용 손실 예산 안)
       vent_pause_window_ratio: 0.05    # I11 — 창문이 이 이상 열려 있으면 보일러 일시 정지 (동파 하한은 유지)
+      fan_reverse_rung: false          # [v1.32-H C5] 사다리 3 끔 — 바닥난방은 성층이 작고 참값은 공기 1노드라 상시 30 W 만 쓴다 (HH402 · docs/14 §16 D1)
       fan_reverse_above_c: 0.0         # 사다리 3 — 난방 중 실링팬 역회전 약 (재실 · 소음 등급 허용 시) · 목표 − 이 값 아래일 때
       blind_open_daylight_lux: 2000.0  # 사다리 1 — 낮 · 외부 조도 이상이면 블라인드 개방 요구 (일사 받기)
       blind_close_night: true          # 사다리 2 (밤 블라인드 닫기) — [v1.31-H C3] 닫았을 때 결로 여유가 아래 값 이상일 때만 (v1.30-H 는 결로로 꺼 둠 · H7)
@@ -651,8 +655,10 @@ smart_home_controller:
         setpoint_step_c: 0.5           # 조절기 설정 단위
         min_power_toggle_s: 300.0      # L0 — 전원 켬/끔 최소 간격 (보일러 자체 보호와 별개)
         min_setpoint_change_s: 120.0   # L0 — 설정 변경 최소 간격 (조절기 · 보일러 잦은 점화 방지)
-        fault_confirm_s: 1800.0        # E17 — 연소 요구가 이만큼 이어졌는데
+        fault_demand_below_c: 0.5      # [v1.32-H C8] E17 — 조절기 켬 · 실내 < 설정 − 이 값이면 '연소 요구' (참값 조절기 점화 = 설정 − 0.25 · 센서 잡음 여유) · 전 1.0
+        fault_confirm_s: 900.0         # E17 — 연소 요구가 이만큼 이어졌는데 (v1.32-H C8: 1800 → 900 · 보일러 최소 꺼짐 300 s + 점화 · 공급수 상승)
         fault_burn_w_min: 40.0         #       보일러 전력이 이 아래이고
+        fault_power_decides: true      # [v1.32-H C8′] 전력을 알면 전력만으로 판단 (실내 온도는 축열 · 일사로도 오른다 · H11 개발 실행) — 모르면 아래 온도 상승
         fault_temp_rise_c: 0.3         #       실내 온도도 이만큼 못 올랐으면 이상
       ac:
         interface: 'ir'

@@ -189,3 +189,71 @@ def test_night_blind_only_when_condensation_safe():
     c = ctrl()
     wet = c.step(22 * 3600.0, inbox(temp=19.0, out=-12.0, **{T.S_HUMIDITY: 55.0}))
     assert not any("사다리 2" in r for r in c.reasons())
+
+
+# ---- [v1.32-H] C5 – C8 (docs/14 §16) ----
+
+def _run(c, t0, n, step=10, **kw):
+    out, alerts = {}, []
+    for t in range(0, n, step):
+        out = c.step(t0 + t, inbox(**kw))
+        alerts += json.loads(out.get(T.T_ALERTS, "[]"))
+    return out, alerts
+
+
+def test_c5_no_winter_ceiling_fan_rung():
+    """바닥난방 중 실링팬 역회전 사다리는 끈다 — v1.31-H 변형(proposed_v131)은 켠다."""
+    from harness.controllers import make_controller
+
+    out, _ = _run(ctrl(), 8 * 3600.0, 120, temp=19.0)
+    assert out.get(T.C_CEILING_FAN, 0) == 0 and not any("사다리 3" in r for r in ctrl().reasons())
+    old = make_controller("variant:proposed_v131")
+    old.reset({"baseline": "proposed", "scenario": {"appliance_profile": "full_heating"}})
+    out, _ = _run(old, 8 * 3600.0, 120, temp=19.0)
+    assert out.get(T.C_CEILING_FAN) == -1
+
+
+def test_c8_fault_detected_on_small_deficit():
+    """설정 − 0.6 °C 에서 대기 전력만 15분 → 알림 (전: 1 °C · 30분이라 못 잡았다) · 설정 − 0.4 °C 면 알리지 않는다."""
+    st = json.dumps({"power": True, "setpoint": 21.0, "manual": False})
+    kw = {T.T_BOILER: st, T.S_APPLIANCE_POWER: json.dumps({"boiler": 5.0})}
+    _, a = _run(ctrl(), 8 * 3600.0, 1000, temp=20.4, **kw)
+    assert any(x["code"] == "H_BOILER_FAULT" for x in a)
+    _, a = _run(ctrl(), 8 * 3600.0, 1000, temp=20.6, **kw)
+    assert not any(x["code"] == "H_BOILER_FAULT" for x in a)
+
+
+def test_c6_heating_humidify_stops_at_45():
+    """난방 중 가습은 하한 40 + 5 = 45 % 에서 멈춘다 — 보일러 없는 v1.29 프로파일은 상한 − 3 %p 까지 계속.
+    습도는 2분에 1 %p 씩 천천히 올린다 (한 번에 올리면 샤워 감지 E3 가 된다)."""
+    for prof, expect_on in (("full_heating", False), ("full", True)):
+        c = ctrl(profile=prof)
+        kw = {T.T_BLIND_ANGLE: 0.0}
+        t = 14 * 3600.0
+        _run(c, t, 200, temp=21.0, out=5.0, **{T.S_HUMIDITY: 36.0}, **kw)
+        t += 200
+        for rh in range(37, 47):
+            out, _ = _run(c, t, 120, temp=21.0, out=5.0, **{T.S_HUMIDITY: float(rh)}, **kw)
+            t += 120
+        assert bool(out.get(T.C_HUMIDIFIER)) is expect_on, (prof, [r for r in c.reasons() if "humid" in r])
+
+
+def test_c7_condensation_costly_means_only_while_critical():
+    """E2 위험 뒤 블라인드를 열어 지금 여유가 위험 기준 위면 난방 중엔 제습을 멈춘다 · v1.29 프로파일은 래치 유지."""
+    for prof, expect_dehum in (("full_heating", False), ("full", True)):
+        c = ctrl(profile=prof)
+        _run(c, 7 * 3600.0, 60, temp=20.0, out=-10.0, **{T.S_HUMIDITY: 50.0, T.T_BLIND_ANGLE: 75.0})
+        out, _ = _run(c, 7 * 3600.0 + 60, 60, temp=20.0, out=-10.0, **{T.S_HUMIDITY: 50.0, T.T_BLIND_ANGLE: 0.0})
+        assert bool(out.get(T.C_DEHUMIDIFIER)) is expect_dehum, prof
+
+
+def test_c8_fault_detected_even_if_room_warms_from_mass():
+    """[C8′] 고장 중에도 축열 · 일사로 실내가 오를 수 있다 — 플러그 전력이 대기 수준이면 알린다."""
+    c = ctrl()
+    st = json.dumps({"power": True, "setpoint": 21.0, "manual": False})
+    kw = {T.T_BOILER: st, T.S_APPLIANCE_POWER: json.dumps({"boiler": 5.0})}
+    alerts = []
+    for k, t in enumerate(range(0, 1200, 10)):
+        out = c.step(8 * 3600.0 + t, inbox(temp=19.0 + min(1.0, k * 0.02), **kw))
+        alerts += json.loads(out.get(T.T_ALERTS, "[]"))
+    assert any(a["code"] == "H_BOILER_FAULT" for a in alerts)

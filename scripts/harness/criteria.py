@@ -440,6 +440,13 @@ def _heating_metrics(df: pd.DataFrame, t: np.ndarray, dt_s: float, hc: dict[str,
     b = df["truth.boiler_burning"].astype(float).to_numpy()
     out["boiler_ignitions"] = float(((b[1:] > 0.5) & (b[:-1] < 0.5)).sum())
     out["expected_cost_heating"] = out["energy_cost_won"] + float(hc.get("cold_won_per_kh", math.nan)) * out["cold_discomfort_kh"]
+    # [v1.32-H M6] 보일러 고장 알림 지연 = 첫 조절기 점화 요구(참값) → H_BOILER_FAULT 알림 (s) · 요구 없음 = NaN · 알림 없음 = inf
+    if "truth.boiler_call" in df.columns:
+        call = df["truth.boiler_call"].astype(float).to_numpy() > 0.5
+        al = (df[T.T_ALERTS].fillna("[]").map(lambda x: any(a.get("code") == "H_BOILER_FAULT" for a in json.loads(x))).to_numpy(bool)
+              if T.T_ALERTS in df.columns else np.zeros(len(df), dtype=bool))
+        out["boiler_fault_alert_delay_s"] = (math.nan if not call.any() else
+                                             float(t[al.argmax()] - t[call.argmax()]) if al.any() else math.inf)
     return out
 
 

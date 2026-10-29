@@ -124,6 +124,7 @@ class RoomModel:
         # 난방 확장 트랙 — boundary(기본)는 v1.29 와 같다
         self.hydronic = cfg.get("heating.mode") == "hydronic"
         self.boiler_burning = False
+        self.boiler_call = False
         self._boiler_change_s = -1e9
         if self.hydronic:
             if state.floor_temp_c is None:
@@ -176,6 +177,15 @@ class RoomModel:
             want = True
         elif t_air > cmd.setpoint_c + hyst:
             want = False
+        # [v1.32-H M6] 조절기 점화 요구 (고장과 무관 · 출력 전용 — 연소 동작은 위 want 그대로) — 고장 알림 지연 지표의 기준 시각
+        call = self.boiler_call
+        if not cmd.power:
+            call = False
+        elif t_air < cmd.setpoint_c - hyst:
+            call = True
+        elif t_air > cmd.setpoint_c + hyst:
+            call = False
+        self.boiler_call = call
         if g(h + "fault_no_ignition"):
             want = False                                 # 고장 — 점화 실패 (전기 = 대기 전력 · 실내로 열 없음)
         if want != self.boiler_burning:
@@ -546,5 +556,6 @@ class RoomModel:
         }
         if self.hydronic:                                 # 확장 트랙만 — boundary 출력 열은 v1.29 와 같다
             obs.update({"floor_temp_c": s.floor_temp_c, "supply_temp_c": s.supply_temp_c,
-                        "boiler_burning": self.boiler_burning, "boiler_gas_w": getattr(self, "_last_gas_w", 0.0)})
+                        "boiler_burning": self.boiler_burning, "boiler_call": self.boiler_call,
+                        "boiler_gas_w": getattr(self, "_last_gas_w", 0.0)})
         return obs

@@ -1,4 +1,4 @@
-"""EXP-H — 바닥난방 외출 전략 비교 (docs/14 §4.5 · docs/15 H-RQ3) — 동결 제어기(지금 코드 · v1.31-H) 그대로, 설정값만 바꾼 인스턴스.
+"""EXP-H — 바닥난방 외출 전략 비교 (docs/14 §4.5 · docs/15 H-RQ3) — 동결 제어기(지금 코드) 그대로, 설정값만 바꾼 인스턴스.
 
 틀: H4 (출근 → 귀가) · 외출 길이 × 외기온 격자 · 전략 6종:
   need_based  셋백 16 °C + 필요 기반 프리히팅 (v1.31-H 기본 — 부족 K × 75 분/K · 상한 3 h · 외출당 한 번)
@@ -6,6 +6,7 @@
 비용(원) = 가스 · 전기 요금 · 귀가 뒤 추위 = 귀가 ~ 귀가 + 2 h 의 (20 °C − 실내)+ K·h · 기대비용 = 비용 + 160 원/K·h × 추위 (harness metrics heating)
 결과: results/exp_heating_away<접미사>/runs.csv · summary.md (요약은 archive/<제어기 버전> 으로)
     uv run python tools/energy/exp_heating_away.py _v131   # v1.31-H 동결 실행 (2026-10-29)
+    uv run python tools/energy/exp_heating_away.py _v132   # v1.32-H — 건물 3종 (basic · old · old_light)
 
     uv run python tools/energy/exp_heating_away.py
 """
@@ -37,9 +38,7 @@ STRATS = {   # (외출 전략, 셋백 °C, 프리히팅 설정 {heating.*}) — 
     "off_need": ("off", 16.0, {}),                                                                 # 끄기(12 °C) + 필요 기반
     "keep": ("setback", 21.0, {"preheat_need_margin_c": 100.0}),
 }
-BUILDINGS = {"basic": {},                                     # 기본 (중간층 · 복층유리)
-             "old": {"air_balance.base_infiltration_ach": 0.7, "window.glazing_u_w_m2k": 4.2,
-                     "thermal.envelope_outdoor_conductance_w_per_k": 6.6}}   # 노후 원룸 (단창 · 틈새 큼 · 외벽 2배)
+BUILDINGS = R.load_harness_config()["building_presets"]   # [v1.32-H M5] basic · old · old_light (config/harness.yaml · building_calibration.py)
 AWAY_H = [4.0, 8.0, 10.0, 12.0]
 OUT_C = [-10.0, -3.0, 3.0]
 LEAVE_S = 1800.0
@@ -100,7 +99,8 @@ def main() -> None:
     piv = df.pivot_table(index=["building", "outdoor_c", "away_h"], columns="strategy", values="expected_cost_won").round(0)
     best = piv.idxmin(axis=1)
     mean = df.groupby(["building", "strategy"])[["cost_won", "cold_after_arrival_kh", "expected_cost_won", "temp_1h_after", "min_temp"]].mean().round(2)
-    lines = ["# EXP-H 바닥난방 외출 전략 — 동결 제어기 v1.31-H · 설정값만 다른 인스턴스 · H4 틀", "",
+    tag = sys.argv[1].lstrip("_") if len(sys.argv) > 1 else "현재"
+    lines = [f"# EXP-H 바닥난방 외출 전략 — 동결 제어기 {tag} · 설정값만 다른 인스턴스 · H4 틀 · 건물 {' · '.join(BUILDINGS)}", "",
              "## 전략별 평균 (외출 4 · 8 · 10 · 12 h × 외기 −10 · −3 · 3 °C)", "", mean.to_string(), "",
              "## 조건별 기대비용(원) — 가장 싼 전략", "", piv.assign(best=best).to_string()]
     (out / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")

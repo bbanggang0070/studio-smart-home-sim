@@ -118,3 +118,25 @@ def test_steady_start_without_fault_preapplied(cfg):
     m = make_model(cfg.with_overrides(ov), sc)
     assert abs(m.state.mass_temp_c - 21.0) < 1.5
     assert m.cfg.get("heating.hydronic.fault_no_ignition") is True      # 본 실행에는 고장이 그대로
+
+
+def test_boiler_fault_alert_delay_metric():
+    """[v1.32-H M6] 지연 = 첫 점화 요구 → H_BOILER_FAULT 알림 · 요구 없음 NaN · 알림 없음 inf."""
+    import json
+
+    import numpy as np
+    import pandas as pd
+
+    from harness.criteria import _heating_metrics
+    from interfaces import topics as T
+
+    t = np.arange(0.0, 5000.0, 100.0)
+    al = [json.dumps([{"code": "H_BOILER_FAULT"}]) if x >= 3000 else "[]" for x in t]
+    base = {"time_s": t, "truth.temperature_c": 20.0, "truth.boiler_burning": False, "energy_wh.boiler_gas": 0.0}
+    df = pd.DataFrame({**base, "truth.boiler_call": t >= 1000, T.T_ALERTS: al})
+    m = _heating_metrics(df, t, 100.0, {}, np.ones(len(t)))
+    assert m["boiler_fault_alert_delay_s"] == pytest.approx(2000.0)
+    df = pd.DataFrame({**base, "truth.boiler_call": t >= 1000, T.T_ALERTS: "[]"})
+    assert math.isinf(_heating_metrics(df, t, 100.0, {}, np.ones(len(t)))["boiler_fault_alert_delay_s"])
+    df = pd.DataFrame({**base, "truth.boiler_call": False, T.T_ALERTS: "[]"})
+    assert math.isnan(_heating_metrics(df, t, 100.0, {}, np.ones(len(t)))["boiler_fault_alert_delay_s"])

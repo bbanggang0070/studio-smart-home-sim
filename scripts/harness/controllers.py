@@ -43,9 +43,34 @@ class ControllerNotImplemented(RuntimeError):
     pass
 
 
+def _variant(name: str) -> Any:
+    """[v1.32-H] 'variant:<이름>' — 같은 협조 제어기에 harness.yaml controller_variants.<이름> 의 임계값만 바꾼 인스턴스.
+    proposed_v131 = v1.32-H 수정 플래그(C5–C8)를 v1.31-H 값으로 되돌린 것 — 같은 새 데이터에서 짝 비교 (docs/15 §12 H-RQ6)."""
+    import copy
+
+    from controller.params import ControllerParams, load_params
+    from controller.smart_home import SmartHomeController
+    from harness.runner import load_harness_config
+
+    over = load_harness_config()["controller_variants"][name]
+    p0 = load_params()
+    th = copy.deepcopy(p0.th)
+    for key, v in over.items():
+        node = th
+        *head, last = key.split(".")
+        for k in head:
+            node = node[k]
+        if last not in node:
+            raise KeyError(f"controller_variants.{name}: thresholds 에 '{key}' 가 없다")
+        node[last] = v
+    return SmartHomeController(ControllerParams(th, p0.modes))
+
+
 def make_controller(spec: str) -> Any:
     if spec in BUILTIN:
         return BUILTIN[spec]()
+    if spec.startswith("variant:"):
+        return _variant(spec.split(":", 1)[1])
     if spec == "unimplemented" or ":" not in spec:
         raise ControllerNotImplemented(
             f"제어기 '{spec}' 는 아직 구현되지 않았다 — config/harness.yaml controllers 를 채우거나 "

@@ -372,15 +372,20 @@ def make_model(env_cfg, sc: dict[str, Any]) -> RoomModel:
 def _steady_model(env_cfg, sc: dict[str, Any]) -> RoomModel:
     """[난방 확장 · 2026-10-28] 시작 전 thermal_steady_h(기본 72 h) 동안 시작 조건(외기 · 초기 가전 · 재실)으로 돌려
     축열 · 외피 · 바닥 · 공급수 온도를 평형으로 맞춘다. 공기 온도 · 습도 · PM · CO₂ 는 시나리오 값으로 다시 둔다.
-    (바닥이 공기와 같은 온도에서 시작하면 난방 중인 방이 처음 몇 시간 비현실적으로 식는다 — 개발 실행 hdev1 에서 발견)"""
+    (바닥이 공기와 같은 온도에서 시작하면 난방 중인 방이 처음 몇 시간 비현실적으로 식는다 — 개발 실행 hdev1 에서 발견)
+    [v1.31-H 하네스 보정 · 2026-10-29] 평형 중 일사는 하루 평균(시작 값 × steady_solar_factor) · 고장 주입은 끈다
+    (한낮 일사 72 h 고정 → 구조체 +8–10 K 과열 · 고장 72 h 선반영 → 구조체 −5 ~ −11 K — 보류 난방 3차 HH307 · HH308 에서 발견)"""
     ini = sc["initial"]
-    m = RoomModel.from_conditions(env_cfg, temp_c=float(ini["temperature_c"]), rh_pct=float(ini["humidity_pct"]),
+    ist = env_cfg.get("initial_state")
+    steady_cfg = env_cfg.with_overrides({"heating.hydronic.fault_no_ignition": False}) if ist["steady_without_faults"] else env_cfg
+    m = RoomModel.from_conditions(steady_cfg, temp_c=float(ini["temperature_c"]), rh_pct=float(ini["humidity_pct"]),
                                   pm25_ugm3=float(ini.get("pm25_ugm3", 12.0)), co2_ppm=float(ini.get("co2_ppm", 600.0)),
                                   filter_hours=float(ini.get("filter_hours", 0.0)))
     w = WorldInputs.from_scenario(sc)
+    w.ext.outdoor_illuminance_lux *= float(ist["steady_solar_factor"])
     act = initial_actuators(sc)
     occ = w.occupancy_model()
-    for _ in range(int(float(ini.get("thermal_steady_h", 72.0)) * 60)):
+    for _ in range(int(float(ini.get("thermal_steady_h", ist["thermal_steady_h"])) * 60)):
         m.step(60.0, act, w.ext, None, occ)
     s = m.state
     keep = (s.mass_temp_c, s.envelope_temp_c, s.floor_temp_c, s.supply_temp_c)

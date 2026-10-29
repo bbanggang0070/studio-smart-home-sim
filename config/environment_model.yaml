@@ -238,3 +238,8 @@ environment_model:
         dhw_temp_c: 40.0                     # draft — 샤워 온수 온도
         cold_water_temp_c: 10.0              # draft — 겨울 상수도 수온
         fault_no_ignition: false             # 고장 주입 (H11) — 조절기는 켜져도 점화하지 않는다 (계량 플러그 = 대기 전력)
+    initial_state:                           # [v1.31-H 하네스 보정 · 2026-10-29] 시나리오 initial.thermal_steady 사전 평형 (fast_world._steady_model)
+      thermal_steady_h: 72.0                 # 평형 길이 (시나리오 initial.thermal_steady_h 가 있으면 그 값)
+      steady_solar_factor: 0.25              # 평형 중 바깥 밝기 = 시작 시각 값 × 이 비 — 하루 평균 일사 (겨울 낮 ~9 h 반파 사인 평균 ≈ 0.24)
+                                             #   시작 시각 일사를 72 h 고정하면 한낮 시작 시나리오의 구조체가 +8–10 K 과열 (보류 난방 3차 HH307 에서 발견)
+      steady_without_faults: true            # 평형 중에는 고장 주입(fault_no_ignition)을 끈다 — 고장은 t = 0 에 시작 (H11 · HH308 구조체 −5 ~ −11 K 선반영 수정)

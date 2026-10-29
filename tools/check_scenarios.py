@@ -7,6 +7,8 @@
 
 확인: ① 시작 결로 여유 > 0 (thermal_steady 면 평형 상태로 계산) ② 시작 습도 ≤ 70 % ③ 창문 '== 0' 판정 없음
       ④ 기준선 A 와 에너지 비교 없음 ⑤ 모드 전환 시나리오는 시각별 모드 환기 판정
+      ⑥ 판정 창(by · within X after 앵커)이 실행 시간 안에 끝난다 (보류 난방 3차 HH311 · 4차 HH404 교훈)
+      (참고) thermal_steady 평형 뒤 구조체 − 실내 차가 2 K 를 넘으면 표시 — 조절기 설정과 시작 실내가 다른 의도된 경우가 많다
 """
 
 from __future__ import annotations
@@ -49,8 +51,29 @@ def main() -> None:
         mode_change = any("user_mode" in (e.get("set") or {}) for e in sc.get("events", []))
         if mode_change and any(re.search(r"\bbase_vent_compliance\b", c) for c in crit):
             issues.append("모드 전환 + 시작 모드 기준 환기 판정 (base_vent_compliance_mode 를 쓸 것)")
+        # 판정 창이 실행 시간을 넘으면 모든 방식이 ERROR (HH311 · HH404)
+        anchors = {}
+        for inj in sc.get("injections", []):
+            lab, at = inj.get("label"), float(inj.get("at_s", 0.0))
+            if lab:
+                anchors[lab + "_start"] = at
+                anchors[lab + "_end"] = at + float(inj.get("duration_s", inj.get("open_s", 0.0)))
+        for c in crit:
+            mt = re.search(r"\b(?:by|within)\s+([0-9.]+)\s+after\s+([A-Za-z0-9_]+)", c)
+            if not mt:
+                continue
+            a0 = float(mt.group(2)) if re.fullmatch(r"[0-9.]+", mt.group(2)) else anchors.get(mt.group(2))
+            if a0 is None:
+                issues.append(f"앵커 '{mt.group(2)}' 없음")
+            elif a0 + float(mt.group(1)) > float(sc["duration_s"]):
+                issues.append(f"판정 창 {a0 + float(mt.group(1)):.0f} s > 실행 {float(sc['duration_s']):.0f} s ({c[:40]})")
+        note = ""
+        if sc["initial"].get("thermal_steady"):
+            dm = m.state.mass_temp_c - float(sc["initial"]["temperature_c"])
+            if abs(dm) > 2.0:
+                note = f"  (참고: 평형 구조체 − 실내 {dm:+.1f} K)"
         bad += bool(issues)
-        print(f"{sc['id']:<7} 결로 여유 {ob['dew_margin_c']:6.2f} °C  {'⚠ ' + ' · '.join(issues) if issues else 'OK'}")
+        print(f"{sc['id']:<7} 결로 여유 {ob['dew_margin_c']:6.2f} °C  {'⚠ ' + ' · '.join(issues) if issues else 'OK'}{note}")
     sys.exit(1 if bad else 0)
 
 

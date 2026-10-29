@@ -135,7 +135,7 @@ scenarios:
     <<: *common
     tier: 3
     name: "문 센서 고장(닫힘 고정) 평일 — 재실 폴백 · 외출 셋백 · 귀가 복귀"
-    duration_s: 43200                    # 07:00 – 19:00
+    duration_s: 50400                    # 07:00 – 21:00 (작성 오류 수정 · 결과 보기 전 · 2026-10-29: 43200 이면 판정 창 46800 s 가 실행을 넘는다)
     log_interval_s: 10
     seed: 20264104
     season: winter

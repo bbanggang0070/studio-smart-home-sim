@@ -106,6 +106,10 @@ controller_variants:
     appliances.boiler.fault_confirm_s: 1800.0
     appliances.boiler.fault_power_decides: false   # C8′ 전
 
+# [v1.32-H] 하네스 난수(IR 누락) 별칭 — 비교 변형은 짝 기준선과 같은 우연을 쓴다 (없으면 기준선 이름)
+rng_alias:
+  proposed_v131: proposed
+
 extra_baselines: {}                   # [2026-10-26] {추가: 짝} — 짝 기준선을 돌리는 시나리오에서 추가 기준선도 (도구 --extra-baselines A2 → {A2: A})
 
 # ---- 가전 프로파일 — 세계(참값)에 존재하는 장치 (docs/06 §7 · thresholds appliances.profiles 와 같은 구성) ----

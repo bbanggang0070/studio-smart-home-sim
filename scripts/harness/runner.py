@@ -96,7 +96,10 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
     th = load_params().th
     # IR 누락은 기준선마다 독립 추첨 — 송신 시각 · 내용이 제어기마다 달라 'n번째 송신'끼리 같은 난수를 쓰면
     # 한 번의 우연(2 %)이 모든 기준선의 첫 명령을 함께 지워 비교가 왜곡된다 (C1). 시드로 재현은 그대로.
-    acts.rng = np.random.default_rng([run.seed, 104729, zlib.crc32(run.baseline.encode())])
+    # [v1.32-H] 같은 제어기의 비교 변형(proposed_v131)은 rng_alias 로 짝 기준선과 같은 IR 난수를 쓴다 — 변형 재현 대조 · 짝 비교가
+    # '같은 우연' 에서 이뤄진다 (별칭이 없으면 전과 같다 · 대조에서 이름만 달라 IR 누락 시각이 달라진 것을 발견)
+    rng_name = (hcfg.get("rng_alias") or {}).get(run.baseline, run.baseline)
+    acts.rng = np.random.default_rng([run.seed, 104729, zlib.crc32(rng_name.encode())])
     base_miss = th["appliances"]["ir"]["sim_miss_probability"]
     acts.ir_refresh_s = float(th["appliances"]["ir"]["state_refresh_s"])
     acts.l0_setup(th["appliances"])                    # L0 압축기 보호 · 제습 ⟂ 가습 (물리 모드 브릿지와 같다)

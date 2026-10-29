@@ -196,6 +196,7 @@ v1.31-H 도 함께 돌려 짝 비교) · H-RQ7 old_light 에서 셋백 16 °C �
 
 | v1.32-H 등록 (이 절) | 2026-10-29 | `b1fcee6` | 구현 전 |
 | v1.32-H 동결 (검증 실행 전) | 2026-10-29 | `0d00846` | C5 · C6 · C7 · C8 · C8′ · M5 · M6 · 비교 변형 proposed_v131 · 동결 목록 +5 (harness controllers · controller_variants · building_presets · controllers.py · building_calibration.py) · 테스트 209 · v1.29 회귀 개발 249/249 · 보류 7차 78/78 같다 · 개발 세트 제안 55/56 (실패 0) |
+| 하네스 난수 별칭 · 재동결 · 변형 재현 확인 | 2026-10-29 | (다음 행) | 대조에서 IR 누락 난수가 기준선 이름으로 갈려 13회가 달랐다 → `rng_alias {proposed_v131: proposed}` (다른 기준선 그대로) · 재대조 90/90 · 공통 지표 40개 모두 같다 = proposed_v131 은 v1.31-H 와 같은 동작 |
 
 ## 변경 이력
 | 날짜 | 버전 | 내용 |

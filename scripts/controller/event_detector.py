@@ -308,12 +308,14 @@ class EventDetector:
         if math.isnan(margin):
             return
         level = "critical" if margin < g(c + "critical_margin_c") else "warn" if margin < g(c + "warn_margin_c") else None
+        if "CONDENSATION" in self.active:                 # [v1.32-H C7] 지금 여유 — 래치된 '위험' 과 별도 (rule_engine 난방 중 단계 대응)
+            self.active["CONDENSATION"].info["margin_now"] = margin
         if level:
             self._enter("CONDENSATION", o.now_s)
             ev = self.active["CONDENSATION"]
             if level == "critical" or ev.info.get("level") != "critical":
                 ev.info["level"] = level
-            ev.info["margin"] = margin
+            ev.info["margin"] = ev.info["margin_now"] = margin
             self._cond_release_since = None
         elif "CONDENSATION" in self.active and margin > g(c + "release_margin_c"):
             self._cond_release_since = self._cond_release_since or o.now_s

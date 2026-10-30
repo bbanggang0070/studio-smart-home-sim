@@ -19,10 +19,10 @@ files:
 - path: config/scenario_profiles.yaml
   sha256: cfa453b8af902c6886f4632a3ec176aeb2d9633106d2e7b9592854b49cc7ee86
 - path: scripts/harness/criteria.py
-  sha256: 9bda8df8ae1643fe53a2397f8594cb7adba4d737a5623dfe30186b8707591c68
+  sha256: 4ccb703b792c88f443493246298e82ac8f09ece015e257fba02620a94d9728d4
 - path: config/harness.yaml
   yaml_key: metrics
-  sha256: 87fe39e6d7a8a7416abad47dbac5a4c313f1bc1d931d41f9c028fda1a85caf8e
+  sha256: 4fe5e84eba112b2fe7e43a64bed0f49fa0263b927c8eb79749000baacdc2dbee
 - path: config/harness.yaml
   yaml_key: analysis
   sha256: 1907b3fe5d2fff4c2e17845253315cde8f8a5a2b7ff8c3fc81cffd0f06d1b7f8
@@ -46,24 +46,24 @@ files:
 controller_frozen_at: '2026-10-25'
 controller:
 - glob: scripts/controller/*.py
-  sha256: 8e0aeba118428bdcc2f473657fa7fd209f0c5e07960e5f6f57d00c8ffb35f9b0
+  sha256: 3bce8a2afac946360528c7426a82376f6b0e2b511cf88310c520ccf1c2d7ae5f
 - glob: scripts/sensors/*.py
-  sha256: 3c88378efca49f92926c254ea0068b7b60e5053a9596ca14363b00cbe996c352
+  sha256: 55c6f57b749da7a19a35619ac17d5498c4075f82b39f8309432b2bf10beb6e34
 - glob: scripts/actuators/*.py
-  sha256: 482ddf1c448b77b123eb9a0189422b5a6f633320948f0cec937ca38fe520c731
+  sha256: 73e5c9244133909ba103dc9904e9efdc02d059fdee83b28f4d78aa76ef5515d4
 - path: scripts/harness/controllers.py
-  sha256: 3d6446ab3b07ebd7a257f66d7dd5eb05470984dd7e05b858daa4003f9a7a7a5c
+  sha256: a7a0ea2eca99260e156a58ec0da2df24e770490eacaf89872caa684f5d7cbff1
 - path: config/thresholds.yaml
-  sha256: cbe34d985d69876d30d4d570faa1dd45e91d7296dbb32a059b4aae68c3b41b91
+  sha256: 652987e0dee875748bf71e4794b28e5646fb59ae4067d01748c555a603eac86f
 - glob: models/*
-  sha256: 543c1aef8870d243f1be861ef90390c94f9a9d271b26ae74cefcde13d1e54bce
+  sha256: 6b33ecbacbc9885e060e51731c85e171ec5c0f71841064fa2bff70bd1f7a6364
 - path: config/user_modes.yaml
-  sha256: 5e1e89e739c65cea27a9537b26c3be28b05c0d9c58e5bb310e28f0798673bdbd
+  sha256: 998a1c1e531b38ecadd7b44a3cce35c3790bf5943de26d6d945de96fd35cfd17
 - path: scripts/harness/fast_world.py
-  sha256: ae4b9470bc94a447695d6fcb44fbe6262bcfe3c8e4d81ab215648a4d9c9becde
+  sha256: bfc67c54f5a38aa58bf0549930e76126df9fbeb1e544e1a7d4d942cd85c739bd
 - path: config/baselines.yaml
-  sha256: 036bd6c6229d64ba0e1267e80e2280f26edc50924fe06412ff49bf3c691f53c3
+  sha256: 8062c8e11925ec4eb1d4881ba41ee1abdc995264cb74782de48928ea4104f91b
 - path: config/sensor_models.yaml
   sha256: ab0ed0510659861f4f3a8165acba0636da8ee34aa8f7b0eb6bf488dd4520e525
 - path: scripts/harness/runner.py
-  sha256: 96573a78741015387bf6708d253034eaaf768d1df6e84854b4f662260dcf381c
+  sha256: 9724602f7d5e011afab335f728cc3d700d511050faa891fe94b93872c85c527a

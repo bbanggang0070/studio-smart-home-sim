@@ -20,10 +20,11 @@ import pandas as pd
 
 REPO = Path(__file__).resolve().parents[2]
 PROCESS = re.compile(r"event_entered\(|alert_raised\(|mode_is\(|feasibility_is\(|ac_manual_detected|ac_sent|cmd_|occupied|"
-                     r"pinch_events|pinch_stop|pinch_detect|ir_tx|budget|appliance_state")
+                     r"pinch_events|pinch_stop|pinch_detect|ir_tx|budget|appliance_state|boiler_fault_alert_delay_s")   # [v1.32-H] 알림 지연 = alert_raised 와 같은 과정
 OUTCOME = re.compile(r"\b(temperature|humidity|pm25|pm25_peak|dew_margin|co2|operative_temperature|q_net|total_power|energy_wh|"
                      r"energy_compare_wh|laundry_dry_time_s|max_contact_force_n|base_vent_compliance|comfort_ratio|"
-                     r"humidity_recovery_time|overheat_time_s)\b")
+                     r"humidity_recovery_time|overheat_time_s|"
+                     r"gas_kwh|electric_kwh|energy_cost_won|cold_discomfort_kh|min_temp_c|expected_cost_heating|base_vent_compliance_mode)\b")   # [난방 확장] 자원 · 추위 = 환경 결과 (energy_wh 와 같은 원칙)
 
 
 def kind(text: str) -> str:

@@ -1,0 +1,14 @@
+{
+ "2025": {
+  "rows": 8760,
+  "raw_items": 8760,
+  "missing_before_fill": {
+   "temperature_2m": 0,
+   "relative_humidity_2m": 0,
+   "shortwave_radiation": 3978,
+   "precipitation": 7609,
+   "cloud_cover": 0,
+   "wind_speed_10m": 0
+  }
+ }
+}

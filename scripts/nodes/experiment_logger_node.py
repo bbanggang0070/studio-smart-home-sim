@@ -50,7 +50,7 @@ def main() -> None:
     last: dict = {}
     st = {"writer": None, "fh": None, "fields": None, "rows": 0, "t_last": time.monotonic()}
 
-    for tp in T.ALL_TOPICS:
+    for tp in list(T.ALL_TOPICS) + list(T.HEATING_TOPICS):          # [난방 확장] 보일러 명령 · 상태
         ros_io.subscribe(node, tp, lambda t, v: last.__setitem__(t, v))
 
     def on_truth(m):
@@ -69,6 +69,9 @@ def main() -> None:
         for tp, name in ACT.items():
             if tp in last:
                 row[f"act.{name}"] = last[tp]
+        if T.T_BOILER in last:                                   # [난방 확장] 고속 하네스와 같은 열 이름
+            b = json.loads(last[T.T_BOILER])
+            row["act.boiler_power"], row["act.boiler_setpoint"] = bool(b.get("power")), float(b.get("setpoint", 0.0))
         if T.T_AC in last:
             a = json.loads(last[T.T_AC])
             row["act.ac"] = last[T.T_AC]
@@ -102,11 +105,13 @@ def main() -> None:
         row["sim.obstacle"] = wl.get("obstacle")                          # 시험 물체 배치 확인 (2026-10-26 — 화분 없이 완주한 실행 진단)
         row["sim.obstacle_dev_mm"] = wl.get("obstacle_dev_mm")
         row["sim.obstacle_replaced"] = wl.get("obstacle_replaced")
-        for tp in T.ALL_TOPICS:
+        for tp in list(T.ALL_TOPICS) + list(T.HEATING_TOPICS):
             if tp in last:
                 row[tp] = last[tp]
         if st["writer"] is None:                                  # 열 = 첫 행 + 액추에이터 · 에어컨 열 + 계약 55개 토픽 (늦게 오는 값도 자리를 둔다)
             late = [f"act.{n}" for n in ACT.values()] + list(AC_COLUMNS) + list(T.ALL_TOPICS)
+            if "truth.floor_temp_c" in row:                        # [난방 확장] hydronic 실행 — 늦게 오는 보일러 열도 자리를 둔다 (없으면 조용히 빠진다)
+                late += ["act.boiler_power", "act.boiler_setpoint"] + list(T.HEATING_TOPICS)
             fields = list(row) + [c for c in late if c not in row]
             st["fh"] = open(out, "w", newline="", encoding="utf-8")
             st["writer"] = csv.DictWriter(st["fh"], fieldnames=fields, extrasaction="ignore", lineterminator="\n")

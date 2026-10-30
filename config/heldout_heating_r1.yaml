@@ -1,0 +1,524 @@
+# ============================================================================
+#  난방 확장 트랙 보류(held-out) 1차 — HH101–HH112 (docs/15 §3 · §6)
+#  - 판정 · 제어기 동결(freeze_heating · 2026-10-28) 뒤, 동결 제어기로 돌려 보기 전에 썼다 — 개발 세트(H1–H14)에 없는 조합
+#  - 판정 문구는 개발 세트와 같은 종류만 쓴다 (환경 결과 위주 · 수단 · 과정은 최소)
+#  - 실행 전에 커밋하고 해시를 등록한다. 결과로 제어기를 고치면 1차 결과는 그대로 보고하고 2차(마지막)로 다시 잰다
+#  - 작성 점검표: ① 시작 상태 thermal_steady (72 h 평형) ② 시작 결로 여유 > 0 ③ 창문 '== 0' 판정 없음 (1차 지연 · ≤ 0.05)
+#    ④ 물리적으로 모든 방식이 불가능한 판정이 없는지 (개발에서 배운 것: 후드 손실 > 바닥난방 출력 · 겨울 빨래 건조)
+#    ⑤ 다른 일을 하는 기준선과의 에너지 · 시간 비교 없음 (같은 셋백 계열 A2 와만)
+#  2026-10-28 작성 · 원시 로그는 10 h 이상이면 10 s 간격
+# ============================================================================
+scenarios:
+  - id: HH101
+    tier: 2
+    name: "야근 늦은 귀가 23:00 — 예측보다 늦은 귀가 ↔ 프리히팅 낭비"
+    duration_s: 54000                    # 08:00 – 23:00
+    log_interval_s: 10
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262901
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 40.0
+      co2_ppm: 800.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "08:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: cloudy
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -6.0
+      outdoor_rh_pct: 60.0
+      outdoor_illuminance_lux: 6000.0
+    injections:
+      - { at_s: 1500, door: open_close, label: leave, open_s: 8 }
+      - { at_s: 50400, door: open_close, label: arrive, open_s: 8 }     # 22:00 귀가
+    events:
+      - { at_s: 1504, set: { occupancy: false, occupant_zone: none } }
+      - { at_s: 21600, set: { outdoor_temp_c: -2.0, outdoor_illuminance_lux: 12000.0 } }
+      - { at_s: 36000, set: { outdoor_temp_c: -5.0, outdoor_illuminance_lux: 0.0 } }
+      - { at_s: 50400, set: { occupancy: true, occupant_zone: room } }
+    pass_criteria:
+      - "temperature >= 14.0 for all t"
+      - "temperature >= 19.5 by 3600 after arrive_start"
+      - "dew_margin >= 0 for all t"
+      - "energy_cost_won <= baseline_A.energy_cost_won"
+    metrics: [cold_discomfort_kh, gas_kwh, energy_cost_won, expected_cost_heating]
+
+  - id: HH102
+    tier: 2
+    name: "주말 오후 2시간 장보기 — 짧은 외출 셋백 ↔ 귀가 쾌적"
+    duration_s: 18000                    # 12:00 – 17:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262902
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: home
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 40.0
+      co2_ppm: 800.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 400.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "12:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: 1.0
+      outdoor_rh_pct: 45.0
+      outdoor_illuminance_lux: 40000.0
+    injections:
+      - { at_s: 3600, door: open_close, label: leave, open_s: 8 }       # 13:00
+      - { at_s: 10800, door: open_close, label: arrive, open_s: 8 }     # 15:00
+    events:
+      - { at_s: 3604, set: { occupancy: false, occupant_zone: none } }
+      - { at_s: 10800, set: { occupancy: true, occupant_zone: room } }
+      - { at_s: 14400, set: { outdoor_illuminance_lux: 10000.0, outdoor_temp_c: 0.0 } }
+    pass_criteria:
+      - "temperature >= 19.5 by 1800 after arrive_start"
+      - "temperature >= 17.0 for all t"
+      - "dew_margin >= 0 for all t"
+    metrics: [cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: HH103
+    tier: 3
+    name: "혹한 아침 — 기상 · 샤워 · 출근이 30분 안에 이어짐"
+    duration_s: 10800                    # 05:30 – 08:30
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262903
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true
+      user_mode: SLEEP
+      temperature_c: 19.0
+      humidity_pct: 42.0
+      co2_ppm: 1000.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 0.0
+      occupancy: true
+      occupant_zone: bed
+      time_of_day: "05:30"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 19.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -11.0
+      outdoor_rh_pct: 60.0
+    injections:
+      - { at_s: 3000, source: shower, label: shower, moisture_g: 250, duration_s: 600 }
+      - { at_s: 6000, door: open_close, label: leave, open_s: 8 }
+    events:
+      - { at_s: 1800, set: { user_mode: NORMAL, occupant_zone: room, motion: moving } }   # 06:00 기상
+      - { at_s: 6004, set: { occupancy: false, occupant_zone: none } }                   # 07:10 출근
+    pass_criteria:
+      - "dew_margin >= 0 for all t"
+      - "temperature >= 18.0 for all t"
+      - "humidity <= 60 by 1800 after shower_end"
+    metrics: [condensation_exposure_s, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: HH104
+    tier: 2
+    name: "겨울 저녁 실내 빨래 — 빨래 습기 ↔ 결로 (가습기 없음)"
+    duration_s: 21600                    # 19:00 – 01:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262904
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    baseline_a: { auto_appliances: [dehumidifier] }
+    initial:
+      thermal_steady: true
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 40.0
+      co2_ppm: 800.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "19:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: -7.0
+      outdoor_rh_pct: 70.0
+    injections:
+      - { at_s: 600, appliance: washer, label: washer, power_w: 450, duration_s: 600, laundry_moisture_g: 1600 }
+    events:
+      - { at_s: 12600, set: { user_mode: SLEEP, occupant_zone: bed, motion: sleeping } }   # 22:30
+    pass_criteria:
+      - "dew_margin >= 0 for all t"
+      - "humidity <= 65 for all t"
+      - "temperature >= 18.5 for all t"
+    metrics: [laundry_dry_time_s, condensation_exposure_s, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: HH105
+    tier: 2
+    name: "맑은 겨울 낮 공부 — 일사 과열 ↔ 난방 ↔ 눈부심"
+    duration_s: 18000                    # 10:00 – 15:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262905
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: home
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true
+      user_mode: STUDY
+      temperature_c: 21.0
+      humidity_pct: 38.0
+      co2_ppm: 800.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 500.0
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "10:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: 5.0
+      outdoor_rh_pct: 40.0
+      outdoor_illuminance_lux: 60000.0
+    events:
+      - { at_s: 7200, set: { outdoor_illuminance_lux: 70000.0, outdoor_temp_c: 7.0 } }
+    pass_criteria:
+      - "temperature <= 25.0 for all t"
+      - "temperature >= 20.0 for all t"
+      - "dew_margin >= 0 for all t"
+    metrics: [cold_discomfort_kh, gas_kwh, energy_cost_won, overheat_time_s]
+
+  - id: HH106
+    tier: 3
+    name: "외기 나쁨 + 혹한 + 공부 기본 환기 40 m³/h"
+    duration_s: 14400                    # 19:00 – 23:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262906
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true
+      user_mode: STUDY
+      temperature_c: 21.0
+      humidity_pct: 40.0
+      co2_ppm: 900.0
+      pm25_ugm3: 20.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "19:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0
+      appliances: { purifier_level: 1, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 85.0
+      outdoor_temp_c: -9.0
+      outdoor_rh_pct: 55.0
+    pass_criteria:
+      - "base_vent_compliance >= 0.95"
+      - "window_open_ratio <= 0.05 for all t"
+      - "pm25 <= 35 by 3600 after 0"
+      - "temperature >= 20.0 for all t"
+    metrics: [base_vent_compliance, pm25_peak, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: HH107
+    tier: 3
+    name: "진눈깨비 오는 저녁 요리 — 창문 금지 ↔ 후드 ↔ 난방"
+    duration_s: 7200                     # 18:00 – 20:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262907
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 50.0
+      co2_ppm: 800.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: kitchen
+      time_of_day: "18:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: rain
+      outdoor_pm25_ugm3: 20.0
+      outdoor_temp_c: 1.0
+      outdoor_rh_pct: 95.0
+    injections:
+      - { at_s: 600, source: cooking, label: cooking, stove: induction_plug, pm_mg_per_min: 1.8,
+          moisture_g_per_h: 500, heat_w: 900, duration_s: 1500 }
+    pass_criteria:
+      - "window_open_ratio <= 0.05 for all t"
+      - "pm25 <= 35 by 1500 after cooking_end"
+      - "temperature >= 18.0 by 1800 after cooking_end"
+      - "dew_margin >= 0 for all t"
+    metrics: [pm25_peak, pm25_recovery_time, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: HH108
+    tier: 3
+    name: "한밤 보일러 무응답 — 수면 중 혹한 · 점화 실패"
+    duration_s: 14400                    # 01:00 – 05:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262908
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic, heating.hydronic.fault_no_ignition: true }
+    initial:
+      thermal_steady: true
+      user_mode: SLEEP
+      temperature_c: 19.0
+      humidity_pct: 45.0
+      co2_ppm: 1100.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 0.0
+      occupancy: true
+      occupant_zone: bed
+      time_of_day: "01:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 19.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: -12.0
+      outdoor_rh_pct: 60.0
+    pass_criteria:
+      - "alert_raised('H_BOILER_FAULT') within 3600 after 0"
+      - "dew_margin >= 0 for all t"
+    metrics: [condensation_exposure_s, cold_discomfort_kh, min_temp_c]
+
+  - id: HH109
+    tier: 2
+    name: "수면 중 추워서 조절기를 23 °C 로 — 수동 존중 ↔ 수면 목표"
+    duration_s: 7200                     # 02:00 – 04:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262909
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true
+      user_mode: SLEEP
+      temperature_c: 19.0
+      humidity_pct: 42.0
+      co2_ppm: 1000.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 0.0
+      occupancy: true
+      occupant_zone: bed
+      time_of_day: "02:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 19.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: -9.0
+      outdoor_rh_pct: 60.0
+    injections:
+      - { at_s: 900, manual: { device: boiler, action: "setpoint:23" }, label: manual_up }
+    pass_criteria:
+      - "boiler_setpoint >= 23 by 600 after manual_up_start"
+      - "boiler_setpoint >= 23 by 1680 after manual_up_start"
+      - "dew_margin >= 0 for all t"
+    metrics: [cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: HH110
+    tier: 3
+    name: "2일 출장 — 사용자 외출 모드 · 영하 10 °C · 귀가 없음"
+    duration_s: 172800
+    log_interval_s: 10
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262910
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true
+      user_mode: AWAY
+      temperature_c: 21.0
+      humidity_pct: 45.0
+      co2_ppm: 700.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: false
+      occupant_zone: none
+      time_of_day: "07:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -8.0
+      outdoor_rh_pct: 60.0
+      outdoor_illuminance_lux: 10000.0
+    events:
+      - { at_s: 21600, set: { outdoor_temp_c: -3.0, outdoor_illuminance_lux: 40000.0 } }
+      - { at_s: 36000, set: { outdoor_temp_c: -8.0, outdoor_illuminance_lux: 0.0 } }
+      - { at_s: 79200, set: { outdoor_temp_c: -11.0 } }
+      - { at_s: 108000, set: { outdoor_temp_c: -4.0, outdoor_illuminance_lux: 35000.0 } }
+      - { at_s: 122400, set: { outdoor_temp_c: -9.0, outdoor_illuminance_lux: 0.0 } }
+    pass_criteria:
+      - "temperature >= 10.0 for all t"
+      - "dew_margin >= 0 for all t"
+      - "energy_cost_won <= 0.8 * baseline_A.energy_cost_won"
+    metrics: [condensation_exposure_s, gas_kwh, energy_cost_won, min_temp_c]
+
+  - id: HH111
+    tier: 2
+    name: "습한 겨울 외출 — 실내 고습 ↔ 셋백(차가운 방 = 결로)"
+    duration_s: 28800                    # 09:00 – 17:00
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262911
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true
+      user_mode: NORMAL
+      temperature_c: 20.5
+      humidity_pct: 62.0
+      co2_ppm: 900.0
+      pm25_ugm3: 8.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "09:00"
+      window_open_ratio: 0.0
+      blind_angle_deg: 0.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: cloudy
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: 3.0
+      outdoor_rh_pct: 85.0
+      outdoor_illuminance_lux: 5000.0
+    injections:
+      - { at_s: 1200, door: open_close, label: leave, open_s: 8 }
+    events:
+      - { at_s: 1204, set: { occupancy: false, occupant_zone: none } }
+      - { at_s: 14400, set: { outdoor_temp_c: 4.0 } }
+    pass_criteria:
+      - "dew_margin >= 0 for all t"
+      - "humidity <= 70 for all t"
+      - "temperature >= 14.0 for all t"
+    metrics: [condensation_exposure_s, gas_kwh, energy_cost_won]
+
+  - id: HH112
+    tier: 3
+    name: "혹한 저녁 요리 뒤 바로 샤워 — 습기 두 번 ↔ 결로 ↔ 열 손실"
+    duration_s: 10800                    # 18:30 – 21:30
+    repeat: 3
+    baselines: [A, B, proposed]
+    seed: 20262912
+    run_mode: fast
+    appliance_profile: full_heating
+    season: winter
+    persona: commuter
+    power_limit_w: 3000
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      thermal_steady: true
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 42.0
+      co2_ppm: 800.0
+      pm25_ugm3: 10.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: kitchen
+      time_of_day: "18:30"
+      window_open_ratio: 0.0
+      blind_angle_deg: 75.0
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -10.0
+      outdoor_rh_pct: 60.0
+    injections:
+      - { at_s: 600, source: cooking, label: cooking, stove: induction_plug, pm_mg_per_min: 1.5,
+          moisture_g_per_h: 450, heat_w: 800, duration_s: 1200 }
+      - { at_s: 2700, source: shower, label: shower, moisture_g: 300, duration_s: 900 }
+    pass_criteria:
+      - "dew_margin >= 0 for all t"
+      - "pm25 <= 35 by 1200 after cooking_end"
+      - "humidity <= 60 by 1800 after shower_end"
+      - "temperature >= 18.0 by 1800 after shower_end"
+    metrics: [pm25_peak, humidity_recovery_time, condensation_exposure_s, cold_discomfort_kh, gas_kwh, energy_cost_won]

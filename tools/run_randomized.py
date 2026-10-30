@@ -44,8 +44,9 @@ def one(args):
     for sect, vals in (cfg.get("harness_overrides") or {}).items():   # 프로파일의 하네스 설정 덮어쓰기 (예: 센서 결함 켬)
         hcfg[sect] = {**hcfg.get(sect, {}), **vals}
     env0 = load_config(REPO / hcfg["paths"]["environment_model"])
-    sc0 = next(s for s in load_scenarios(REPO / hcfg["paths"]["scenarios"]) if s["id"] == sid)
-    over, ext = draw(cfg, env0, int(sc0["seed"]) * 1000 + rep, nominal=(rep == 1 and cfg["nominal_first"]))
+    sc0 = next(s for s in load_scenarios(REPO / cfg.get("scenario_file", hcfg["paths"]["scenarios"])) if s["id"] == sid)
+    off = int(cfg.get("seed_offset", 0))                     # [v1.32-H] 새 시드 — 쓴 적 없는 조건 (docs/15 §12)
+    over, ext = draw(cfg, env0, int(sc0["seed"]) * 1000 + rep + off, nominal=(rep == 1 and cfg["nominal_first"]))
     over.update(cfg.get("truth_set") or {})                  # 고정 참값 (B4 장비 민감도 — 예: 흡기 용량)
     env_cfg = env0.with_overrides(over)
     sc = perturb_scenario(sc0, ext)
@@ -54,7 +55,7 @@ def one(args):
     results = []
     cond_scale: dict = {}
     for bl in [b for b in scenario_baselines(sc, extra) if not only or b in only]:
-        run = Run(scenario=sc, baseline=bl, rep=rep, seed=int(sc["seed"]) + rep)
+        run = Run(scenario=sc, baseline=bl, rep=rep, seed=int(sc["seed"]) + rep + off)
         spec = hcfg["controllers"][bl]
         ctrl = make_controller(spec)
         cs = cfg.get("controller_scale")
@@ -109,11 +110,13 @@ def main() -> None:
     ap.add_argument("--out-suffix", default="")        # 결과 폴더 뒤에 붙인다 (예: _a2)
     a = ap.parse_args()
     cfg = profile_cfg(hcfg, a.profile)
-    chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py")], capture_output=True, text=True)
+    fz = ["--config", cfg["freeze_config"], "--group", "all"] if cfg.get("freeze_config") else []   # 난방 확장 = freeze_heating
+    chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py"), *fz], capture_output=True, text=True)
     print(chk.stdout.strip())
     if chk.returncode != 0:
         sys.exit("동결된 판정 · 지표가 바뀌었다 — docs/12 동결 개정을 먼저 기록할 것")
-    scen = [s for s in load_scenarios(REPO / hcfg["paths"]["scenarios"]) if s["run_mode"] == "fast"]
+    scen = [s for s in load_scenarios(REPO / cfg.get("scenario_file", hcfg["paths"]["scenarios"])) if s["run_mode"] == "fast"]
+    scen = [s for s in scen if s["id"] not in (cfg.get("exclude_ids") or [])]
     if a.ids:
         scen = [s for s in scen if s["id"] in a.ids.split(",")]
     extra = {x: "A" for x in a.extra_baselines.split(",") if x}

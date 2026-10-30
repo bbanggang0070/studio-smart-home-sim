@@ -1,0 +1,78 @@
+# ============================================================================
+#  난방 확장 트랙 동결 목록 (docs/14 · docs/15 §6–§7 · 브랜치 heating) — v1.29 의 config/freeze.yaml 과 별개
+#  tools/check_freeze.py --config config/freeze_heating.yaml --group all
+#  files: 난방 시나리오 · 보류 1–4차 · 판정 문법 · 지표 설정 · 무작위 범위 · 기준선 명세 · 참값 모델 · 주 비교 분석
+#  controller: 제어기 v1.32-H 코드 (v1.30-H 2026-10-28 → v1.31-H 2026-10-29 → v1.32-H 2026-10-29 → v1.33-H 달력 2026-10-30 · docs/15 §10 · §12 · §14) · 계수 · 학습 산출물 · 하네스 (고치면 새 보류 묶음으로 다시 평가)
+# ============================================================================
+frozen_at: '2026-10-30'
+files:
+- path: config/scenarios_heating.yaml
+  sha256: 69a44ddc794145bbcd53974c5273aa164cde12ad17415235b4d0706bd7322635
+- path: config/heldout_heating_r1.yaml
+  sha256: 954fc2e0d7b9f8b3d5e870eca753b2af18b32d5a126278f5458588efbc2c75ff
+- path: config/heldout_heating_r2.yaml
+  sha256: 2b0c0dc53eab2e7b85fb96ddab71a33175f5f72991dc8a84c9064e7cf63dc876
+- path: config/heldout_heating_r3.yaml
+  sha256: 56bfdba635b5fc56977f41ea2a97fb92763c14fa3ab7548a2ae3b40a362e1f8d
+- path: config/heldout_heating_r4.yaml
+  sha256: 497734cb9807ccd87edf125941b50883eadbc34758512f0f9012dd97bbf53b03
+- path: scripts/harness/criteria.py
+  sha256: 4ccb703b792c88f443493246298e82ac8f09ece015e257fba02620a94d9728d4
+- path: config/harness.yaml
+  yaml_key: metrics
+  sha256: 4fe5e84eba112b2fe7e43a64bed0f49fa0263b927c8eb79749000baacdc2dbee
+- path: config/harness.yaml
+  yaml_key: appliance_profiles
+  sha256: 5e4535b8f9e3affbe5ceb75333df1192a8a6e33bb72d629528e0189aedf341a5
+- path: config/baselines.yaml
+  sha256: 8062c8e11925ec4eb1d4881ba41ee1abdc995264cb74782de48928ea4104f91b
+- path: config/environment_model.yaml
+  sha256: 7f1ffadef2d7458f46dbbacd9593218a4290ed9c00c544f9aecb8f5884063107
+- glob: scripts/env_model/*.py
+  sha256: 08312510b0ddb15e34790b9ae6a6bd8c9f38da07cd862bcd71cf4e38f2dfb702
+- path: config/harness.yaml
+  yaml_key: randomization
+  sha256: 4c710e061c634e19e2c6d2b1424792d01dd1ed1f073136319bb220a46867b43b
+- path: tools/analysis/heating_primary.py
+  sha256: 286d6f1d4dbfab3255fc67f979a7ca0deeed8eddbbb6718ebf76c973b520ed05
+- path: tools/analysis/criteria_classes.py
+  sha256: 8a103c6838abf70367fcc92b1d2b0906c87ca67b9f1b49c4a30b9ebec5d304cb
+- path: config/harness.yaml
+  yaml_key: controller_variants
+  sha256: 0d076682a92618558e59992b055e0a95e5b8a45b9a3223015de7fbce023d65bf
+- path: config/harness.yaml
+  yaml_key: building_presets
+  sha256: ce2c090f1b3eaad673d58997a56a5794fb009ce5488db1a99538c29a17170615
+- path: config/harness.yaml
+  yaml_key: controllers
+  sha256: 18d07be37e439dc67b84263052af1900db034eff955dbeb8d032bed9bd44c2fc
+- path: config/harness.yaml
+  yaml_key: rng_alias
+  sha256: f0f6f3c7eddda4f8d59cdc4e4133fe0e817cd6f33ad3b39618db9feaa48ceb5c
+- path: config/scenarios_weekly_v133.yaml
+  sha256: 3749eb9d24663f850576c7e20d3f9edfb82cb15f71e88d5fe2bf017180f207b8
+- path: tools/scenarios/gen_weekly_v133.py
+  sha256: 60d56f9f08afa2cb2f3d5e00c66d68ac291ef6fa3b2d8563fe7d49d2d698c39b
+controller:
+- glob: scripts/controller/*.py
+  sha256: 3bce8a2afac946360528c7426a82376f6b0e2b511cf88310c520ccf1c2d7ae5f
+- glob: scripts/sensors/*.py
+  sha256: 55c6f57b749da7a19a35619ac17d5498c4075f82b39f8309432b2bf10beb6e34
+- glob: scripts/actuators/*.py
+  sha256: 73e5c9244133909ba103dc9904e9efdc02d059fdee83b28f4d78aa76ef5515d4
+- path: config/thresholds.yaml
+  sha256: 652987e0dee875748bf71e4794b28e5646fb59ae4067d01748c555a603eac86f
+- path: config/user_modes.yaml
+  sha256: 998a1c1e531b38ecadd7b44a3cce35c3790bf5943de26d6d945de96fd35cfd17
+- glob: models/*
+  sha256: 6b33ecbacbc9885e060e51731c85e171ec5c0f71841064fa2bff70bd1f7a6364
+- path: scripts/harness/fast_world.py
+  sha256: bfc67c54f5a38aa58bf0549930e76126df9fbeb1e544e1a7d4d942cd85c739bd
+- path: scripts/harness/runner.py
+  sha256: 9724602f7d5e011afab335f728cc3d700d511050faa891fe94b93872c85c527a
+- path: tools/energy/building_calibration.py
+  sha256: 5c2c9249c1f1c6bc7a215ddab27ceebdf7774395e2298d9855db8c954bad21bd
+- path: scripts/harness/controllers.py
+  sha256: a7a0ea2eca99260e156a58ec0da2df24e770490eacaf89872caa684f5d7cbff1
+- path: tools/boptest/run_twozone_hydronic.py
+  sha256: 3ad611f8d40d3c247f22dbbabc422462dee560326324b45fa436107b9803dfdc

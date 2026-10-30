@@ -31,6 +31,11 @@ metrics:
   rh_recovery_abs_pct: 60.0       # 지표 #14 — 또는 60 %
   co2_reference_ppm: { study: 800.0, other: 1000.0 }   # 지표 #9 (참값 검증)
   base_vent_tolerance_m3h: 0.5    # 지표 #9 — 기본 환기 충족 판정 허용 오차 (rpm 반올림)
+  heating:                        # [난방 확장 docs/14 §8] hydronic 실행에만 — 요금 · 추위 기준은 draft (출처 확인 · 민감도)
+    gas_won_per_kwh: 81.0         # draft — 도시가스 주택용 약 22.5 원/MJ × 3.6 (서울 · 확인 필요)
+    electric_won_per_kwh: 200.0   # draft — 주택용 누진 중간 구간 근사 (확인 필요)
+    cold_below_c: { default: 20.0, SLEEP: 18.0, NIGHT: 19.0 }   # 재실 중 이 아래를 추위로 센다 (모드 목표 − 1 °C)
+    cold_won_per_kh: 160.0        # draft — 추위 1 K·h 의 원 환산 = 냉방 기대비용 2,000 Wh/K·h × 전기 80 원/kWh 와 같은 크기
   overheat_margin_c: 0.5          # 지표 #1 보조 — 체감온도가 모드 냉방 목표 + 0.5 °C 를 넘은 누적 시간 (overheat_time_s)
   # 지표 #8 — 장치 전환(구동) 횟수: 이산 장치는 값이 바뀔 때마다, 연속 장치는 아래 폭 이상 바뀔 때 1회
   actuation_columns: [act.ac_cool, act.ac_dry, act.ceiling_fan, act.purifier_level, act.range_hood_level,
@@ -87,7 +92,28 @@ controllers:
   B: "controller.smart_home:SmartHomeController"   # docs/03 §6 — 같은 제어기, baseline=B 이면 히스테리시스 · 자동 전환 대기 0
   proposed: "controller.smart_home:SmartHomeController"   # W09 v1 — 규칙 + 모드 + 이벤트 · 6계층 중재
   proposed_np: "controller.smart_home:SmartHomeController"   # Proposed−P (docs/03 C15) — 우선 목표(L4.5) 비활성
+  A2V: "controller.baseline_a2:BaselineAPrimeVent"   # [2026-10-29] A′ + 24시간 환기장치 (v1.31-H 결과 보기 전 · baselines.yaml baseline_a2v)
+  proposed_v132: "variant:proposed_v132"   # [v1.33-H docs/15 §14] v1.33-H 플래그만 v1.32-H 값 (요일 무시) — 같은 데이터 짝
+  proposed_v131: "variant:proposed_v131"   # [v1.32-H docs/15 §12] v1.32-H 수정 플래그를 v1.31-H 값으로 — 같은 새 데이터 짝 비교 (H-RQ6)
   A2: "controller.baseline_a2:BaselineAPrime"   # [2026-10-26] A′ — 상용 스마트홈 허브 수준 규칙 자동화 (docs/11 권장 7 · baselines.yaml baseline_a2)
+
+# [v1.32-H] 같은 협조 제어기의 임계값 변형 (controllers 의 "variant:<이름>") — 키는 thresholds 점 경로
+controller_variants:
+  proposed_v132:
+    heating.preheat_weekday_aware: false            # C9 전 (요일을 알아도 여행 판정 = 외출 24 h 초과)
+    energy.arrival_gbm.use_calendar: false          # C9 전 (귀가 GBM 요일 = 수 고정)
+  proposed_v131:
+    heating.fan_reverse_rung: true                  # C5 전
+    heating.humidify_heating_target: false          # C6 전 (상한 − 3 %p · 실링팬 확장은 모드 상한 기준)
+    heating.condensation_staged: false              # C7 전
+    appliances.boiler.fault_demand_below_c: 1.0     # C8 전
+    appliances.boiler.fault_confirm_s: 1800.0
+    appliances.boiler.fault_power_decides: false   # C8′ 전
+
+# [v1.32-H] 하네스 난수(IR 누락) 별칭 — 비교 변형은 짝 기준선과 같은 우연을 쓴다 (없으면 기준선 이름)
+rng_alias:
+  proposed_v131: proposed
+  proposed_v132: proposed
 
 extra_baselines: {}                   # [2026-10-26] {추가: 짝} — 짝 기준선을 돌리는 시나리오에서 추가 기준선도 (도구 --extra-baselines A2 → {A2: A})
 
@@ -98,6 +124,8 @@ appliance_profiles:
   std:  [ceiling_light, desk_lamp, exhaust_fan, blind, window, ac, range_hood, cooktop_plug]
   full: [ceiling_light, desk_lamp, exhaust_fan, blind, window,
          ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood, cooktop_plug]
+  full_heating: [ceiling_light, desk_lamp, exhaust_fan, blind, window,                 # [난방 확장 docs/14] full + 보일러
+                 ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood, cooktop_plug, boiler]
 
 # ---- mmWave(LD2410) 시뮬레이션 — 참값 → 구간 0–8 의 움직임 · 정지 에너지 (고속 모드 재실 노드 입력) ----
 #  구간 = 0.75 m. 사람 위치(zone) → 구간은 thresholds occupancy.zone_gates 와 같은 배치를 쓴다 (센서 배치 = config/scene_layout.yaml · Scene v0.1 에서 확인).
@@ -302,6 +330,89 @@ randomization:
     outdoor_rh_pct: { offset: [-5.0, 5.0], clip: [5.0, 100.0] }
     outdoor_illuminance_lux: { scale: [0.8, 1.2] }
   profiles:                         # --profile <이름> — 위 truth_params · external · out_dir 를 이 값으로 바꿔 돌린다
+    heating:                        # [난방 확장 docs/15 §3 · 2026-10-28] 난방 시나리오 18개 × 반복 · 참값 계수(바닥 · 배관 · 보일러 · 침기 · U값 · 열용량 · COP) · 외기
+      out_dir: results/randomized_heating_v131
+      scenario_file: config/scenarios_heating.yaml
+      exclude_ids: [H0, HP0]        # 개발용 동작 확인 · 물리 연결 확인 (등록 대상 아님)
+      freeze_config: config/freeze_heating.yaml   # 실행 전 난방 트랙 동결(판정 · 제어기) 점검
+      truth_params:                 # [v1.31-H R2 · 2026-10-29] 노후 원룸까지 — 침기 0.2–0.8 회/h · 창 U 1.5(복층 신축)–4.5(단창 알루미늄) · 외벽 ×0.7–2.0
+        air_balance.base_infiltration_ach: { uniform: [0.2, 0.8] }        #  가장 새는 조합에서도 −15 °C 에서 21 °C 유지 확인 (하루 가스 33.5 kWh)
+        window.glazing_u_w_m2k: { uniform: [1.5, 4.5] }
+        thermal.envelope_outdoor_conductance_w_per_k: { scale: [0.7, 2.0] }
+        thermal.air_capacity_wh_per_k: { scale: [0.8, 1.2] }
+        thermal.mass_capacity_wh_per_k: { scale: [0.6, 1.4] }
+        thermal.envelope_capacity_wh_per_k: { scale: [0.8, 1.2] }
+        appliances.ac.cop_values: { scale: [0.85, 1.15] }
+        appliances.range_hood.capture_efficiency: { uniform: [0.5, 0.7] }
+        heating.hydronic.floor_capacity_wh_per_k: { scale: [0.8, 1.2] }      # 0.4–0.6 kWh/K 범위 (docs/14 F10)
+        heating.hydronic.pipe_conductance_w_per_k: { scale: [0.8, 1.2] }
+        heating.hydronic.boiler_efficiency: { uniform: [0.82, 0.92] }
+        heating.hydronic.en1264_coefficient: { scale: [0.9, 1.1] }
+        heating.hydronic.floor_below_conductance_w_per_k: { scale: [0.5, 1.5] }
+        heating.hydronic.supply_temp_c: { uniform: [40.0, 50.0] }
+      external:
+        outdoor_temp_c: { offset: [-1.5, 1.5] }
+        outdoor_rh_pct: { offset: [-5.0, 5.0], clip: [5.0, 100.0] }
+        outdoor_illuminance_lux: { scale: [0.8, 1.2] }
+    heating_v131_equiv:             # [v1.32-H] proposed_v131 변형 = v1.31-H 확인 — profile heating 과 같은 조건 · 같은 시드 (archive/v1.31-H 와 대조)
+      out_dir: results/randomized_heating_v131_equiv
+      freeze_config: config/freeze_heating.yaml
+      scenario_file: config/scenarios_heating.yaml
+      exclude_ids: [H0, HP0]
+      truth_params:
+        air_balance.base_infiltration_ach: { uniform: [0.2, 0.8] }
+        window.glazing_u_w_m2k: { uniform: [1.5, 4.5] }
+        thermal.envelope_outdoor_conductance_w_per_k: { scale: [0.7, 2.0] }
+        thermal.air_capacity_wh_per_k: { scale: [0.8, 1.2] }
+        thermal.mass_capacity_wh_per_k: { scale: [0.6, 1.4] }
+        thermal.envelope_capacity_wh_per_k: { scale: [0.8, 1.2] }
+        appliances.ac.cop_values: { scale: [0.85, 1.15] }
+        appliances.range_hood.capture_efficiency: { uniform: [0.5, 0.7] }
+        heating.hydronic.floor_capacity_wh_per_k: { scale: [0.8, 1.2] }
+        heating.hydronic.pipe_conductance_w_per_k: { scale: [0.8, 1.2] }
+        heating.hydronic.boiler_efficiency: { uniform: [0.82, 0.92] }
+        heating.hydronic.en1264_coefficient: { scale: [0.9, 1.1] }
+        heating.hydronic.floor_below_conductance_w_per_k: { scale: [0.5, 1.5] }
+        heating.hydronic.supply_temp_c: { uniform: [40.0, 50.0] }
+      external:
+        outdoor_temp_c: { offset: [-1.5, 1.5] }
+        outdoor_rh_pct: { offset: [-5.0, 5.0], clip: [5.0, 100.0] }
+        outdoor_illuminance_lux: { scale: [0.8, 1.2] }
+    heating_v132:                   # [v1.32-H docs/15 §12 · 2026-10-29] 사후 개선판 확인 — 새 시드(+50,000) · 명목 반복 없음 · 가벼운 구조까지 열용량 범위 확대
+      out_dir: results/randomized_heating_v132
+      scenario_file: config/scenarios_heating.yaml
+      exclude_ids: [H0, HP0]
+      freeze_config: config/freeze_heating.yaml
+      seed_offset: 50000
+      nominal_first: false
+      truth_params:                 # heating 과 같고 열용량만 넓힘 — τ12 약 40–250 h (tools/energy/building_calibration.py · 영국 실측 중앙값 44 h)
+        air_balance.base_infiltration_ach: { uniform: [0.2, 0.8] }
+        window.glazing_u_w_m2k: { uniform: [1.5, 4.5] }
+        thermal.envelope_outdoor_conductance_w_per_k: { scale: [0.7, 2.0] }
+        thermal.air_capacity_wh_per_k: { scale: [0.8, 1.2] }
+        thermal.mass_capacity_wh_per_k: { scale: [0.35, 1.4] }
+        thermal.envelope_capacity_wh_per_k: { scale: [0.4, 1.2] }
+        appliances.ac.cop_values: { scale: [0.85, 1.15] }
+        appliances.range_hood.capture_efficiency: { uniform: [0.5, 0.7] }
+        heating.hydronic.floor_capacity_wh_per_k: { scale: [0.4, 1.2] }      # 건식 온수 패널(가벼움) ~ 습식 모르타르
+        heating.hydronic.pipe_conductance_w_per_k: { scale: [0.8, 1.2] }
+        heating.hydronic.boiler_efficiency: { uniform: [0.82, 0.92] }
+        heating.hydronic.en1264_coefficient: { scale: [0.9, 1.1] }
+        heating.hydronic.floor_below_conductance_w_per_k: { scale: [0.5, 1.5] }
+        heating.hydronic.supply_temp_c: { uniform: [40.0, 50.0] }
+      external:
+        outdoor_temp_c: { offset: [-1.5, 1.5] }
+        outdoor_rh_pct: { offset: [-5.0, 5.0], clip: [5.0, 100.0] }
+        outdoor_illuminance_lux: { scale: [0.8, 1.2] }
+    heating_v133_weekly:            # [v1.33-H docs/15 §14 · 2026-10-30] 1주 시나리오 W1–W4 · 새 시드(+70,000) · 명목 없음 · 참값 범위는 heating_v132 와 같다
+      out_dir: results/randomized_heating_v133_weekly
+      scenario_file: config/scenarios_weekly_v133.yaml
+      exclude_ids: []
+      freeze_config: config/freeze_heating.yaml
+      seed_offset: 70000
+      nominal_first: false
+      truth_params: {air_balance.base_infiltration_ach: {uniform: [0.2, 0.8]}, appliances.ac.cop_values: {scale: [0.85, 1.15]}, appliances.range_hood.capture_efficiency: {uniform: [0.5, 0.7]}, heating.hydronic.boiler_efficiency: {uniform: [0.82, 0.92]}, heating.hydronic.en1264_coefficient: {scale: [0.9, 1.1]}, heating.hydronic.floor_below_conductance_w_per_k: {scale: [0.5, 1.5]}, heating.hydronic.floor_capacity_wh_per_k: {scale: [0.4, 1.2]}, heating.hydronic.pipe_conductance_w_per_k: {scale: [0.8, 1.2]}, heating.hydronic.supply_temp_c: {uniform: [40.0, 50.0]}, thermal.air_capacity_wh_per_k: {scale: [0.8, 1.2]}, thermal.envelope_capacity_wh_per_k: {scale: [0.4, 1.2]}, thermal.envelope_outdoor_conductance_w_per_k: {scale: [0.7, 2.0]}, thermal.mass_capacity_wh_per_k: {scale: [0.35, 1.4]}, window.glazing_u_w_m2k: {uniform: [1.5, 4.5]}}
+      external: {outdoor_illuminance_lux: {scale: [0.8, 1.2]}, outdoor_rh_pct: {clip: [5.0, 100.0], offset: [-5.0, 5.0]}, outdoor_temp_c: {offset: [-1.5, 1.5]}}
     sensor_faults:                  # [2026-10-26] A1 — 기본 무작위 반복(참값 계수 · 외기)과 같은 조건에 센서 결함만 더한다 (같은 시드 → 짝 비교)
       out_dir: results/randomized_faults
       harness_overrides: { fast_mode: { sensor_faults: true } }
@@ -373,6 +484,22 @@ heldout:
 #  연결: 제어기 출력 에어컨 명령 → 냉방 설정온도(켜짐 = 설정 · 꺼짐 = ac_off_setpoint_k) · 난방은 테스트 케이스 기본값(모든 방식 공통)
 #  테스트 케이스에 없는 신호(실내 습도 · PM · 조도 · 후드 온도)는 고정값 — 냉방 판단만 비교된다 (습도 · 환기 · 차광 사다리는 쉰다)
 #  재실 = 테스트 케이스 일정(8–18시 2명) · 제어기는 1 Hz 로 부르고 BOPTEST 는 step_s 마다 진행
+boptest_heating:                  # [난방 확장 docs/15 · 2026-10-28] tools/boptest/run_twozone_hydronic.py
+  url: http://127.0.0.1:5002
+  testcase: twozone_apartment_hydronic
+  periods: [typical_heat_day, peak_heat_day]
+  electricity_price: constant
+  step_s: 60.0
+  controller_dt_s: 10.0           # 2구역 FMU 가 무거워 제어 주기 10 s (난방 판단은 분 단위)
+  occupied_from_h: 20.0           # 재실 = 월–금 20시 ~ 다음 날 08시 (테스트 케이스 문서 · 발열 신호는 덮어쓰기 때 고정돼 못 씀)
+  occupied_until_h: 8.0
+  official_occupancy: true        # [2026-10-30] 재실 = 테스트 케이스 occupancy.csv 그대로 (위 두 값은 파일이 없을 때만 · 월요일 0–8시 해석 오류 수정)
+  off_setpoint_c: 10.0            # 전원 끔 = 동파 하한 수준
+  assumed: { humidity_pct: 40.0, pm25_ugm3: 10.0, illuminance_lux: 200.0 }
+  devices: [boiler]
+  methods: [boptest_baseline, A, A2, B, proposed]
+  out_dir: results/boptest_heating
+
 boptest:
   url: http://127.0.0.1:5000
   testcase: bestest_air
@@ -389,3 +516,12 @@ boptest:
   methods: [boptest_baseline, A, B, proposed]
   baseline_a: { auto_appliances: [ac], user_ac_away: true }   # 사람이 켜고 끄는 에어컨 (C16 과 같은 사용자 모델)
   out_dir: results/boptest
+
+# ---- [v1.32-H · 2026-10-29] 건물 프리셋 — 보류 시나리오 · EXP-H · 보정 도구(tools/energy/building_calibration.py)가 함께 쓴다 ----
+#  basic = 기본 참값 (중간층 · 복층유리 · v1.29 와 같음) / old = 노후 원룸 (v1.31-H 보류 3 · 4차 · EXP-H 의 &old 와 같은 값)
+building_presets:
+  basic: {}
+  old: { air_balance.base_infiltration_ach: 0.7, window.glazing_u_w_m2k: 4.2, thermal.envelope_outdoor_conductance_w_per_k: 6.6 }
+  #  old_light = 노후 + 가벼운 구조 (옥탑 · 샌드위치 패널 · 목조 · 건식 온수 패널) — 열용량 ×0.4 · τ12 ≈ 48 h (영국 742가구 실측 중앙값 44.4 h · docs/14 §16 D5)
+  old_light: { air_balance.base_infiltration_ach: 0.7, window.glazing_u_w_m2k: 4.2, thermal.envelope_outdoor_conductance_w_per_k: 6.6,
+               thermal.mass_capacity_wh_per_k: 600.0, thermal.envelope_capacity_wh_per_k: 320.0, heating.hydronic.floor_capacity_wh_per_k: 200.0 }

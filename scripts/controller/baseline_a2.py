@@ -42,6 +42,9 @@ class BaselineAPrime:
         self.pur = yaml.safe_load(open(path, encoding="utf-8"))["baseline_a"]
 
     def reset(self, params: dict[str, Any]) -> None:
+        from controller.baseline_a import has_boiler
+        self.heating = has_boiler(params.get("scenario") or {})
+        self._absent_since: float | None = None
         self._ac = self._dry = self._win = self._exh = self._dehum = self._hum = self._shade = self._fan = self._hood = False
         self._cook_end: float | None = None
         self._pur_level: int | None = None
@@ -124,4 +127,33 @@ class BaselineAPrime:
         f = c["ceiling_fan"]
         self._fan = occ and self._flip(self._fan, temp > f["on_above_c"], temp < f["off_below_c"])
         out[T.C_CEILING_FAN] = int(f["level"]) if self._fan else 0
+        if self.heating:                               # [난방 확장] 스마트 조절기 — 재실 연동 + 밤 시간대 (협조 없음)
+            b = c["boiler"]
+            if occ:
+                self._absent_since = None
+            elif self._absent_since is None:
+                self._absent_since = now_s
+            h = (now_s % 86400.0) / 3600.0
+            night = h >= b["night_start_h"] or h < b["night_end_h"]
+            away = self._absent_since is not None and now_s - self._absent_since >= b["away_after_s"]
+            sp = b["away_c"] if away else b["night_c"] if night else b["home_c"]
+            out[T.C_BOILER] = json.dumps({"power": True, "setpoint": float(sp)})
+        return out
+
+
+class BaselineAPrimeVent(BaselineAPrime):
+    """A′V — A′ + 24시간 환기장치 (2026-10-29 · docs/15 §2). 흡기팬으로 vent_m3h 를 상시 공급 (A′ 의 흡기 요구와 큰 쪽)."""
+    name = "baseline_A2V"
+
+    def __init__(self, path: str | Path = BASELINES):
+        super().__init__(path)
+        with open(path, encoding="utf-8") as f:
+            self.vcfg = yaml.safe_load(f)["baseline_a2v"]
+        from controller.params import load_params
+        p = load_params()
+        self._vent_rpm = self.vcfg["vent_m3h"] / p.get("appliances.intake_fan.max_m3h") * p.get("appliances.intake_fan.max_rpm")
+
+    def step(self, now_s: float, inbox: dict[str, Any]) -> dict[str, Any]:
+        out = super().step(now_s, inbox)
+        out[T.C_INTAKE_FAN_RPM] = max(float(out.get(T.C_INTAKE_FAN_RPM, 0.0)), self._vent_rpm)
         return out

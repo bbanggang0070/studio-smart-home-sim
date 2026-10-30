@@ -15,7 +15,7 @@ import json
 
 import rclpy
 
-from actuators.l0_protect import CompressorGuard, dehum_hum_mutex
+from actuators.l0_protect import BoilerGuard, CompressorGuard, dehum_hum_mutex
 from controller.params import load_params
 from interfaces import ros_io
 from interfaces import topics as T
@@ -32,9 +32,19 @@ def main() -> None:
     want = {"ac": {"power": False, "mode": "cool", "setpoint": 26.0, "fan": "auto"}, "dehumidifier": False,
             "humidifier": False, "purifier_level": 0, "range_hood_level": 0, "cooktop_power": True}
     lo, hi = ap_["ac"]["setpoint_range_c"]
+    # [난방 확장 2026-10-29] Wi-Fi 룸 온도조절기 — L0 BoilerGuard · 명령을 한 번이라도 받은 뒤에만 state/boiler 발행 (v1.29 실행은 그대로)
+    b_ = ap_["boiler"]
+    boiler_g = BoilerGuard(b_["min_power_toggle_s"], b_["min_setpoint_change_s"], b_["setpoint_range_c"], b_["setpoint_step_c"])
+    boiler = {"want": None}
 
     def on_cmd(topic, v):
-        if topic == T.C_AC:
+        if topic == T.C_BOILER:
+            try:
+                d = json.loads(v)
+                boiler["want"] = (bool(d.get("power", False)), float(d.get("setpoint", boiler_g.setpoint)))
+            except (ValueError, TypeError):
+                log.warn(f"cmd/boiler JSON 해석 실패: {v!r}")
+        elif topic == T.C_AC:
             try:
                 a = json.loads(v)
                 a["setpoint"] = min(max(float(a.get("setpoint", 26.0)), lo), hi)
@@ -48,10 +58,10 @@ def main() -> None:
         else:
             want[topic.rsplit("/", 1)[-1]] = bool(v)
 
-    for tp in (T.C_AC, T.C_DEHUMIDIFIER, T.C_HUMIDIFIER, T.C_PURIFIER_LEVEL, T.C_RANGE_HOOD_LEVEL, T.C_COOKTOP_POWER):
+    for tp in (T.C_AC, T.C_DEHUMIDIFIER, T.C_HUMIDIFIER, T.C_PURIFIER_LEVEL, T.C_RANGE_HOOD_LEVEL, T.C_COOKTOP_POWER, T.C_BOILER):
         ros_io.subscribe(node, tp, on_cmd)
     out = (T.T_AC, T.T_DEHUMIDIFIER, T.T_HUMIDIFIER, T.T_PURIFIER_LEVEL, T.T_RANGE_HOOD_LEVEL)
-    pubs = {tp: ros_io.publisher(node, tp) for tp in out}
+    pubs = {tp: ros_io.publisher(node, tp) for tp in out + (T.T_BOILER,)}
     clock = ros_io.SimClock(node)
 
     def tick():
@@ -67,6 +77,10 @@ def main() -> None:
         ros_io.publish(pubs[T.T_HUMIDIFIER], T.T_HUMIDIFIER, hum and not dehum)
         ros_io.publish(pubs[T.T_PURIFIER_LEVEL], T.T_PURIFIER_LEVEL, want["purifier_level"])
         ros_io.publish(pubs[T.T_RANGE_HOOD_LEVEL], T.T_RANGE_HOOD_LEVEL, want["range_hood_level"])
+        if boiler["want"] is not None:
+            pw, sp = boiler_g.apply(*boiler["want"], now)
+            ros_io.publish(pubs[T.T_BOILER], T.T_BOILER, json.dumps({"power": pw, "setpoint": sp, "manual": False,
+                                                                     "l0_hold": boiler_g.held}))
 
     node.create_timer(1.0, tick)
     log.info("가전 브릿지 시작 — L0 보호 (압축기 최소 ON/OFF · 제습 ⟂ 가습)")

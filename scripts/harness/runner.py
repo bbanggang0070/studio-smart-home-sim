@@ -69,6 +69,8 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
     sc = run.scenario
     fm = hcfg["fast_mode"]
     dt, log_every = float(fm["dt_s"]), float(fm["log_interval_s"])
+    if sc.get("log_interval_s"):                      # [난방 확장] 긴 시나리오(72 h 등) — 로그 크기 (실행당 ~1 GB → 1/10)
+        log_every = float(sc["log_interval_s"])
     duration = float(sc["duration_s"])
     np.random.seed(run.seed)                      # 이후 노이즈 · 확률 주입이 이 시드를 쓴다
     rng = np.random.default_rng(run.seed)
@@ -94,7 +96,10 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
     th = load_params().th
     # IR 누락은 기준선마다 독립 추첨 — 송신 시각 · 내용이 제어기마다 달라 'n번째 송신'끼리 같은 난수를 쓰면
     # 한 번의 우연(2 %)이 모든 기준선의 첫 명령을 함께 지워 비교가 왜곡된다 (C1). 시드로 재현은 그대로.
-    acts.rng = np.random.default_rng([run.seed, 104729, zlib.crc32(run.baseline.encode())])
+    # [v1.32-H] 같은 제어기의 비교 변형(proposed_v131)은 rng_alias 로 짝 기준선과 같은 IR 난수를 쓴다 — 변형 재현 대조 · 짝 비교가
+    # '같은 우연' 에서 이뤄진다 (별칭이 없으면 전과 같다 · 대조에서 이름만 달라 IR 누락 시각이 달라진 것을 발견)
+    rng_name = (hcfg.get("rng_alias") or {}).get(run.baseline, run.baseline)
+    acts.rng = np.random.default_rng([run.seed, 104729, zlib.crc32(rng_name.encode())])
     base_miss = th["appliances"]["ir"]["sim_miss_probability"]
     acts.ir_refresh_s = float(th["appliances"]["ir"]["state_refresh_s"])
     acts.l0_setup(th["appliances"])                    # L0 압축기 보호 · 제습 ⟂ 가습 (물리 모드 브릿지와 같다)
@@ -109,6 +114,7 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
         scfg = yaml.safe_load((REPO / "config" / "sensor_models.yaml").read_text(encoding="utf-8"))
         frng = np.random.default_rng(run.seed + 31337) if hcfg["fast_mode"].get("sensor_faults", False) else None
         sens = SensorSuite(scfg, np.random.default_rng(run.seed + 104729), frng)   # frng — 센서 결함 (A1 · 기본 꺼짐)
+        sens.boiler_rng = np.random.default_rng(run.seed + 60013)                    # [난방 확장] 보일러 플러그 전용
 
     controller.reset({"scenario": sc, "baseline": run.baseline, "seed": run.seed, "rng": rng})
     user_cmds: dict[str, Any] = {T.C_MODE: world.user_mode}
@@ -168,6 +174,8 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
         # 계량 플러그 = 플러그가 달린 가전 + 발생원 (물리 모드와 같은 범위 — 팬 · 조명 등은 측정하지 않는다, docs/08 §3)
         plug_power = (sens.plug_power(obs, extra_power, dt) if sens else
                       {**{d: obs["appliance_power_w"].get(d, 0.0) for d in PLUG_DEVICES}, **extra_power})
+        if not sens and "boiler" in obs["appliance_power_w"]:          # [난방 확장] 보일러 플러그 (참값에 있을 때만)
+            plug_power["boiler"] = obs["appliance_power_w"]["boiler"]
         app_states = pmon.update(now, plug_power)
 
         inbox = sensor_topics(obs, world, contact, extra_power,
@@ -210,6 +218,9 @@ def run_fast(run: Run, hcfg: dict[str, Any], env_cfg, controller, controller_nam
             row["act.ac_setpoint"] = ac.setpoint_c
             row["act.ac_fan"] = acts.ac_fan
             row["act.cooktop_power"] = acts.cooktop_relay
+            if "boiler" in acts.allowed_devices:          # [난방 확장] 조절기 실제 명령 (L0 뒤)
+                row["act.boiler_power"] = acts.actual.boiler.power
+                row["act.boiler_setpoint"] = acts.actual.boiler.setpoint_c
             row["act.desk_cct"] = acts.desk_cct
             row["bridge.ir_tx_ac"] = acts.ir_tx["ac"]
             row["pm.ac.state"] = app_states.get("ac", {}).get("state", "")
@@ -328,7 +339,7 @@ def run_batch(ids: list[str] | None = None, baselines: list[str] | None = None, 
             except Exception as exc:
                 r = RunResult(run, C.ERROR, spec, notes=[f"{type(exc).__name__}: {exc}"])
             r.wall_s = time.perf_counter() - t0
-            if r.df is not None:
+            if r.df is not None and hcfg.get("keep_raw", True):   # --no-raw — 디스크 (72 h 실행당 ~1 GB · 2026-10-28 디스크 가득 참)
                 r.df.to_csv(out / "raw" / f"{run.run_id}.csv", index=False)
         progress(f"[{i}/{len(runs)}] {run.run_id} · 제어기 {spec} · {r.wall_s:.1f}s")
         results.append(r)

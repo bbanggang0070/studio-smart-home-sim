@@ -17,6 +17,7 @@ from collections import deque
 from controller.arbiter import Candidate
 from controller.energy import EnergyPlanner, daylight_fn
 from controller.event_detector import GRADE_ORDER, ActiveEvent, _History, own_load_w
+from controller.heating import HeatingLadder
 from controller.ladders import ComfortLadders
 from controller.lighting import Lighting
 from controller.params import ControllerParams
@@ -50,6 +51,7 @@ class RuleEngine:
         self.alerts: list[str] = []
         self.info: dict = {}
         self.ladders = ComfortLadders(p, psy, self, hysteresis)
+        self.heating = HeatingLadder(p, hysteresis)        # 난방 확장 — 가전 프로파일에 boiler 가 있을 때만 후보를 낸다
         self.hysteresis = hysteresis
         self._pm_level = 0                          # 실내 PM 청정기 단 (히스테리시스 상태)
         self._pm_avg: float | None = None           # 청정기 판단용 PM 이동평균
@@ -208,8 +210,14 @@ class RuleEngine:
             add("blind", "force", g("condensation.blind_slat_on_critical_deg"), L2, "E2 결로 위험 블라인드 개방")
             add("humidifier", "force", 0, L2, "E2 결로 위험 가습 금지")
             add("ceiling_fan", "need", -1, L2, "E2 결로 위험 실링팬 역회전")
-            add("dehumidifier", "need", 1, L2, "E2 결로 위험 제습")
-            self._pulse_vent(o, cond, blocked, add)
+            # [v1.32-H C7] 난방 중에는 비싼 수단(제습 · 간헐 환기 · 배기)을 '지금 여유' 가 위험 기준 아래일 때만 — 블라인드만 열어도
+            # 0 → 6 °C 로 회복되는데 래치된 '위험' 으로 10분 동안 제습 · 창 20 % · 배기 → I11 보일러 정지 · 가습 되돌림 (H6 · docs/14 §16 D3)
+            now_m = cond.info.get("margin_now", cond.info.get("margin", -math.inf))
+            staged = (g("heating.condensation_staged") and "boiler" in self.devices and not math.isnan(o.outdoor_temp_c)
+                      and o.outdoor_temp_c <= g("heating.season_max_outdoor_c"))
+            if not staged or now_m < g("condensation.critical_margin_c"):
+                add("dehumidifier", "need", 1, L2, "E2 결로 위험 제습")
+                self._pulse_vent(o, cond, blocked, add)
 
         # -- L4.5 우선 목표 (E10 빨래 건조) · L1 전력 한도 (E11) --
         self._laundry(o, ev, mode, noise, add)
@@ -243,6 +251,11 @@ class RuleEngine:
         self.info["saving"] = saving
         self.ladders.moisture_event = "COOKING" in ev or "HOOD_POST_RUN" in ev or "SHOWER" in ev
         self.info.update(self.ladders.apply(o, mode, blocked, noise, add, saving=saving))
+        if "boiler" in self.devices:                       # 난방 확장 (docs/14 §4) — v1.29 프로파일에는 boiler 가 없다
+            self.info.update(self.heating.apply(o, mode, self.home_mode, ev, self.devices, self.ladders.cooling, add,
+                                                energy=self.energy))
+            self.alerts.extend(self.heating.alerts)
+            self.heating.alerts = []
         # -- L6 조도 · 조명 --
         if "ceiling_light" in self.devices or "desk_lamp" in self.devices:
             li = self.lighting.apply(o, mode, saving, self.ladders.cooling, add)

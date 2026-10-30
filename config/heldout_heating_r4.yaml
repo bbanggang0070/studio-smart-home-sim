@@ -1,0 +1,465 @@
+# ============================================================================
+#  난방 확장 트랙 보류(held-out) 4차 — HH401–HH412 (v1.31-H · docs/15 §10 · 마지막 보류 묶음)
+#  - v1.31-H 동결(e3fdf79) 뒤, 보류 3차 결과를 보기 전에 썼다 — 개발 세트 · 1 · 2 · 3차에 없는 조합
+#  - 난방 계절 경계(늦가을 · 초봄) · 외출 중 보일러 고장 · 문 센서 고장 폴백 · 연속 샤워 · −18 °C 혹한 · 수동 올림 · 5일 외출 ·
+#    재택 공부 하루 · 겨울비 빨래 · 짧은 외출 · 늦은 귀가 후 바로 수면
+#  - 작성 점검 도구(tools/check_scenarios.py) 통과 · 결과는 고치지 않고 보고 · 이 뒤로 보류 묶음을 더 만들지 않는다
+#  2026-10-29 작성
+# ============================================================================
+x-old-building: &old { heating.mode: hydronic, air_balance.base_infiltration_ach: 0.7, window.glazing_u_w_m2k: 4.2,
+                       thermal.envelope_outdoor_conductance_w_per_k: 6.6 }
+x-common: &common
+  repeat: 3
+  baselines: [A, B, proposed]
+  run_mode: fast
+  appliance_profile: full_heating
+  power_limit_w: 3000
+x-init: &init
+  thermal_steady: true
+  co2_ppm: 800.0
+  pm25_ugm3: 8.0
+  window_open_ratio: 0.0
+  blind_angle_deg: 0.0
+scenarios:
+  - id: HH401
+    <<: *common
+    tier: 1
+    name: "늦가을 저녁 귀가 — 난방 계절 경계 (외기 12 → 5 °C)"
+    duration_s: 21600                    # 15:00 – 21:00
+    log_interval_s: 10
+    seed: 20264101
+    season: autumn
+    persona: commuter
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      <<: *init
+      user_mode: NORMAL
+      temperature_c: 19.0
+      humidity_pct: 50.0
+      illuminance_lux: 200.0
+      occupancy: false
+      occupant_zone: none
+      time_of_day: "15:00"
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: cloudy
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: 12.0
+      outdoor_rh_pct: 65.0
+      outdoor_illuminance_lux: 15000.0
+    injections:
+      - { at_s: 10800, door: open_close, label: arrive, open_s: 8 }     # 18:00
+    events:
+      - { at_s: 7200, set: { outdoor_temp_c: 9.0, outdoor_illuminance_lux: 3000.0 } }
+      - { at_s: 10800, set: { occupancy: true, occupant_zone: room, outdoor_illuminance_lux: 0.0 } }
+      - { at_s: 14400, set: { outdoor_temp_c: 5.0 } }
+    pass_criteria:
+      - "temperature >= 19.5 by 5400 after arrive_start"
+      - "temperature <= 25.0 for all t"
+      - "dew_margin >= 0 for all t"
+    metrics: [cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: HH402
+    <<: *common
+    tier: 1
+    name: "초봄 맑은 날 재택 — 강한 일사 · 외기 4 → 13 °C (난방 과잉 · 과열)"
+    duration_s: 28800                    # 08:00 – 16:00
+    log_interval_s: 10
+    seed: 20264102
+    season: spring
+    persona: home
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      <<: *init
+      user_mode: NORMAL
+      temperature_c: 20.5
+      humidity_pct: 35.0
+      illuminance_lux: 400.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "08:00"
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 20.0
+      outdoor_temp_c: 4.0
+      outdoor_rh_pct: 40.0
+      outdoor_illuminance_lux: 40000.0
+    events:
+      - { at_s: 10800, set: { outdoor_temp_c: 11.0, outdoor_illuminance_lux: 70000.0 } }
+      - { at_s: 18000, set: { outdoor_temp_c: 13.0, outdoor_illuminance_lux: 60000.0 } }
+    pass_criteria:
+      - "temperature <= 25.0 for all t"
+      - "temperature >= 19.5 for all t"
+      - "energy_cost_won <= baseline_A2V.energy_cost_won"
+    metrics: [overheat_time_s, gas_kwh, energy_cost_won]
+
+  - id: HH403
+    <<: *common
+    tier: 3
+    name: "외출 중 보일러 고장 · 노후 원룸 · 한파 — 귀가 전에 알린다"
+    duration_s: 36000                    # 08:00 – 18:00
+    log_interval_s: 10
+    seed: 20264103
+    season: winter
+    persona: commuter
+    environment_overrides: { heating.mode: hydronic, air_balance.base_infiltration_ach: 0.7, window.glazing_u_w_m2k: 4.2,
+                             thermal.envelope_outdoor_conductance_w_per_k: 6.6, heating.hydronic.fault_no_ignition: true }
+    initial:
+      <<: *init
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 38.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "08:00"
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -10.0
+      outdoor_rh_pct: 55.0
+      outdoor_illuminance_lux: 10000.0
+    injections:
+      - { at_s: 1200, door: open_close, label: leave, open_s: 8 }
+    events:
+      - { at_s: 1204, set: { occupancy: false, occupant_zone: none } }
+      - { at_s: 25200, set: { outdoor_temp_c: -12.0, outdoor_illuminance_lux: 0.0 } }
+    pass_criteria:
+      - "alert_raised('H_BOILER_FAULT') within 36000 after 0"
+      - "dew_margin >= 0 for all t"
+    metrics: [min_temp_c, condensation_exposure_s]
+
+  - id: HH404
+    <<: *common
+    tier: 3
+    name: "문 센서 고장(닫힘 고정) 평일 — 재실 폴백 · 외출 셋백 · 귀가 복귀"
+    duration_s: 50400                    # 07:00 – 21:00 (작성 오류 수정 · 결과 보기 전 · 2026-10-29: 43200 이면 판정 창 46800 s 가 실행을 넘는다)
+    log_interval_s: 10
+    seed: 20264104
+    season: winter
+    persona: commuter
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      <<: *init
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 38.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "07:00"
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: cloudy
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -5.0
+      outdoor_rh_pct: 55.0
+      outdoor_illuminance_lux: 8000.0
+    injections:
+      - { at_s: 0, fault: door_sensor_stuck, label: stuck }
+      - { at_s: 1800, door: open_close, label: leave, open_s: 8 }
+      - { at_s: 39600, door: open_close, label: arrive, open_s: 8 }
+    events:
+      - { at_s: 1804, set: { occupancy: false, occupant_zone: none } }
+      - { at_s: 39600, set: { occupancy: true, occupant_zone: room, outdoor_illuminance_lux: 0.0, outdoor_temp_c: -7.0 } }
+    pass_criteria:
+      - "temperature >= 12.0 for all t"
+      - "temperature >= 19.0 by 7200 after arrive_start"
+      - "dew_margin >= 0 for all t"
+    metrics: [cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: HH405
+    <<: *common
+    tier: 2
+    name: "노후 원룸 아침 샤워 2회 연속 (동거인) — 온수 우선 30분 · 결로"
+    duration_s: 9000                     # 06:30 – 09:00
+    seed: 20264105
+    season: winter
+    persona: commuter
+    environment_overrides: *old
+    initial:
+      <<: *init
+      user_mode: NORMAL
+      temperature_c: 20.5
+      humidity_pct: 40.0
+      co2_ppm: 1000.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      occupants: 2
+      time_of_day: "06:30"
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -6.0
+      outdoor_rh_pct: 65.0
+    injections:
+      - { at_s: 1200, source: shower, label: shower1, moisture_g: 280, duration_s: 900 }
+      - { at_s: 2160, source: shower, label: shower2, moisture_g: 280, duration_s: 900 }
+    pass_criteria:
+      - "dew_margin >= 0 for all t"
+      - "humidity <= 60 by 2400 after shower2_end"
+      - "temperature >= 18.5 for all t"
+    metrics: [humidity_recovery_time, condensation_exposure_s, cold_discomfort_kh, gas_kwh]
+
+  - id: HH406
+    tier: 3
+    <<: *common
+    name: "−18 °C 혹한 밤 · 노후 원룸 · 수면 — 보일러 용량 · 결로"
+    duration_s: 28800                    # 23:00 – 07:00
+    log_interval_s: 10
+    seed: 20264106
+    season: winter
+    persona: commuter
+    environment_overrides: *old
+    initial:
+      <<: *init
+      user_mode: SLEEP
+      temperature_c: 19.5
+      humidity_pct: 35.0
+      co2_ppm: 1000.0
+      illuminance_lux: 0.0
+      occupancy: true
+      occupant_zone: bed
+      time_of_day: "23:00"
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 19.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 12.0
+      outdoor_temp_c: -14.0
+      outdoor_rh_pct: 55.0
+    events:
+      - { at_s: 10800, set: { outdoor_temp_c: -18.0 } }
+      - { at_s: 25200, set: { outdoor_temp_c: -16.0 } }
+    pass_criteria:
+      - "temperature >= 17.5 for all t"
+      - "dew_margin >= 0 for all t"
+      - "base_vent_compliance_mode >= 0.9"
+    metrics: [condensation_exposure_s, cold_discomfort_kh, gas_kwh, energy_cost_won, base_vent_compliance_mode]
+
+  - id: HH407
+    <<: *common
+    tier: 1
+    name: "저녁 추위를 타서 조절기를 24 °C 로 올림 — 수동 존중 · 과열 · 환기"
+    duration_s: 7200                     # 20:00 – 22:00
+    seed: 20264107
+    season: winter
+    persona: commuter
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      <<: *init
+      user_mode: NORMAL
+      temperature_c: 20.5
+      humidity_pct: 38.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "20:00"
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -4.0
+      outdoor_rh_pct: 55.0
+    injections:
+      - { at_s: 600, manual: { device: boiler, action: "setpoint:24" }, label: manual_up }
+    pass_criteria:
+      - "boiler_setpoint >= 24 by 600 after manual_up_start"
+      - "boiler_setpoint >= 24 by 1680 after manual_up_start"
+      - "dew_margin >= 0 for all t"
+    metrics: [cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: HH408
+    <<: *common
+    tier: 3
+    name: "5일 해외여행 · 혹한 반복 · 귀가 없음 — 동파 · 외출당 프리히팅 없음"
+    duration_s: 432000
+    log_interval_s: 30
+    seed: 20264108
+    season: winter
+    persona: commuter
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      <<: *init
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 40.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "06:00"
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -6.0
+      outdoor_rh_pct: 55.0
+      outdoor_illuminance_lux: 0.0
+    injections:
+      - { at_s: 1800, door: open_close, label: leave, open_s: 8 }
+    events:
+      - { at_s: 1804, set: { occupancy: false, occupant_zone: none } }
+      - { at_s: 10800, set: { outdoor_temp_c: -3.0, outdoor_illuminance_lux: 25000.0 } }
+      - { at_s: 43200, set: { outdoor_temp_c: -10.0, outdoor_illuminance_lux: 0.0 } }
+      - { at_s: 97200, set: { outdoor_temp_c: -5.0, outdoor_illuminance_lux: 25000.0 } }
+      - { at_s: 129600, set: { outdoor_temp_c: -15.0, outdoor_illuminance_lux: 0.0 } }
+      - { at_s: 183600, set: { outdoor_temp_c: -9.0, outdoor_illuminance_lux: 25000.0 } }
+      - { at_s: 216000, set: { outdoor_temp_c: -13.0, outdoor_illuminance_lux: 0.0 } }
+      - { at_s: 270000, set: { outdoor_temp_c: -2.0, outdoor_illuminance_lux: 25000.0 } }
+      - { at_s: 302400, set: { outdoor_temp_c: -8.0, outdoor_illuminance_lux: 0.0 } }
+      - { at_s: 356400, set: { outdoor_temp_c: -4.0, outdoor_illuminance_lux: 25000.0 } }
+      - { at_s: 388800, set: { outdoor_temp_c: -11.0, outdoor_illuminance_lux: 0.0 } }
+    pass_criteria:
+      - "temperature >= 12.0 for all t"
+      - "dew_margin >= 0 for all t"
+      - "energy_cost_won <= baseline_A2V.energy_cost_won"
+    metrics: [gas_kwh, energy_cost_won, min_temp_c, boiler_ignitions]
+
+  - id: HH409
+    <<: *common
+    tier: 2
+    name: "노후 원룸 재택 공부 하루 — 공부 환기 40 m³/h ↔ 난방 · 결로"
+    duration_s: 43200                    # 09:00 – 21:00
+    log_interval_s: 10
+    seed: 20264109
+    season: winter
+    persona: home
+    environment_overrides: *old
+    initial:
+      <<: *init
+      user_mode: STUDY
+      temperature_c: 21.0
+      humidity_pct: 38.0
+      illuminance_lux: 500.0
+      occupancy: true
+      occupant_zone: desk
+      time_of_day: "09:00"
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: cloudy
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -6.0
+      outdoor_rh_pct: 60.0
+      outdoor_illuminance_lux: 10000.0
+    events:
+      - { at_s: 21600, set: { outdoor_temp_c: -3.0 } }
+      - { at_s: 30600, set: { outdoor_temp_c: -8.0, outdoor_illuminance_lux: 0.0 } }
+    pass_criteria:
+      - "base_vent_compliance_mode >= 0.95"
+      - "temperature >= 19.5 for all t"
+      - "dew_margin >= 0 for all t"
+      - "energy_cost_won <= baseline_A2V.energy_cost_won * 1.3"
+    metrics: [base_vent_compliance_mode, cold_discomfort_kh, gas_kwh, energy_cost_won]
+
+  - id: HH410
+    <<: *common
+    tier: 2
+    name: "겨울비 (외기 3 °C · 95 %) 실내 빨래 — 바깥 이슬점 높음 · 배기 제습 금지(I10)"
+    duration_s: 28800                    # 10:00 – 18:00
+    log_interval_s: 10
+    seed: 20264110
+    season: winter
+    persona: home
+    environment_overrides: { heating.mode: hydronic }
+    baseline_a: { auto_appliances: [dehumidifier] }
+    initial:
+      <<: *init
+      user_mode: NORMAL
+      temperature_c: 20.5
+      humidity_pct: 45.0
+      illuminance_lux: 300.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "10:00"
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: rain
+      outdoor_pm25_ugm3: 10.0
+      outdoor_temp_c: 3.0
+      outdoor_rh_pct: 95.0
+      outdoor_illuminance_lux: 4000.0
+    injections:
+      - { at_s: 600, appliance: washer, label: washer, power_w: 450, duration_s: 600, laundry_moisture_g: 1600 }
+    pass_criteria:
+      - "dew_margin >= 0 for all t"
+      - "humidity <= 65 for all t"
+      - "laundry_dry_time_s <= baseline_A2V.laundry_dry_time_s"
+    metrics: [laundry_dry_time_s, condensation_exposure_s, gas_kwh, energy_cost_won]
+
+  - id: HH411
+    <<: *common
+    tier: 1
+    name: "주말 짧은 외출 1.5 h (마트) — 셋백 · 귀가 쾌적 · 점화 횟수"
+    duration_s: 18000                    # 13:00 – 18:00
+    log_interval_s: 10
+    seed: 20264111
+    season: winter
+    persona: home
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      <<: *init
+      user_mode: NORMAL
+      temperature_c: 21.0
+      humidity_pct: 38.0
+      illuminance_lux: 400.0
+      occupancy: true
+      occupant_zone: room
+      time_of_day: "13:00"
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 21.0 } }
+    external:
+      weather: cloudy
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -2.0
+      outdoor_rh_pct: 55.0
+      outdoor_illuminance_lux: 12000.0
+    injections:
+      - { at_s: 3600, door: open_close, label: leave, open_s: 8 }
+      - { at_s: 9000, door: open_close, label: arrive, open_s: 8 }
+    events:
+      - { at_s: 3604, set: { occupancy: false, occupant_zone: none } }
+      - { at_s: 9000, set: { occupancy: true, occupant_zone: room } }
+    pass_criteria:
+      - "temperature >= 19.5 by 1800 after arrive_start"
+      - "dew_margin >= 0 for all t"
+      - "energy_cost_won <= baseline_A2V.energy_cost_won"
+    metrics: [cold_discomfort_kh, gas_kwh, energy_cost_won, boiler_ignitions]
+
+  - id: HH412
+    <<: *common
+    tier: 2
+    name: "밤 11시 귀가 · 샤워 · 바로 수면 — 늦은 프리히팅 · 수면 목표 · 결로"
+    duration_s: 28800                    # 18:00 – 02:00
+    log_interval_s: 10
+    seed: 20264112
+    season: winter
+    persona: commuter
+    environment_overrides: { heating.mode: hydronic }
+    initial:
+      <<: *init
+      user_mode: NORMAL
+      temperature_c: 17.0
+      humidity_pct: 40.0
+      illuminance_lux: 0.0
+      occupancy: false
+      occupant_zone: none
+      time_of_day: "18:00"
+      appliances: { purifier_level: 0, boiler: { power: true, setpoint: 16.0 } }
+    external:
+      weather: clear
+      outdoor_pm25_ugm3: 15.0
+      outdoor_temp_c: -5.0
+      outdoor_rh_pct: 60.0
+    injections:
+      - { at_s: 18000, door: open_close, label: arrive, open_s: 8 }     # 23:00
+      - { at_s: 19800, source: shower, label: shower, moisture_g: 280, duration_s: 900 }
+    events:
+      - { at_s: 18000, set: { occupancy: true, occupant_zone: room } }
+      - { at_s: 21600, set: { user_mode: SLEEP, occupant_zone: bed, motion: sleeping, outdoor_temp_c: -8.0 } }
+    pass_criteria:
+      - "temperature >= 19.0 by 3600 after arrive_start"
+      - "dew_margin >= 0 for all t"
+      - "humidity <= 60 by 2400 after shower_end"
+    metrics: [cold_discomfort_kh, condensation_exposure_s, gas_kwh, energy_cost_won]

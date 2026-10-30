@@ -406,6 +406,7 @@ smart_home_controller:
         learning_rate: 0.05
         min_samples_leaf: 5
         default_weekday: 2               # 시뮬레이션 시각에 요일이 없다 — 평일 대표(수) draft
+        use_calendar: true               # [v1.33-H C9-2] 제어기가 요일을 알면(시나리오 initial.weekday) 그 요일을 특성으로 (모르면 위 기본값)
       learned_model_file: 'models/energy_commuter.yaml'   # [v3.4.6] tools/energy/train_energy_model.py 산출물
       planner:                           # [v3.4.6] 기대비용 격자 탐색 (docs/08 §5.3) — draft
         sim_step_s: 300.0                # 2R2C 예측 적분 보폭
@@ -432,6 +433,31 @@ smart_home_controller:
       progressive_tariff:                # 선택 · 기본 비활성 (user_modes.yaml 에서 켬)
         summer_tiers_kwh: [300.0, 450.0]
         guard_setpoint_relax_c: 0.5
+
+    # ---- 난방 사다리 · 규칙 — [난방 확장 docs/14 §4] draft (boiler 가 가전 프로파일에 있을 때만 쓴다) ----
+    heating:
+      season_max_outdoor_c: 15.0       # 외기가 이 이하일 때만 난방 사다리
+      cooling_deadband_c: 2.0          # 난방 목표 ≤ 냉방 목표 − 이 값 (난방 ⟂ 냉방 · docs/14 F5)
+      frost_min_c: 10.0                # E16 동파 하한 — 어떤 모드에서도 이 아래로 설정하지 않는다
+      frost_alert_c: 12.0              # E16 — 실내가 이 아래면 사용자 알림 + 하한 강제
+      warmup_no_humidify_c: 1.0        # I12 — 실내가 난방 목표 − 이 값보다 낮으면(데우는 중) 가습하지 않는다 (차가운 방 = 차가운 창 → 결로 · H0 에서 발견)
+      preheat_quantile: 0.2            # 귀가 전 프리히팅 — 예측 귀가 분포의 이 분위 시각 (E13 프리쿨링과 같은 귀가 모델)
+      # [v1.31-H C1 · C2 · 2026-10-29] 필요 기반 · 외출 한 번에 한 번 (v1.30-H 의 '고정 120분' 대체 — EXP-H · HH207)
+      preheat_need_margin_c: 0.5       # 실내가 집 목표 − 이 값보다 따뜻하면 프리히팅하지 않는다
+      preheat_recover_min_per_k: 75.0  # draft — 바닥난방 회복 속도 (H0: 18 → 20.3 °C 3 h) · 시작 = 부족 K × 이 값 전
+      preheat_lead_max_min: 180.0      # 시작 상한
+      preheat_trip_after_h: 24.0       # 외출이 이보다 길면 여행으로 보고 프리히팅하지 않는다
+      preheat_weekday_aware: true      # [v1.33-H C9-3] 요일을 알면 출근일에 놓친 귀가 = 여행 · 주말은 24 h 초과만 그날 안 함 (BOPTEST 주말 외박 · docs/14 §17)
+      condensation_staged: true        # [v1.32-H C7] 난방 중 E2 '위험' 의 제습 · 간헐 환기는 지금 여유 < 위험 기준일 때만 (블라인드 · 역회전 · 가습 금지는 래치 유지)
+      humidify_heating_target: true    # [v1.32-H C6] 난방 중 가습 목표 = 하한 + 아래 값 · 실링팬 상한 확장은 결로 상한이 그 목표를 막을 때만
+      humidify_target_above_lo_pct: 5.0   # [v1.32-H C6] 난방 중 가습 정지 목표 = 모드 하한 + 이 값 (40 → 45 %) · 결로 상한(I4)은 그대로
+      laundry_boost_c: 1.5             # I14 — 빨래 건조 중 목표 + 이 값 (L4.5 허용 손실 예산 안)
+      vent_pause_window_ratio: 0.05    # I11 — 창문이 이 이상 열려 있으면 보일러 일시 정지 (동파 하한은 유지)
+      fan_reverse_rung: false          # [v1.32-H C5] 사다리 3 끔 — 바닥난방은 성층이 작고 참값은 공기 1노드라 상시 30 W 만 쓴다 (HH402 · docs/14 §16 D1)
+      fan_reverse_above_c: 0.0         # 사다리 3 — 난방 중 실링팬 역회전 약 (재실 · 소음 등급 허용 시) · 목표 − 이 값 아래일 때
+      blind_open_daylight_lux: 2000.0  # 사다리 1 — 낮 · 외부 조도 이상이면 블라인드 개방 요구 (일사 받기)
+      blind_close_night: true          # 사다리 2 (밤 블라인드 닫기) — [v1.31-H C3] 닫았을 때 결로 여유가 아래 값 이상일 때만 (v1.30-H 는 결로로 꺼 둠 · H7)
+      night_blind_dew_guard_c: 3.0     # draft — 닫힘 상태 유리 표면 결로 여유 (제어기 추정) 하한
 
     # ---- 열 · 건조 모델 — [신설 v3.1] (계수는 environment_model.yaml, W08 확정) ----
     thermal_model:
@@ -622,6 +648,20 @@ smart_home_controller:
         std:  [ceiling_light, desk_lamp, exhaust_fan, blind, window, ac, range_hood, cooktop_plug]
         full: [ceiling_light, desk_lamp, exhaust_fan, blind, window,
                ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood, cooktop_plug]
+        # [난방 확장 docs/14] full + 보일러(Wi-Fi 룸 온도조절기) — 난방 시나리오만 쓴다 (기본 프로파일은 그대로 full)
+        full_heating: [ceiling_light, desk_lamp, exhaust_fan, blind, window,
+                       ac, dehumidifier, humidifier, ceiling_fan, intake_fan, purifier, range_hood, cooktop_plug, boiler]
+      boiler:                          # [난방 확장 docs/14 §2 · §4.6] Wi-Fi 룸 온도조절기 (H-a) — draft
+        interface: 'wifi_thermostat'
+        setpoint_range_c: [10.0, 28.0]
+        setpoint_step_c: 0.5           # 조절기 설정 단위
+        min_power_toggle_s: 300.0      # L0 — 전원 켬/끔 최소 간격 (보일러 자체 보호와 별개)
+        min_setpoint_change_s: 120.0   # L0 — 설정 변경 최소 간격 (조절기 · 보일러 잦은 점화 방지)
+        fault_demand_below_c: 0.5      # [v1.32-H C8] E17 — 조절기 켬 · 실내 < 설정 − 이 값이면 '연소 요구' (참값 조절기 점화 = 설정 − 0.25 · 센서 잡음 여유) · 전 1.0
+        fault_confirm_s: 900.0         # E17 — 연소 요구가 이만큼 이어졌는데 (v1.32-H C8: 1800 → 900 · 보일러 최소 꺼짐 300 s + 점화 · 공급수 상승)
+        fault_burn_w_min: 40.0         #       보일러 전력이 이 아래이고
+        fault_power_decides: true      # [v1.32-H C8′] 전력을 알면 전력만으로 판단 (실내 온도는 축열 · 일사로도 오른다 · H11 개발 실행) — 모르면 아래 온도 상승
+        fault_temp_rise_c: 0.3         #       실내 온도도 이만큼 못 올랐으면 이상
       ac:
         interface: 'ir'
         setpoint_range_c: [18.0, 30.0]

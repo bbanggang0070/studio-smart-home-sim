@@ -73,4 +73,12 @@ def clamp_user_modes(modes: dict[str, Any]) -> list[str]:
         lt = m.get("lighting") or {}
         if lt.get("cct_k"):
             lt["cct_k"] = clip(f"{name}.cct_k", lt["cct_k"], r.get("cct_k"))
+        # 난방 확장 (docs/14 §4.2) — 키가 없으면 아무것도 하지 않는다 (v1.29 설정과 같다)
+        hkey = "sleep_heating_setpoint_c" if name == "SLEEP" else "heating_setpoint_c"
+        if m.get("heating_setpoint_c") is not None:
+            m["heating_setpoint_c"] = clip(f"{name}.heating_setpoint_c", m["heating_setpoint_c"], r.get(hkey))
+    en = modes.get("energy") or {}
+    if en.get("away_heating_setback_c") is not None:
+        en["away_heating_setback_c"] = clip("energy.away_heating_setback_c", en["away_heating_setback_c"],
+                                            r.get("away_heating_setback_c"))
     return changed

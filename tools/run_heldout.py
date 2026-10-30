@@ -30,8 +30,21 @@ def main() -> None:
     ap.add_argument("--scenarios", default="")
     ap.add_argument("--tag", default="")
     ap.add_argument("--extra-baselines", default="")   # 예: A2 (기준선 A′ · 2026-10-26)
+    ap.add_argument("--freeze-config", default="")     # [난방 확장] config/freeze_heating.yaml
+    ap.add_argument("--known-issues", default="")      # 이미 공개한 작성 오류 시나리오 (예: HH311) — 등록본 그대로 다시 돌릴 때만 · docs/15 에 적을 것
+    ap.add_argument("--keep-raw", action="store_true") # 기본은 시계열 저장 안 함 (디스크 · 2026-10-29)
     a = ap.parse_args()
-    chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py"), "--group", "all"],
+    if a.scenarios:                                    # 작성 점검 (시작 결로 여유 · 창문 == 0 · 기준선 에너지 비교) — 통과해야 실행
+        ck = subprocess.run([sys.executable, str(REPO / "tools" / "check_scenarios.py"), a.scenarios], capture_output=True, text=True)
+        print(ck.stdout.strip())
+        known = {x for x in a.known_issues.split(",") if x}
+        flagged = {ln.split()[0] for ln in ck.stdout.splitlines() if "⚠" in ln}
+        if ck.returncode != 0 and flagged and flagged <= known:
+            print(f"작성 점검: 알려진 작성 오류 {sorted(flagged)} — 등록본 그대로 실행 (docs/15 공개)")
+        elif ck.returncode != 0:
+            sys.exit("시나리오 작성 점검 실패 — 등록 전에 고칠 것 (tools/check_scenarios.py · 보류 난방 1차 교훈)")
+    fz = ["--config", a.freeze_config] if a.freeze_config else []
+    chk = subprocess.run([sys.executable, str(REPO / "tools" / "check_freeze.py"), "--group", "all", *fz],
                          capture_output=True, text=True)
     print(chk.stdout.strip())
     if chk.returncode != 0:
@@ -40,6 +53,7 @@ def main() -> None:
     hcfg["paths"]["scenarios"] = a.scenarios or hcfg["heldout"]["scenarios"]
     sfx = f"_{a.tag}" if a.tag else ""
     out = REPO / (hcfg["heldout"]["out_dir"] + sfx)
+    hcfg["keep_raw"] = a.keep_raw
     if a.extra_baselines:
         hcfg["extra_baselines"] = {x: "A" for x in a.extra_baselines.split(",") if x}
     res = run_batch(hcfg=hcfg, out_dir=out, progress=lambda m: None)

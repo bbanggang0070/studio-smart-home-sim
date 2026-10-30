@@ -93,12 +93,15 @@ controllers:
   proposed: "controller.smart_home:SmartHomeController"   # W09 v1 — 규칙 + 모드 + 이벤트 · 6계층 중재
   proposed_np: "controller.smart_home:SmartHomeController"   # Proposed−P (docs/03 C15) — 우선 목표(L4.5) 비활성
   A2V: "controller.baseline_a2:BaselineAPrimeVent"   # [2026-10-29] A′ + 24시간 환기장치 (v1.31-H 결과 보기 전 · baselines.yaml baseline_a2v)
+  proposed_kostat: "variant:proposed_kostat"   # [docs/15 §16] 귀가 이력만 통계청 2024 표본 (민감도 · 기본값 아님)
   proposed_v132: "variant:proposed_v132"   # [v1.33-H docs/15 §14] v1.33-H 플래그만 v1.32-H 값 (요일 무시) — 같은 데이터 짝
   proposed_v131: "variant:proposed_v131"   # [v1.32-H docs/15 §12] v1.32-H 수정 플래그를 v1.31-H 값으로 — 같은 새 데이터 짝 비교 (H-RQ6)
   A2: "controller.baseline_a2:BaselineAPrime"   # [2026-10-26] A′ — 상용 스마트홈 허브 수준 규칙 자동화 (docs/11 권장 7 · baselines.yaml baseline_a2)
 
 # [v1.32-H] 같은 협조 제어기의 임계값 변형 (controllers 의 "variant:<이름>") — 키는 thresholds 점 경로
 controller_variants:
+  proposed_kostat:
+    energy.learned_model_file: models/energy_commuter_kostat.yaml   # 귀가 이력만 다르다 (열 모델 같음)
   proposed_v132:
     heating.preheat_weekday_aware: false            # C9 전 (요일을 알아도 여행 판정 = 외출 24 h 초과)
     energy.arrival_gbm.use_calendar: false          # C9 전 (귀가 GBM 요일 = 수 고정)
@@ -114,6 +117,7 @@ controller_variants:
 rng_alias:
   proposed_v131: proposed
   proposed_v132: proposed
+  proposed_kostat: proposed
 
 extra_baselines: {}                   # [2026-10-26] {추가: 짝} — 짝 기준선을 돌리는 시나리오에서 추가 기준선도 (도구 --extra-baselines A2 → {A2: A})
 
@@ -525,3 +529,14 @@ building_presets:
   #  old_light = 노후 + 가벼운 구조 (옥탑 · 샌드위치 패널 · 목조 · 건식 온수 패널) — 열용량 ×0.4 · τ12 ≈ 48 h (영국 742가구 실측 중앙값 44.4 h · docs/14 §16 D5)
   old_light: { air_balance.base_infiltration_ach: 0.7, window.glazing_u_w_m2k: 4.2, thermal.envelope_outdoor_conductance_w_per_k: 6.6,
                thermal.mass_capacity_wh_per_k: 600.0, thermal.envelope_capacity_wh_per_k: 320.0, heating.hydronic.floor_capacity_wh_per_k: 200.0 }
+
+# ---- [2026-10-30] 공개 생활시간 통계로 귀가 분포 점검 (docs/11 권장 9 · tools/energy/timeuse_calibration.py · data/timeuse/) ----
+timeuse_calibration:
+  work_share_file: data/timeuse/kostat_2024_work_share_weekday.csv
+  column: all_2024
+  plateau: ["14:00", "16:30"]      # 오후 근무 비율 기준 구간 (이 평균 = 아직 일하는 사람 100 %)
+  end_from: "16:30"                # 이 시각부터의 감소를 퇴근으로 본다 (점심 감소 제외)
+  commute_one_way_min: 45.0        # 서울 평일 출퇴근 행위자 평균 1:30 (왕복) — 보도자료 45쪽
+  commute_sd_min: 15.0             # draft — 통근 시간 개인차
+  samples: 20000
+  seed: 20261030

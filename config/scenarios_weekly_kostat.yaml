@@ -1,0 +1,1601 @@
+# ============================================================================
+#  귀가 분포 보정 민감도 K1–K6 (docs/15 §16) — tools/scenarios/gen_weekly_kostat.py 가 만든다 (손으로 고치지 않는다)
+#  평일 귀가 = 통계청 2024 생활시간조사 분포 (data/timeuse) · 실행 전 생성 · 등록
+# ============================================================================
+scenarios:
+- id: K1
+  tier: 3
+  name: 평일 귀가 = 통계청 2024 분포 표본 (17:05, 19:48, 21:02, 18:33, 20:05) · 주말 재택 — 기본 원룸
+  duration_s: 604800
+  log_interval_s: 60
+  repeat: 3
+  baselines:
+  - A
+  - B
+  - proposed
+  seed: 20263400
+  run_mode: fast
+  appliance_profile: full_heating
+  season: winter
+  persona: commuter
+  power_limit_w: 3000
+  environment_overrides:
+    heating.mode: hydronic
+  initial:
+    thermal_steady: true
+    weekday: 0
+    user_mode: SLEEP
+    temperature_c: 20.0
+    humidity_pct: 38.0
+    co2_ppm: 900.0
+    pm25_ugm3: 8.0
+    illuminance_lux: 0.0
+    occupancy: true
+    occupant_zone: bed
+    motion: sleeping
+    time_of_day: 00:00
+    window_open_ratio: 0.0
+    blind_angle_deg: 0.0
+    appliances:
+      purifier_level: 0
+      boiler:
+        power: true
+        setpoint: 19.0
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 15.0
+    outdoor_temp_c: -6.0
+    outdoor_rh_pct: 55.0
+    outdoor_illuminance_lux: 0.0
+  injections:
+  - at_s: 29940
+    door: open_close
+    label: leave0
+    open_s: 8
+  - at_s: 61500
+    door: open_close
+    label: arrive0
+    open_s: 8
+  - at_s: 115440
+    door: open_close
+    label: leave1
+    open_s: 8
+  - at_s: 157680
+    door: open_close
+    label: arrive1
+    open_s: 8
+  - at_s: 201180
+    door: open_close
+    label: leave2
+    open_s: 8
+  - at_s: 248520
+    door: open_close
+    label: arrive2
+    open_s: 8
+  - at_s: 287460
+    door: open_close
+    label: leave3
+    open_s: 8
+  - at_s: 325980
+    door: open_close
+    label: arrive3
+    open_s: 8
+  - at_s: 374340
+    door: open_close
+    label: leave4
+    open_s: 8
+  - at_s: 417900
+    door: open_close
+    label: arrive4
+    open_s: 8
+  events:
+  - at_s: 25200
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 29944
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 61200
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 61500
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 84600
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 111600
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 115444
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 147600
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 157680
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 171000
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 198000
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 201184
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 234000
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 248520
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 257400
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 284400
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 287464
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 320400
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 325980
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 343800
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 370800
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 374344
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 406800
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 417900
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 430200
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 457200
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 493200
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 516600
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 543600
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 579600
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 603000
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  pass_criteria:
+  - temperature >= 12.0 for all t
+  - dew_margin >= 0 for all t
+  - energy_cost_won <= baseline_A2V.energy_cost_won
+  - temperature >= 19.5 by 3600 after arrive0_start
+  - temperature >= 19.5 by 3600 after arrive1_start
+  - temperature >= 19.5 by 3600 after arrive2_start
+  - temperature >= 19.5 by 3600 after arrive3_start
+  - temperature >= 19.5 by 3600 after arrive4_start
+  metrics:
+  - cold_discomfort_kh
+  - gas_kwh
+  - energy_cost_won
+  - min_temp_c
+  - boiler_ignitions
+- id: K2
+  tier: 3
+  name: 평일 귀가 = 통계청 2024 분포 표본 (19:19, 19:35, 21:25, 17:15, 17:33) · 주말 재택 — 노후 원룸
+  duration_s: 604800
+  log_interval_s: 60
+  repeat: 3
+  baselines:
+  - A
+  - B
+  - proposed
+  seed: 20263401
+  run_mode: fast
+  appliance_profile: full_heating
+  season: winter
+  persona: commuter
+  power_limit_w: 3000
+  environment_overrides:
+    heating.mode: hydronic
+    air_balance.base_infiltration_ach: 0.7
+    window.glazing_u_w_m2k: 4.2
+    thermal.envelope_outdoor_conductance_w_per_k: 6.6
+  initial:
+    thermal_steady: true
+    weekday: 0
+    user_mode: SLEEP
+    temperature_c: 20.0
+    humidity_pct: 38.0
+    co2_ppm: 900.0
+    pm25_ugm3: 8.0
+    illuminance_lux: 0.0
+    occupancy: true
+    occupant_zone: bed
+    motion: sleeping
+    time_of_day: 00:00
+    window_open_ratio: 0.0
+    blind_angle_deg: 0.0
+    appliances:
+      purifier_level: 0
+      boiler:
+        power: true
+        setpoint: 19.0
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 15.0
+    outdoor_temp_c: -9.0
+    outdoor_rh_pct: 55.0
+    outdoor_illuminance_lux: 0.0
+  injections:
+  - at_s: 29820
+    door: open_close
+    label: leave0
+    open_s: 8
+  - at_s: 69540
+    door: open_close
+    label: arrive0
+    open_s: 8
+  - at_s: 115140
+    door: open_close
+    label: leave1
+    open_s: 8
+  - at_s: 156900
+    door: open_close
+    label: arrive1
+    open_s: 8
+  - at_s: 202380
+    door: open_close
+    label: leave2
+    open_s: 8
+  - at_s: 249900
+    door: open_close
+    label: arrive2
+    open_s: 8
+  - at_s: 286620
+    door: open_close
+    label: leave3
+    open_s: 8
+  - at_s: 321300
+    door: open_close
+    label: arrive3
+    open_s: 8
+  - at_s: 373440
+    door: open_close
+    label: leave4
+    open_s: 8
+  - at_s: 408780
+    door: open_close
+    label: arrive4
+    open_s: 8
+  events:
+  - at_s: 25200
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 29824
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 61200
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 69540
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 84600
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 111600
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 115144
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 147600
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 156900
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 171000
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 198000
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 202384
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 234000
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 249900
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 257400
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 284400
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 286624
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 320400
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 321300
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 343800
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 370800
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 373444
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 406800
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 408780
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 430200
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 457200
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 493200
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 516600
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 543600
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 579600
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 603000
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  pass_criteria:
+  - temperature >= 12.0 for all t
+  - dew_margin >= 0 for all t
+  - energy_cost_won <= baseline_A2V.energy_cost_won
+  - temperature >= 19.5 by 3600 after arrive0_start
+  - temperature >= 19.5 by 3600 after arrive1_start
+  - temperature >= 19.5 by 3600 after arrive2_start
+  - temperature >= 19.5 by 3600 after arrive3_start
+  - temperature >= 19.5 by 3600 after arrive4_start
+  metrics:
+  - cold_discomfort_kh
+  - gas_kwh
+  - energy_cost_won
+  - min_temp_c
+  - boiler_ignitions
+- id: K3
+  tier: 3
+  name: 평일 귀가 = 통계청 2024 분포 표본 (18:02, 19:50, 18:57, 17:47, 18:01) · 주말 재택 — 가벼운 노후 원룸
+  duration_s: 604800
+  log_interval_s: 60
+  repeat: 3
+  baselines:
+  - A
+  - B
+  - proposed
+  seed: 20263402
+  run_mode: fast
+  appliance_profile: full_heating
+  season: winter
+  persona: commuter
+  power_limit_w: 3000
+  environment_overrides:
+    heating.mode: hydronic
+    air_balance.base_infiltration_ach: 0.7
+    window.glazing_u_w_m2k: 4.2
+    thermal.envelope_outdoor_conductance_w_per_k: 6.6
+    thermal.mass_capacity_wh_per_k: 600.0
+    thermal.envelope_capacity_wh_per_k: 320.0
+    heating.hydronic.floor_capacity_wh_per_k: 200.0
+  initial:
+    thermal_steady: true
+    weekday: 0
+    user_mode: SLEEP
+    temperature_c: 20.0
+    humidity_pct: 38.0
+    co2_ppm: 900.0
+    pm25_ugm3: 8.0
+    illuminance_lux: 0.0
+    occupancy: true
+    occupant_zone: bed
+    motion: sleeping
+    time_of_day: 00:00
+    window_open_ratio: 0.0
+    blind_angle_deg: 0.0
+    appliances:
+      purifier_level: 0
+      boiler:
+        power: true
+        setpoint: 19.0
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 15.0
+    outdoor_temp_c: -3.0
+    outdoor_rh_pct: 55.0
+    outdoor_illuminance_lux: 0.0
+  injections:
+  - at_s: 28800
+    door: open_close
+    label: leave0
+    open_s: 8
+  - at_s: 64920
+    door: open_close
+    label: arrive0
+    open_s: 8
+  - at_s: 116640
+    door: open_close
+    label: leave1
+    open_s: 8
+  - at_s: 157800
+    door: open_close
+    label: arrive1
+    open_s: 8
+  - at_s: 200580
+    door: open_close
+    label: leave2
+    open_s: 8
+  - at_s: 241020
+    door: open_close
+    label: arrive2
+    open_s: 8
+  - at_s: 289560
+    door: open_close
+    label: leave3
+    open_s: 8
+  - at_s: 323220
+    door: open_close
+    label: arrive3
+    open_s: 8
+  - at_s: 373980
+    door: open_close
+    label: leave4
+    open_s: 8
+  - at_s: 410460
+    door: open_close
+    label: arrive4
+    open_s: 8
+  events:
+  - at_s: 25200
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 28804
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 61200
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 64920
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 84600
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 111600
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 116644
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 147600
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 157800
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 171000
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 198000
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 200584
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 234000
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 241020
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 257400
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 284400
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 289564
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 320400
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 323220
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 343800
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 370800
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 373984
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 406800
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 410460
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 430200
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 457200
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 493200
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 516600
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 543600
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 579600
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 603000
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  pass_criteria:
+  - temperature >= 12.0 for all t
+  - dew_margin >= 0 for all t
+  - energy_cost_won <= baseline_A2V.energy_cost_won
+  - temperature >= 19.5 by 3600 after arrive0_start
+  - temperature >= 19.5 by 3600 after arrive1_start
+  - temperature >= 19.5 by 3600 after arrive2_start
+  - temperature >= 19.5 by 3600 after arrive3_start
+  - temperature >= 19.5 by 3600 after arrive4_start
+  metrics:
+  - cold_discomfort_kh
+  - gas_kwh
+  - energy_cost_won
+  - min_temp_c
+  - boiler_ignitions
+- id: K4
+  tier: 3
+  name: 평일 귀가 = 통계청 2024 분포 표본 (18:13, 19:13, 18:26, 18:28, 19:17) · 주말 재택 — 기본 원룸
+  duration_s: 604800
+  log_interval_s: 60
+  repeat: 3
+  baselines:
+  - A
+  - B
+  - proposed
+  seed: 20263403
+  run_mode: fast
+  appliance_profile: full_heating
+  season: winter
+  persona: commuter
+  power_limit_w: 3000
+  environment_overrides:
+    heating.mode: hydronic
+  initial:
+    thermal_steady: true
+    weekday: 0
+    user_mode: SLEEP
+    temperature_c: 20.0
+    humidity_pct: 38.0
+    co2_ppm: 900.0
+    pm25_ugm3: 8.0
+    illuminance_lux: 0.0
+    occupancy: true
+    occupant_zone: bed
+    motion: sleeping
+    time_of_day: 00:00
+    window_open_ratio: 0.0
+    blind_angle_deg: 0.0
+    appliances:
+      purifier_level: 0
+      boiler:
+        power: true
+        setpoint: 19.0
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 15.0
+    outdoor_temp_c: -6.0
+    outdoor_rh_pct: 55.0
+    outdoor_illuminance_lux: 0.0
+  injections:
+  - at_s: 27480
+    door: open_close
+    label: leave0
+    open_s: 8
+  - at_s: 65580
+    door: open_close
+    label: arrive0
+    open_s: 8
+  - at_s: 114000
+    door: open_close
+    label: leave1
+    open_s: 8
+  - at_s: 155580
+    door: open_close
+    label: arrive1
+    open_s: 8
+  - at_s: 201420
+    door: open_close
+    label: leave2
+    open_s: 8
+  - at_s: 239160
+    door: open_close
+    label: arrive2
+    open_s: 8
+  - at_s: 288000
+    door: open_close
+    label: leave3
+    open_s: 8
+  - at_s: 325680
+    door: open_close
+    label: arrive3
+    open_s: 8
+  - at_s: 374040
+    door: open_close
+    label: leave4
+    open_s: 8
+  - at_s: 415020
+    door: open_close
+    label: arrive4
+    open_s: 8
+  events:
+  - at_s: 25200
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 27484
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 61200
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 65580
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 84600
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 111600
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 114004
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 147600
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 155580
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 171000
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 198000
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 201424
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 234000
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 239160
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 257400
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 284400
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 288004
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 320400
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 325680
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 343800
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 370800
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 374044
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 406800
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 415020
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 430200
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 457200
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 493200
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 516600
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 543600
+    set:
+      outdoor_temp_c: 2.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 579600
+    set:
+      outdoor_temp_c: -6.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 603000
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  pass_criteria:
+  - temperature >= 12.0 for all t
+  - dew_margin >= 0 for all t
+  - energy_cost_won <= baseline_A2V.energy_cost_won
+  - temperature >= 19.5 by 3600 after arrive0_start
+  - temperature >= 19.5 by 3600 after arrive1_start
+  - temperature >= 19.5 by 3600 after arrive2_start
+  - temperature >= 19.5 by 3600 after arrive3_start
+  - temperature >= 19.5 by 3600 after arrive4_start
+  metrics:
+  - cold_discomfort_kh
+  - gas_kwh
+  - energy_cost_won
+  - min_temp_c
+  - boiler_ignitions
+- id: K5
+  tier: 3
+  name: 평일 귀가 = 통계청 2024 분포 표본 (18:31, 19:04, 17:36, 18:43, 18:09) · 주말 재택 — 노후 원룸
+  duration_s: 604800
+  log_interval_s: 60
+  repeat: 3
+  baselines:
+  - A
+  - B
+  - proposed
+  seed: 20263404
+  run_mode: fast
+  appliance_profile: full_heating
+  season: winter
+  persona: commuter
+  power_limit_w: 3000
+  environment_overrides:
+    heating.mode: hydronic
+    air_balance.base_infiltration_ach: 0.7
+    window.glazing_u_w_m2k: 4.2
+    thermal.envelope_outdoor_conductance_w_per_k: 6.6
+  initial:
+    thermal_steady: true
+    weekday: 0
+    user_mode: SLEEP
+    temperature_c: 20.0
+    humidity_pct: 38.0
+    co2_ppm: 900.0
+    pm25_ugm3: 8.0
+    illuminance_lux: 0.0
+    occupancy: true
+    occupant_zone: bed
+    motion: sleeping
+    time_of_day: 00:00
+    window_open_ratio: 0.0
+    blind_angle_deg: 0.0
+    appliances:
+      purifier_level: 0
+      boiler:
+        power: true
+        setpoint: 19.0
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 15.0
+    outdoor_temp_c: -9.0
+    outdoor_rh_pct: 55.0
+    outdoor_illuminance_lux: 0.0
+  injections:
+  - at_s: 29220
+    door: open_close
+    label: leave0
+    open_s: 8
+  - at_s: 66660
+    door: open_close
+    label: arrive0
+    open_s: 8
+  - at_s: 114960
+    door: open_close
+    label: leave1
+    open_s: 8
+  - at_s: 155040
+    door: open_close
+    label: arrive1
+    open_s: 8
+  - at_s: 201360
+    door: open_close
+    label: leave2
+    open_s: 8
+  - at_s: 236160
+    door: open_close
+    label: arrive2
+    open_s: 8
+  - at_s: 287880
+    door: open_close
+    label: leave3
+    open_s: 8
+  - at_s: 326580
+    door: open_close
+    label: arrive3
+    open_s: 8
+  - at_s: 374520
+    door: open_close
+    label: leave4
+    open_s: 8
+  - at_s: 410940
+    door: open_close
+    label: arrive4
+    open_s: 8
+  events:
+  - at_s: 25200
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 29224
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 61200
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 66660
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 84600
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 111600
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 114964
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 147600
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 155040
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 171000
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 198000
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 201364
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 234000
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 236160
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 257400
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 284400
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 287884
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 320400
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 326580
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 343800
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 370800
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 374524
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 406800
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 410940
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 430200
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 457200
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 493200
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 516600
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 543600
+    set:
+      outdoor_temp_c: 0.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 579600
+    set:
+      outdoor_temp_c: -9.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 603000
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  pass_criteria:
+  - temperature >= 12.0 for all t
+  - dew_margin >= 0 for all t
+  - energy_cost_won <= baseline_A2V.energy_cost_won
+  - temperature >= 19.5 by 3600 after arrive0_start
+  - temperature >= 19.5 by 3600 after arrive1_start
+  - temperature >= 19.5 by 3600 after arrive2_start
+  - temperature >= 19.5 by 3600 after arrive3_start
+  - temperature >= 19.5 by 3600 after arrive4_start
+  metrics:
+  - cold_discomfort_kh
+  - gas_kwh
+  - energy_cost_won
+  - min_temp_c
+  - boiler_ignitions
+- id: K6
+  tier: 3
+  name: 평일 귀가 = 통계청 2024 분포 표본 (18:30, 18:36, 18:25, 18:36, 20:10) · 주말 재택 — 가벼운 노후 원룸
+  duration_s: 604800
+  log_interval_s: 60
+  repeat: 3
+  baselines:
+  - A
+  - B
+  - proposed
+  seed: 20263405
+  run_mode: fast
+  appliance_profile: full_heating
+  season: winter
+  persona: commuter
+  power_limit_w: 3000
+  environment_overrides:
+    heating.mode: hydronic
+    air_balance.base_infiltration_ach: 0.7
+    window.glazing_u_w_m2k: 4.2
+    thermal.envelope_outdoor_conductance_w_per_k: 6.6
+    thermal.mass_capacity_wh_per_k: 600.0
+    thermal.envelope_capacity_wh_per_k: 320.0
+    heating.hydronic.floor_capacity_wh_per_k: 200.0
+  initial:
+    thermal_steady: true
+    weekday: 0
+    user_mode: SLEEP
+    temperature_c: 20.0
+    humidity_pct: 38.0
+    co2_ppm: 900.0
+    pm25_ugm3: 8.0
+    illuminance_lux: 0.0
+    occupancy: true
+    occupant_zone: bed
+    motion: sleeping
+    time_of_day: 00:00
+    window_open_ratio: 0.0
+    blind_angle_deg: 0.0
+    appliances:
+      purifier_level: 0
+      boiler:
+        power: true
+        setpoint: 19.0
+  external:
+    weather: clear
+    outdoor_pm25_ugm3: 15.0
+    outdoor_temp_c: -3.0
+    outdoor_rh_pct: 55.0
+    outdoor_illuminance_lux: 0.0
+  injections:
+  - at_s: 28440
+    door: open_close
+    label: leave0
+    open_s: 8
+  - at_s: 66600
+    door: open_close
+    label: arrive0
+    open_s: 8
+  - at_s: 113460
+    door: open_close
+    label: leave1
+    open_s: 8
+  - at_s: 153360
+    door: open_close
+    label: arrive1
+    open_s: 8
+  - at_s: 200580
+    door: open_close
+    label: leave2
+    open_s: 8
+  - at_s: 239100
+    door: open_close
+    label: arrive2
+    open_s: 8
+  - at_s: 286440
+    door: open_close
+    label: leave3
+    open_s: 8
+  - at_s: 326160
+    door: open_close
+    label: arrive3
+    open_s: 8
+  - at_s: 376020
+    door: open_close
+    label: leave4
+    open_s: 8
+  - at_s: 418200
+    door: open_close
+    label: arrive4
+    open_s: 8
+  events:
+  - at_s: 25200
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 28444
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 61200
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 66600
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 84600
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 111600
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 113464
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 147600
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 153360
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 171000
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 198000
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 200584
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 234000
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 239100
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 257400
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 284400
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 286444
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 320400
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 326160
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 343800
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 370800
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 376024
+    set:
+      occupancy: false
+      occupant_zone: none
+  - at_s: 406800
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 418200
+    set:
+      occupancy: true
+      occupant_zone: room
+      user_mode: NORMAL
+      motion: still
+  - at_s: 430200
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 457200
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 493200
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 516600
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  - at_s: 543600
+    set:
+      outdoor_temp_c: 4.0
+      outdoor_illuminance_lux: 20000.0
+      user_mode: NORMAL
+      occupant_zone: room
+      motion: still
+  - at_s: 579600
+    set:
+      outdoor_temp_c: -3.0
+      outdoor_illuminance_lux: 0.0
+  - at_s: 603000
+    set:
+      user_mode: SLEEP
+      occupant_zone: bed
+      motion: sleeping
+  pass_criteria:
+  - temperature >= 12.0 for all t
+  - dew_margin >= 0 for all t
+  - energy_cost_won <= baseline_A2V.energy_cost_won
+  - temperature >= 19.5 by 3600 after arrive0_start
+  - temperature >= 19.5 by 3600 after arrive1_start
+  - temperature >= 19.5 by 3600 after arrive2_start
+  - temperature >= 19.5 by 3600 after arrive3_start
+  - temperature >= 19.5 by 3600 after arrive4_start
+  metrics:
+  - cold_discomfort_kh
+  - gas_kwh
+  - energy_cost_won
+  - min_temp_c
+  - boiler_ignitions

@@ -94,6 +94,14 @@ def main() -> None:
     for a in (ax1, ax2):
         a.spines["left"].set_color(GRID)
     fig.tight_layout()
+    # 발표용 패널 따로 (덱 v2 14 · 15장) — 같은 그림의 각 축만
+    fig.canvas.draw()
+    for ax, name in ((ax1, "heating_confirmed.png"), (ax2, "heating_posthoc.png")):
+        bb = ax.get_tightbbox(fig.canvas.get_renderer()).transformed(fig.dpi_scale_trans.inverted())
+        if ax is ax2:   # 범례(축 아래)까지
+            leg = ax2.get_legend().get_window_extent(fig.canvas.get_renderer()).transformed(fig.dpi_scale_trans.inverted())
+            bb = bb.union([bb, leg]) if hasattr(bb, "union") else bb
+        fig.savefig(REPO / "results" / "figures" / name, bbox_inches=bb.expanded(1.03, 1.05))
     out = REPO / "results" / "figures" / "heating_extension.png"
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out)

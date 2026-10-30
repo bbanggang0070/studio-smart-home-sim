@@ -16,6 +16,7 @@
 | `randomized_thresholds_summary_filled.csv` | 임계값 ±20 % (A2) — 보류 3개 시나리오 채움 | `--profile threshold_sensitivity` (+ `_fill`) |
 | `randomized_intake{150,300}_summary_filled.csv` | 흡기 용량 민감도 (B4) | `--profile intake150 / intake300` |
 | `measured_weather_summary.csv` · `measured_weather_a2_summary.csv` | 실측 기상 2024 (A · B · 제안 / A · A′) | `tools/run_measured_weather.py` |
+| `measured_weather_asos_summary.csv` | 실측 기상 2024 — **기상청 ASOS** 로 재실행 (2026-10-30 · ERA5 겨울 −2 °C 편차 점검 · A · A′ · B · 제안) | `tools/run_measured_weather.py --site asos_seoul --eval-years 2024 --extra-baselines A2` |
 | `heldout*_summary.csv` | 보류 평가 1–7차 (+ 7차 A′) | `tools/run_heldout.py` |
 | `*_manifest.json` | 실행 기록 — 커밋 · 미커밋 파일 · 동결 점검 · 명령줄 (2026-10-26 이후 실행만) | `harness/manifest.py` |
 | `tables/` | 분석 표 — 지표 16종 · 무작위 요약 · 3분류 · 짝 검정 · BOPTEST KPI 등 | `scripts/analyze_results.py` · `tools/analysis/*` |

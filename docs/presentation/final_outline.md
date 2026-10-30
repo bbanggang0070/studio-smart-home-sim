@@ -2,7 +2,7 @@
 
 > 초안 2026-10-27 · 제어기 v1.29 · 수치 출처: [`docs/report_draft.md`](../report_draft.md) v0.6 · [`archive/v1.29/`](../../archive/v1.29/README.md)
 > 그림은 `results/figures/` (생성: `tools/analysis/plot_final.py` 외 — 보고서 §6.12) · 영상은 `docs/presentation/media/`
-> **덱: [Figma Slides — 최종발표 (19장 · 난방 확장 2장 추가 예정 → 21장)](https://www.figma.com/slides/Ob1CRTQrEK8owlFCtjvZXv)** (2026-10-28 · 중간발표 디자인 계승 · 발표자 노트 포함) — 아래 18장 구성에 **15장 EXP-5** 를 더해 19장 (16–19 는 한 칸씩 밀림)
+> **⚠ 대체됨 — 전체 재구성판은 [`final_outline_v2.md`](final_outline_v2.md) · 새 덱 https://www.figma.com/slides/L809qZ6za9kyaTyCq0sH6e** · 이전 덱: [Figma Slides — 최종발표 (19장)](https://www.figma.com/slides/Ob1CRTQrEK8owlFCtjvZXv)** (2026-10-28 · 중간발표 디자인 계승 · 발표자 노트 포함) — 아래 18장 구성에 **15장 EXP-5** 를 더해 19장 (16–19 는 한 칸씩 밀림)
 
 ## 발표 원칙
 - **주장은 세 가지만** — ① 목표가 충돌할 때 실내 환경 결과를 훨씬 잘 지킨다 ② 같은 쾌적을 더 싸게 (기대비용 −30 %) ③ 처음 보는 조합 · 센서 결함 · 물리 조건 변동에도 83–91 % 유지

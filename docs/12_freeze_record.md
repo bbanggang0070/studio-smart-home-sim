@@ -73,6 +73,7 @@
 | 2026-10-26 | 하네스 · 기준선만 (`runner.py` · `scenario.py` · `baselines.yaml` — 제어 코드 · 판정 · 시나리오 불변) | 기준선 A′ 추가 (§19) — `extra_baselines` 기본 {} 이면 실행 조합이 이전과 같다 · `baselines.yaml` 은 `baseline_a2` 절만 추가 (A 의 값 불변) | 고속 개발 · 보류 결과 불변 (A · B · 제안 실행 조합 · 판정 같음) |
 | 2026-10-26 | 하네스 · 센서 모델만 (`sensors/sensor_models.py` · `runner.py` · `sensor_models.yaml` — 제어 · 판정 불변) | 견고성 평가 A1 — 센서 결함(편향 · 드리프트 · 이상값 · 끊김) 옵션 · `fast_mode.sensor_faults` 기본 false 이면 이전과 같다 (결함 난수는 따로) | 기본 실행 결과 불변 · 단위 테스트로 결함 0 일 때 잡음 순서 동일 확인 |
 | 2026-10-30 | **files · controller 묶음 전체 재기록** — 난방 확장(브랜치 `heating`) main 병합 (사용자 결정) · 바뀐 것은 모두 **추가**: 판정 별칭 · 난방 지표(`criteria.py` · `harness.yaml metrics.heating`) · 난방 사다리 · 규칙(`controller/heating.py` 등 — **가전 프로파일에 보일러가 있을 때만** 동작) · 보일러 L0 · 계량 플러그 · 참값 온수 바닥난방(`heating.mode` 기본 `boundary` = v1.29 그대로) · 기준선 A′V · 비교 변형 · 3노드 난방 모델(`models/heating_3node.yaml`) | v1.29 결과를 바꾸지 않는 확장 — 난방 트랙의 동결은 별도 목록 `config/freeze_heating.yaml` (docs/15) | **v1.29 회귀 자동 확인** (`tools/check_v129_regression.py --heldout` · 보관 요약 대조): 개발 249/249 · 보류 7차 78/78 **지표 · 판정 · 상태 모두 같다** — 난방 트랙 매 버전(v1.31 · v1.32 · v1.33-H 동결 전 · 2026-10-29 · 30) · 단위 테스트 212 passed (보류 1–6차 보관본은 v1.29 이전 제어기 결과라 대조 대상 아님) |
+| 2026-10-30 | controller 묶음 `models/*` — 새 파일 `models/energy_commuter_kostat.yaml` 추가만 (기본 `energy_commuter.yaml` 불변) | 귀가 분포 보정 민감도(docs/15 §16)의 비교 변형 `proposed_kostat` 전용 — 기본 설정은 이 파일을 읽지 않는다 | v1.29 실행 경로 불변 (제어기 기본 모델 파일 그대로) |
 
 ---
 
@@ -484,3 +485,4 @@
 | 2026-10-26 | v1.13 | §19 기준선 A′ 사전 명세 (실행 전) · 판정 기준 3분류(환경 결과 · 수단 · 과정) |
 | 2026-10-27 | v1.14 | §20 기준선 A′ 결과 · 동결 개정 8 · 9 (하네스 · 기준선 · 센서 모델 — 제어 · 판정 불변) |
 | 2026-10-30 | v1.15 | §4 동결 개정 — 난방 확장 main 병합 (추가만 · v1.29 회귀 개발 249 · 보류 7차 78 같다) |
+| 2026-10-30 | v1.16 | §4 — models/* 에 민감도용 모델 파일 추가 (기본 불변) |

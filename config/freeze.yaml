@@ -56,7 +56,7 @@ controller:
 - path: config/thresholds.yaml
   sha256: 652987e0dee875748bf71e4794b28e5646fb59ae4067d01748c555a603eac86f
 - glob: models/*
-  sha256: 6b33ecbacbc9885e060e51731c85e171ec5c0f71841064fa2bff70bd1f7a6364
+  sha256: ae5ec314e8fa02e1773985a9e76ff098722db9221d38260e5ab253c228175804
 - path: config/user_modes.yaml
   sha256: 998a1c1e531b38ecadd7b44a3cce35c3790bf5943de26d6d945de96fd35cfd17
 - path: scripts/harness/fast_world.py

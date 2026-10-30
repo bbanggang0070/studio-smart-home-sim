@@ -15,6 +15,7 @@
 | **검증** | 시나리오 **41개 × 249회** (물리 8 · 고속 33) · 평가 지표 16종 · 무작위 반복 · 실측 기상 · **사전 등록 보류 평가 7차** · **BOPTEST** — 결과 [§9.4](#94-결과-요약-2026-10-25--제어기-v129) |
 | **부품비** | **~137,300원** (DIY 전력 측정) / ~168,300원 (계량 스마트 플러그 · 실물 권장) · 가전 구매 0원 |
 | **기획 버전** | **v3.4** (기획 확정) · 제어기 **v1.29** (2026-10-25 동결 · `config/freeze.yaml`) |
+| **난방 확장** (브랜치 `heating`) | 온수 바닥난방 + 온수 겸용 가스보일러 · 확정 결과 **v1.31-H** (A · 24시간 환기 스마트 조절기 A′V 대비 환경 결과 낫다 · 난방 비용 차이 확인 못함) · 사후 개선판 v1.32 · **v1.33-H** · 계획 [`docs/14`](docs/14_heating_extension_plan.md) · 등록 · 결과 [`docs/15`](docs/15_heating_preregistration.md) · 보고서 §6.14 |
 
 ---
 
@@ -825,6 +826,8 @@ studio-smart-home-sim/
 | 에너지 제어 방식 비교 연구 (EXP-5 · 논문) | [`docs/10_energy_control_comparison_study.md`](docs/10_energy_control_comparison_study.md) · 사전 등록 · 결과 [`docs/13_exp5_preregistration.md`](docs/13_exp5_preregistration.md) |
 | 논문 신뢰성 검토 · 조치 계획 | [`docs/11_paper_credibility_review.md`](docs/11_paper_credibility_review.md) |
 | 판정 · 지표 동결 · 사후 개정 · 보류 평가 기록 | [`docs/12_freeze_record.md`](docs/12_freeze_record.md) |
+| **난방 확장 — 계획 · 진단 · 개선 (v1.30 – v1.33-H)** | [`docs/14_heating_extension_plan.md`](docs/14_heating_extension_plan.md) |
+| **난방 확장 — 사전 등록 · 동결 · 결과 · 정정** | [`docs/15_heating_preregistration.md`](docs/15_heating_preregistration.md) · 요약 `archive/v1.31-H` · `v1.32-H` · `v1.33-H` |
 | 센서리스 알고리즘 · Isaac Sim 구현 | [`docs/04_sensorless_window_control.md`](docs/04_sensorless_window_control.md) |
 | 선행연구 대비 · 참고문헌 | [`docs/05_related_work.md`](docs/05_related_work.md) |
 | **가전 편입 · 인터페이스 · 환경 모델 확장** | [`docs/06_appliance_integration.md`](docs/06_appliance_integration.md) |
@@ -857,7 +860,7 @@ studio-smart-home-sim/
 | ~~7~~ | ~~필터 급기가 불가능하다~~ | ✅ **v3.0 해소** — 필터 흡기팬 · 양압 환기 |
 | ~~8~~ | ~~실내 공기질을 측정하지 않는다~~ | ✅ **v3.0 해소** — PM2.5 실측 (CO₂는 v3.4부터 재실 기본 환기로 보장 · 참값 검증) |
 | 9 | **가전 동특성은 정격 기반 1차 근사** | 인버터 등 내부 제어 미반영. 계수 민감도로 제시 |
-| 10 | **난방은 범위 밖** | 겨울 시나리오는 실내 21 °C 유지를 가정 |
+| 10 | **난방은 주 결과(v1.29) 밖** | 주 결과의 겨울 시나리오는 실내 21 °C 유지를 가정 · 온수 바닥난방 · 보일러는 **확장 트랙**(브랜치 `heating` · docs/14 · 15 · 보고서 §6.14)에서만 — 보류 평가를 한 번 더 '마지막' 을 넘겨 다시 했고 v1.32 · v1.33-H 는 사후 개선판 · 출장 뒤 귀가는 춥다 (맞교환) |
 | 11 | **실내 공기는 균일 혼합 가정** | 요리 PM 공간 분포 · 센서 위치 효과는 1차 지연으로만 근사 |
 | 12 | **IR 코드 · 릴레이 대상은 제품 의존** | 터치식 전원 가전은 릴레이 불가 (가정 A11) |
 | 13 | **고속 모드는 물리를 검증하지 않는다** | 가전 시나리오는 환경 모델 수준의 검증이다. 조인트 · 끼임 지표는 물리 모드 8개에서만 |
@@ -878,12 +881,12 @@ studio-smart-home-sim/
 
 ### 범위 밖 (Out of Scope)
 
-실물 하드웨어 제작 · RGB-D 카메라 인식 · 정밀 CFD · **모바일 앱 · DB** · 음성 명령 · TOU 요금 연동 · **난방 제어** · 제조사 클라우드 API · 다중 거주자 · 클라우드 연동
+실물 하드웨어 제작 · RGB-D 카메라 인식 · 정밀 CFD · **모바일 앱 · DB** · 음성 명령 · TOU 요금 연동 · 제조사 클라우드 API · 다중 거주자 · 클라우드 연동
 
 ### 확장 아이디어
 
 - **모바일 대시보드 · 이력 DB** — 모드 선택 UI · 상태 이력 조회 (현재는 `/studio/cmd/mode` 토픽 + CSV 로깅)
-- 보일러 편입 — 난방까지 사다리에 포함
+- ~~보일러 편입 — 난방까지 사다리에 포함~~ ✅ 확장 트랙에서 구현 (브랜치 `heating` · docs/14 · 15)
 - 전기요금 시간대(TOU) 연동 — 에어컨 프리쿨링 시각 최적화
 - 서카디안 조명 (시간대별 색온도 자동 변화)
 - **설치 환경 프로파일**(남향/북향/반지하) 보정 — 파라미터 구조는 준비됨

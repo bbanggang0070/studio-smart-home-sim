@@ -56,6 +56,6 @@
 ## 변경 이력
 | 날짜 | 버전 | 내용 |
 |---|---|---|
+| 2026-10-30 | — | 난방 확장 슬라이드 15″a · 15″b · 백업 B-H1 · B-H2 (그림 `tools/analysis/plot_heating.py` → `results/figures/heating_extension.png`) · Figma 반영은 연결 복구 뒤 |
 | 2026-10-28 | v0.2 | Figma 덱 19장 제작 (EXP-5 1장 추가) · 데모를 v1.29 재녹화 C3 · C2 로 |
 | 2026-10-27 | v0.1 | 초안 — 18장 구성 · 발표 원칙 · 백업 슬라이드 |
-| 2026-10-30 | — | 난방 확장 슬라이드 15″a · 15″b · 백업 B-H1 · B-H2 (그림 `tools/analysis/plot_heating.py` → `results/figures/heating_extension.png`) · Figma 반영은 연결 복구 뒤 |

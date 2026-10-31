@@ -1,0 +1,664 @@
+{
+ "10.1002/qj.3803": {
+  "title": "The ERA5 global reanalysis",
+  "year": 2020,
+  "journal": "Quarterly Journal of the Royal Meteorological Society",
+  "volume": "146",
+  "issue": "730",
+  "page": "1999-2049",
+  "authors": [
+   "Hersbach, Hans",
+   "Bell, Bill",
+   "Berrisford, Paul",
+   "Hirahara, Shoji",
+   "Horányi, András",
+   "Muñoz‐Sabater, Joaquín",
+   "Nicolas, Julien",
+   "Peubey, Carole",
+   "Radu, Raluca",
+   "Schepers, Dinand",
+   "Simmons, Adrian",
+   "Soci, Cornel",
+   "Abdalla, Saleh",
+   "Abellan, Xavier",
+   "Balsamo, Gianpaolo",
+   "Bechtold, Peter",
+   "Biavati, Gionata",
+   "Bidlot, Jean",
+   "Bonavita, Massimo",
+   "De Chiara, Giovanna",
+   "Dahlgren, Per",
+   "Dee, Dick",
+   "Diamantakis, Michail",
+   "Dragani, Rossana",
+   "Flemming, Johannes",
+   "Forbes, Richard",
+   "Fuentes, Manuel",
+   "Geer, Alan",
+   "Haimberger, Leo",
+   "Healy, Sean",
+   "Hogan, Robin J.",
+   "Hólm, Elías",
+   "Janisková, Marta",
+   "Keeley, Sarah",
+   "Laloyaux, Patrick",
+   "Lopez, Philippe",
+   "Lupu, Cristina",
+   "Radnoti, Gabor",
+   "de Rosnay, Patricia",
+   "Rozum, Iryna",
+   "Vamborg, Freja",
+   "Villaume, Sebastien",
+   "Thépaut, Jean‐Noël"
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.apenergy.2020.115036": {
+  "title": "Reinforcement learning for building controls: The opportunities and challenges",
+  "year": 2020,
+  "journal": "Applied Energy",
+  "volume": "269",
+  "issue": null,
+  "page": "115036",
+  "authors": [
+   "Wang, Zhe",
+   "Hong, Tianzhen"
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.apenergy.2021.118346": {
+  "title": "Reinforced model predictive control (RL-MPC) for building energy management",
+  "year": 2022,
+  "journal": "Applied Energy",
+  "volume": "309",
+  "issue": null,
+  "page": "118346",
+  "authors": [
+   "Arroyo, Javier",
+   "Manna, Carlo",
+   "Spiessens, Fred",
+   "Helsen, Lieve"
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.applthermaleng.2023.120430": {
+  "title": "Comparison of reinforcement learning and model predictive control for building energy system optimization",
+  "year": 2023,
+  "journal": "Applied Thermal Engineering",
+  "volume": "228",
+  "issue": null,
+  "page": "120430",
+  "authors": [
+   "Wang, Dan",
+   "Zheng, Wanfu",
+   "Wang, Zhe",
+   "Wang, Yaran",
+   "Pang, Xiufeng",
+   "Wang, Wei"
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.arcontrol.2020.09.001": {
+  "title": "All you need to know about model predictive control for buildings",
+  "year": 2020,
+  "journal": "Annual Reviews in Control",
+  "volume": "50",
+  "issue": null,
+  "page": "190-232",
+  "authors": [
+   "Drgoňa, Ján",
+   "Arroyo, Javier",
+   "Cupeiro Figueroa, Iago",
+   "Blum, David",
+   "Arendt, Krzysztof",
+   "Kim, Donghun",
+   "Ollé, Enric Perarnau",
+   "Oravec, Juraj",
+   "Wetter, Michael",
+   "Vrabie, Draguna L.",
+   "Helsen, Lieve"
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.buildenv.2022.109747": {
+  "title": "Towards self-learning control of HVAC systems with the consideration of dynamic occupancy patterns: Application of model-free deep reinforcement learning",
+  "year": 2022,
+  "journal": "Building and Environment",
+  "volume": "226",
+  "issue": null,
+  "page": "109747",
+  "authors": [
+   "Esrafilian-Najafabadi, Mohammad",
+   "Haghighat, Fariborz"
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.buildenv.2023.110816": {
+  "title": "MF^2: Model-free reinforcement learning for modeling-free building HVAC control with data-driven environment construction in a residential building",
+  "year": 2023,
+  "journal": "Building and Environment",
+  "volume": "244",
+  "issue": null,
+  "page": "110816",
+  "authors": [
+   "Wang, Man",
+   "Lin, Borong"
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.buildenv.2025.113501": {
+  "title": "Occupancy-driven HVAC control optimization via LSTM and deep reinforcement learning for enhanced indoor air quality, thermal comfort and energy efficiency",
+  "year": 2025,
+  "journal": "Building and Environment",
+  "volume": "284",
+  "issue": null,
+  "page": "113501",
+  "authors": [
+   "Hou, Fangli",
+   "Cheng, Jack C.P.",
+   "Ma, Jun",
+   "Kwok, Helen H.L.",
+   "Huang, Cong",
+   "Wu, Zhaoji"
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.enbuild.2021.111377": {
+  "title": "Occupancy-based HVAC control using deep learning algorithms for estimating online preconditioning time in residential buildings",
+  "year": 2021,
+  "journal": "Energy and Buildings",
+  "volume": "252",
+  "issue": null,
+  "page": "111377",
+  "authors": [
+   "Esrafilian-Najafabadi, Mohammad",
+   "Haghighat, Fariborz"
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.enbuild.2024.113895": {
+  "title": "Real-life data-driven model predictive control for building energy systems comparing different machine learning models",
+  "year": 2024,
+  "journal": "Energy and Buildings",
+  "volume": "305",
+  "issue": null,
+  "page": "113895",
+  "authors": [
+   "Stoffel, Phillip",
+   "Berktold, Max",
+   "Müller, Dirk"
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.jobe.2024.108583": {
+  "title": "A comparison between grey-box models and neural networks for indoor air temperature prediction in buildings",
+  "year": 2024,
+  "journal": "Journal of Building Engineering",
+  "volume": "84",
+  "issue": null,
+  "page": "108583",
+  "authors": [
+   "Vivian, J.",
+   "Prataviera, E.",
+   "Gastaldello, N.",
+   "Zarrella, A."
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.jobe.2025.113776": {
+  "title": "A comparative analysis of reinforcement learning and model predictive control for HVAC system optimization",
+  "year": 2025,
+  "journal": "Journal of Building Engineering",
+  "volume": "112",
+  "issue": null,
+  "page": "113776",
+  "authors": [
+   "Kumkam, Supakit",
+   "Trinuruk, Piyatida",
+   "Chaiwiwatworakul, Pipat",
+   "Saito, Kiyoshi"
+  ],
+  "type": "journal-article"
+ },
+ "10.1080/19401493.2021.1986574": {
+  "title": "Building optimization testing framework (BOPTEST) for simulation-based benchmarking of control strategies in buildings",
+  "year": 2021,
+  "journal": "Journal of Building Performance Simulation",
+  "volume": "14",
+  "issue": "5",
+  "page": "586-610",
+  "authors": [
+   "Blum, David",
+   "Arroyo, Javier",
+   "Huang, Sen",
+   "Drgoňa, Ján",
+   "Jorissen, Filip",
+   "Walnum, Harald Taxt",
+   "Chen, Yan",
+   "Benne, Kyle",
+   "Vrabie, Draguna",
+   "Wetter, Michael",
+   "Helsen, Lieve"
+  ],
+  "type": "journal-article"
+ },
+ "10.1109/access.2022.3156581": {
+  "title": "Building Energy Management With Reinforcement Learning and Model Predictive Control: A Survey",
+  "year": 2022,
+  "journal": "IEEE Access",
+  "volume": "10",
+  "issue": null,
+  "page": "27853-27862",
+  "authors": [
+   "Zhang, Huiliang",
+   "Seal, Sayani",
+   "Wu, Di",
+   "Bouffard, Francois",
+   "Boulet, Benoit"
+  ],
+  "type": "journal-article"
+ },
+ "10.1109/pesgm41954.2020.9281893": {
+  "title": "Deep Reinforcement Learning for Residential HVAC Control with Consideration of Human Occupancy",
+  "year": 2020,
+  "journal": "2020 IEEE Power &amp; Energy Society General Meeting (PESGM)",
+  "volume": null,
+  "issue": null,
+  "page": "1-5",
+  "authors": [
+   "McKee, Evan",
+   "Du, Yan",
+   "Li, Fangxing",
+   "Munk, Jeffrey",
+   "Johnston, Travis",
+   "Kurte, Kuldeep",
+   "Kotevska, Olivera",
+   "Amasyali, Kadir",
+   "Zandi, Helia"
+  ],
+  "type": "proceedings-article"
+ },
+ "10.1145/3360322.3360849": {
+  "title": "Gnu-RL",
+  "year": 2019,
+  "journal": "Proceedings of the 6th ACM International Conference on Systems for Energy-Efficient Buildings, Cities, and Transportation",
+  "volume": null,
+  "issue": null,
+  "page": "316-325",
+  "authors": [
+   "Chen, Bingqing",
+   "Cai, Zicheng",
+   "Bergés, Mario"
+  ],
+  "type": "proceedings-article"
+ },
+ "10.1145/3486611.3488729": {
+  "title": "Sinergym",
+  "year": 2021,
+  "journal": "Proceedings of the 8th ACM International Conference on Systems for Energy-Efficient Buildings, Cities, and Transportation",
+  "volume": null,
+  "issue": null,
+  "page": "319-323",
+  "authors": [
+   "Jiménez-Raboso, Javier",
+   "Campoy-Nieves, Alejandro",
+   "Manjavacas-Lucas, Antonio",
+   "Gómez-Romero, Juan",
+   "Molina-Solana, Miguel"
+  ],
+  "type": "proceedings-article"
+ },
+ "10.3389/fbuil.2022.849754": {
+  "title": "Comparison of Optimal Control Techniques for Building Energy Management",
+  "year": 2022,
+  "journal": "Frontiers in Built Environment",
+  "volume": "8",
+  "issue": null,
+  "page": "849754",
+  "authors": [
+   "Arroyo, Javier",
+   "Spiessens, Fred",
+   "Helsen, Lieve"
+  ],
+  "type": "journal-article"
+ },
+ "10.1111/j.1467-9868.2007.00593.x": {
+  "title": "Bootstrapping Clustered Data",
+  "year": 2007,
+  "journal": "Journal of the Royal Statistical Society Series B: Statistical Methodology",
+  "volume": "69",
+  "issue": "3",
+  "page": "369-390",
+  "authors": [
+   "Field, C. A.",
+   "Welsh, A. H."
+  ],
+  "type": "journal-article"
+ },
+ "10.1073/pnas.1708274114": {
+  "title": "The preregistration revolution",
+  "year": 2018,
+  "journal": "Proceedings of the National Academy of Sciences",
+  "volume": "115",
+  "issue": "11",
+  "page": "2600-2606",
+  "authors": [
+   "Nosek, Brian A.",
+   "Ebersole, Charles R.",
+   "DeHaven, Alexander C.",
+   "Mellor, David T."
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.atmosenv.2013.01.061": {
+  "title": "Emissions and indoor concentrations of particulate matter and its specific chemical components from cooking: A review",
+  "year": 2013,
+  "journal": "Atmospheric Environment",
+  "volume": "71",
+  "issue": null,
+  "page": "260-294",
+  "authors": [
+   "Abdullahi, Karimatu L.",
+   "Delgado-Saborit, Juana Maria",
+   "Harrison, Roy M."
+  ],
+  "type": "journal-article"
+ },
+ "10.1289/ehp.1104789": {
+  "title": "Is CO2 an Indoor Pollutant? Direct Effects of Low-to-Moderate CO2 Concentrations on Human Decision-Making Performance",
+  "year": 2012,
+  "journal": "Environmental Health Perspectives",
+  "volume": "120",
+  "issue": "12",
+  "page": "1671-1677",
+  "authors": [
+   "Satish, Usha",
+   "Mendell, Mark J.",
+   "Shekhar, Krishnamurthy",
+   "Hotchi, Toshifumi",
+   "Sullivan, Douglas",
+   "Streufert, Siegfried",
+   "Fisk, William J."
+  ],
+  "type": "journal-article"
+ },
+ "10.1289/ehp.1510037": {
+  "title": "Associations of Cognitive Function Scores with Carbon Dioxide, Ventilation, and Volatile Organic Compound Exposures in Office Workers: A Controlled Exposure Study of Green and Conventional Office Environments",
+  "year": 2015,
+  "journal": "Environmental Health Perspectives",
+  "volume": "124",
+  "issue": "6",
+  "page": "805-812",
+  "authors": [
+   "Allen, Joseph G.",
+   "MacNaughton, Piers",
+   "Satish, Usha",
+   "Santanam, Suresh",
+   "Vallarino, Jose",
+   "Spengler, John D."
+  ],
+  "type": "journal-article"
+ },
+ "10.1175/1520-0450(1996)035<0601:imfaos>2.0.co;2": {
+  "title": "Improved Magnus Form Approximation of Saturation Vapor Pressure",
+  "year": 1996,
+  "journal": "Journal of Applied Meteorology",
+  "volume": "35",
+  "issue": "4",
+  "page": "601-609",
+  "authors": [
+   "Alduchov, Oleg A.",
+   "Eskridge, Robert E."
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.enbuild.2011.02.005": {
+  "title": "Identifying suitable models for the heat dynamics of buildings",
+  "year": 2011,
+  "journal": "Energy and Buildings",
+  "volume": "43",
+  "issue": "7",
+  "page": "1511-1522",
+  "authors": [
+   "Bacher, Peder",
+   "Madsen, Henrik"
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.rser.2021.110969": {
+  "title": "Intelligent building control systems for thermal comfort and energy-efficiency: A systematic review of artificial intelligence-assisted techniques",
+  "year": 2021,
+  "journal": "Renewable and Sustainable Energy Reviews",
+  "volume": "144",
+  "issue": null,
+  "page": "110969",
+  "authors": [
+   "Halhoul Merabet, Ghezlane",
+   "Essaaidi, Mohamed",
+   "Ben Haddou, Mohamed",
+   "Qolomany, Basheer",
+   "Qadir, Junaid",
+   "Anan, Muhammad",
+   "Al-Fuqaha, Ala",
+   "Abid, Mohamed Riduan",
+   "Benhaddou, Driss"
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.rser.2024.114682": {
+  "title": "Energy, thermal comfort, and indoor air quality: Multi-objective optimization review",
+  "year": 2024,
+  "journal": "Renewable and Sustainable Energy Reviews",
+  "volume": "202",
+  "issue": null,
+  "page": "114682",
+  "authors": [
+   "Al Mindeel, T.",
+   "Spentzou, E.",
+   "Eftekhari, M."
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.apenergy.2017.03.076": {
+  "title": "Energy-efficient predictive control of indoor thermal comfort and air quality in a direct expansion air conditioning system",
+  "year": 2017,
+  "journal": "Applied Energy",
+  "volume": "195",
+  "issue": null,
+  "page": "439-452",
+  "authors": [
+   "Mei, Jun",
+   "Xia, Xiaohua"
+  ],
+  "type": "journal-article"
+ },
+ "10.1109/jiot.2024.3362950": {
+  "title": "Threat Detection in Trigger-Action Programming Rules of Smart Home With Heterogeneous Information Network Model",
+  "year": 2024,
+  "journal": "IEEE Internet of Things Journal",
+  "volume": "11",
+  "issue": "10",
+  "page": "18320-18334",
+  "authors": [
+   "Sun, Dongming",
+   "Hu, Liang",
+   "Wu, Gang",
+   "Xing, Yongheng",
+   "Hu, Juncheng",
+   "Wang, Feng"
+  ],
+  "type": "journal-article"
+ },
+ "10.1109/cac51589.2020.9327552": {
+  "title": "Conflict Detection of Device Linkage Rules in Smart Home Systems",
+  "year": 2020,
+  "journal": "2020 Chinese Automation Congress (CAC)",
+  "volume": null,
+  "issue": null,
+  "page": "3160-3166",
+  "authors": [
+   "Fu, Ye",
+   "Zhang, Daojuan",
+   "Wang, Chonghua",
+   "Luo, Xi",
+   "Liu, Wenxin",
+   "Luo, Tianjie",
+   "Fang, Fuyang"
+  ],
+  "type": "proceedings-article"
+ },
+ "10.3390/buildings15193440": {
+  "title": "Design and Validation of a Compact, Low-Cost Sensor System for Real-Time Indoor Environmental Monitoring",
+  "year": 2025,
+  "journal": "Buildings",
+  "volume": "15",
+  "issue": "19",
+  "page": "3440",
+  "authors": [
+   "Di Leo, Vincenzo",
+   "Speroni, Alberto",
+   "Ferla, Giulio",
+   "Blanco Cadena, Juan Diego"
+  ],
+  "type": "journal-article"
+ },
+ "10.3390/en14175359": {
+  "title": "Sensorless Speed Control of Brushed DC Motor Based at New Current Ripple Component Signal Processing",
+  "year": 2021,
+  "journal": "Energies",
+  "volume": "14",
+  "issue": "17",
+  "page": "5359",
+  "authors": [
+   "Vidlak, Michal",
+   "Gorel, Lukas",
+   "Makys, Pavol",
+   "Stano, Michal"
+  ],
+  "type": "journal-article"
+ },
+ "10.1109/ecce-asia49820.2021.9479020": {
+  "title": "Robust Position-Sensorless Algorithm for DC Motor Using Ripple Current and Model-Based Method",
+  "year": 2021,
+  "journal": "2021 IEEE 12th Energy Conversion Congress &amp; Exposition - Asia (ECCE-Asia)",
+  "volume": null,
+  "issue": null,
+  "page": "2104-2109",
+  "authors": [
+   "Choi, Jongwon"
+  ],
+  "type": "proceedings-article"
+ },
+ "10.1088/1742-6596/1754/1/012177": {
+  "title": "Research on Anti-pinch Control Strategy of Window Start-up Phase based on Ripple Motor",
+  "year": 2021,
+  "journal": "Journal of Physics: Conference Series",
+  "volume": "1754",
+  "issue": "1",
+  "page": "012177",
+  "authors": [
+   "Cheng, Anyu",
+   "Long, Tianci",
+   "Cheng, Zhu",
+   "Liu, Chang"
+  ],
+  "type": "journal-article"
+ },
+ "10.3390/rs16142572": {
+  "title": "Millimeter-Wave Radar Detection and Localization of a Human in Indoor Complex Environments",
+  "year": 2024,
+  "journal": "Remote Sensing",
+  "volume": "16",
+  "issue": "14",
+  "page": "2572",
+  "authors": [
+   "Xing, Zhixuan",
+   "Chen, Penghui",
+   "Wang, Jun",
+   "Bai, Yujing",
+   "Song, Jinhao",
+   "Tian, Liuyang"
+  ],
+  "type": "journal-article"
+ },
+ "10.2307/4615733": {
+  "error": "HTTP Error 404: Not Found"
+ },
+ "10.1126/scirobotics.abm6074": {
+  "title": "Robot Operating System 2: Design, architecture, and uses in the wild",
+  "year": 2022,
+  "journal": "Science Robotics",
+  "volume": "7",
+  "issue": "66",
+  "page": "eabm6074",
+  "authors": [
+   "Macenski, Steven",
+   "Foote, Tully",
+   "Gerkey, Brian",
+   "Lalancette, Chris",
+   "Woodall, William"
+  ],
+  "type": "journal-article"
+ },
+ "10.1145/2556288.2557420": {
+  "title": "Practical trigger-action programming in the smart home",
+  "year": 2014,
+  "journal": "Proceedings of the SIGCHI Conference on Human Factors in Computing Systems",
+  "volume": null,
+  "issue": null,
+  "page": "803-812",
+  "authors": [
+   "Ur, Blase",
+   "McManus, Elyse",
+   "Pak Yong Ho, Melwyn",
+   "Littman, Michael L."
+  ],
+  "type": "proceedings-article"
+ },
+ "10.1145/3290605.3300782": {
+  "title": "How Users Interpret Bugs in Trigger-Action Programming",
+  "year": 2019,
+  "journal": "Proceedings of the 2019 CHI Conference on Human Factors in Computing Systems",
+  "volume": null,
+  "issue": null,
+  "page": "1-12",
+  "authors": [
+   "Brackenbury, Will",
+   "Deora, Abhimanyu",
+   "Ritchey, Jillian",
+   "Vallee, Jason",
+   "He, Weijia",
+   "Wang, Guan",
+   "Littman, Michael L.",
+   "Ur, Blase"
+  ],
+  "type": "proceedings-article"
+ },
+ "10.1016/j.enbuild.2016.09.059": {
+  "title": "The effect of window opening ventilation control on residential building energy consumption",
+  "year": 2016,
+  "journal": "Energy and Buildings",
+  "volume": "133",
+  "issue": null,
+  "page": "1-13",
+  "authors": [
+   "Sorgato, M.J.",
+   "Melo, A.P.",
+   "Lamberts, R."
+  ],
+  "type": "journal-article"
+ },
+ "10.1016/j.enbuild.2021.110834": {
+  "title": "Residential smart thermostat use: An exploration of thermostat programming, environmental attitudes, and the influence of smart controls on energy savings",
+  "year": 2021,
+  "journal": "Energy and Buildings",
+  "volume": "238",
+  "issue": null,
+  "page": "110834",
+  "authors": [
+   "Stopps, Helen",
+   "Touchie, Marianne F."
+  ],
+  "type": "journal-article"
+ }
+}

@@ -1,0 +1,739 @@
+# 논문 참고문헌 DB — Crossref 로 검증된 항목(verified) + 수기 항목 (docs/16 · 2026-11-01)
+abdullahi2013emissions:
+  authors:
+  - Abdullahi, Karimatu L.
+  - Delgado-Saborit, Juana Maria
+  - Harrison, Roy M.
+  doi: 10.1016/j.atmosenv.2013.01.061
+  issue: null
+  journal: Atmospheric Environment
+  page: 260-294
+  title: 'Emissions and indoor concentrations of particulate matter and its specific chemical components from cooking: A review'
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '71'
+  year: 2013
+alduchov1996improved:
+  authors:
+  - Alduchov, Oleg A.
+  - Eskridge, Robert E.
+  doi: 10.1175/1520-0450(1996)035<0601:imfaos>2.0.co;2
+  issue: '4'
+  journal: Journal of Applied Meteorology
+  page: 601-609
+  title: Improved Magnus Form Approximation of Saturation Vapor Pressure
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '35'
+  year: 1996
+allen2015associations:
+  authors:
+  - Allen, Joseph G.
+  - MacNaughton, Piers
+  - Satish, Usha
+  - Santanam, Suresh
+  - Vallarino, Jose
+  - Spengler, John D.
+  doi: 10.1289/ehp.1510037
+  issue: '6'
+  journal: Environmental Health Perspectives
+  page: 805-812
+  title: 'Associations of Cognitive Function Scores with Carbon Dioxide, Ventilation, and Volatile Organic Compound Exposures in Office Workers: A Controlled Exposure Study of Green and Conventional Office
+    Environments'
+  type: journal-article
+  verified: crossref 2026-11-01 · 온라인 2015 · 124(6) 2016 호 연도 사용 (APA)
+  volume: '124'
+  year: 2016
+almindeel2024energy:
+  authors:
+  - Al Mindeel, T.
+  - Spentzou, E.
+  - Eftekhari, M.
+  doi: 10.1016/j.rser.2024.114682
+  issue: null
+  journal: Renewable and Sustainable Energy Reviews
+  page: '114682'
+  title: 'Energy, thermal comfort, and indoor air quality: Multi-objective optimization review'
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '202'
+  year: 2024
+arroyo2022comparison:
+  authors:
+  - Arroyo, Javier
+  - Spiessens, Fred
+  - Helsen, Lieve
+  doi: 10.3389/fbuil.2022.849754
+  issue: null
+  journal: Frontiers in Built Environment
+  page: '849754'
+  title: Comparison of Optimal Control Techniques for Building Energy Management
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '8'
+  year: 2022
+arroyo2022reinforced:
+  authors:
+  - Arroyo, Javier
+  - Manna, Carlo
+  - Spiessens, Fred
+  - Helsen, Lieve
+  doi: 10.1016/j.apenergy.2021.118346
+  issue: null
+  journal: Applied Energy
+  page: '118346'
+  title: Reinforced model predictive control (RL-MPC) for building energy management
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '309'
+  year: 2022
+ashrae55:
+  authors:
+  - ASHRAE
+  journal: ASHRAE, Atlanta, GA, USA
+  title: Thermal environmental conditions for human occupancy (ANSI/ASHRAE Standard 55-2023)
+  type: standard
+  verified: 표준 · 연도 확인 필요
+  year: 2023
+bacher2011identifying:
+  authors:
+  - Bacher, Peder
+  - Madsen, Henrik
+  doi: 10.1016/j.enbuild.2011.02.005
+  issue: '7'
+  journal: Energy and Buildings
+  page: 1511-1522
+  title: Identifying suitable models for the heat dynamics of buildings
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '43'
+  year: 2011
+blum2021building:
+  authors:
+  - Blum, David
+  - Arroyo, Javier
+  - Huang, Sen
+  - Drgoňa, Ján
+  - Jorissen, Filip
+  - Walnum, Harald Taxt
+  - Chen, Yan
+  - Benne, Kyle
+  - Vrabie, Draguna
+  - Wetter, Michael
+  - Helsen, Lieve
+  doi: 10.1080/19401493.2021.1986574
+  issue: '5'
+  journal: Journal of Building Performance Simulation
+  page: 586-610
+  title: Building optimization testing framework (BOPTEST) for simulation-based benchmarking of control strategies in buildings
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '14'
+  year: 2021
+brackenbury2019how:
+  authors:
+  - Brackenbury, Will
+  - Deora, Abhimanyu
+  - Ritchey, Jillian
+  - Vallee, Jason
+  - He, Weijia
+  - Wang, Guan
+  - Littman, Michael L.
+  - Ur, Blase
+  doi: 10.1145/3290605.3300782
+  issue: null
+  journal: Proceedings of the 2019 CHI Conference on Human Factors in Computing Systems
+  page: 1-12
+  title: How Users Interpret Bugs in Trigger-Action Programming
+  type: proceedings-article
+  verified: crossref 2026-11-01
+  volume: null
+  year: 2019
+chen2019gnurl:
+  authors:
+  - Chen, Bingqing
+  - Cai, Zicheng
+  - Bergés, Mario
+  doi: 10.1145/3360322.3360849
+  issue: null
+  journal: Proceedings of the 6th ACM International Conference on Systems for Energy-Efficient Buildings, Cities, and Transportation
+  page: 316-325
+  title: Gnu-RL
+  type: proceedings-article
+  verified: crossref 2026-11-01
+  volume: null
+  year: 2019
+cheng2021research:
+  authors:
+  - Cheng, Anyu
+  - Long, Tianci
+  - Cheng, Zhu
+  - Liu, Chang
+  doi: 10.1088/1742-6596/1754/1/012177
+  issue: '1'
+  journal: 'Journal of Physics: Conference Series'
+  page: '012177'
+  title: Research on Anti-pinch Control Strategy of Window Start-up Phase based on Ripple Motor
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '1754'
+  year: 2021
+choi2021robust:
+  authors:
+  - Choi, Jongwon
+  doi: 10.1109/ecce-asia49820.2021.9479020
+  issue: null
+  journal: 2021 IEEE 12th Energy Conversion Congress &amp; Exposition - Asia (ECCE-Asia)
+  page: 2104-2109
+  title: Robust Position-Sensorless Algorithm for DC Motor Using Ripple Current and Model-Based Method
+  type: proceedings-article
+  verified: crossref 2026-11-01
+  volume: null
+  year: 2021
+dileo2025design:
+  authors:
+  - Di Leo, Vincenzo
+  - Speroni, Alberto
+  - Ferla, Giulio
+  - Blanco Cadena, Juan Diego
+  doi: 10.3390/buildings15193440
+  issue: '19'
+  journal: Buildings
+  page: '3440'
+  title: Design and Validation of a Compact, Low-Cost Sensor System for Real-Time Indoor Environmental Monitoring
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '15'
+  year: 2025
+drgoa2020all:
+  authors:
+  - Drgoňa, Ján
+  - Arroyo, Javier
+  - Cupeiro Figueroa, Iago
+  - Blum, David
+  - Arendt, Krzysztof
+  - Kim, Donghun
+  - Ollé, Enric Perarnau
+  - Oravec, Juraj
+  - Wetter, Michael
+  - Vrabie, Draguna L.
+  - Helsen, Lieve
+  doi: 10.1016/j.arcontrol.2020.09.001
+  issue: null
+  journal: Annual Reviews in Control
+  page: 190-232
+  title: All you need to know about model predictive control for buildings
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '50'
+  year: 2020
+esrafiliannajafabadi2021occupancybased:
+  authors:
+  - Esrafilian-Najafabadi, Mohammad
+  - Haghighat, Fariborz
+  doi: 10.1016/j.enbuild.2021.111377
+  issue: null
+  journal: Energy and Buildings
+  page: '111377'
+  title: Occupancy-based HVAC control using deep learning algorithms for estimating online preconditioning time in residential buildings
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '252'
+  year: 2021
+esrafiliannajafabadi2022towards:
+  authors:
+  - Esrafilian-Najafabadi, Mohammad
+  - Haghighat, Fariborz
+  doi: 10.1016/j.buildenv.2022.109747
+  issue: null
+  journal: Building and Environment
+  page: '109747'
+  title: 'Towards self-learning control of HVAC systems with the consideration of dynamic occupancy patterns: Application of model-free deep reinforcement learning'
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '226'
+  year: 2022
+field2007bootstrapping:
+  authors:
+  - Field, C. A.
+  - Welsh, A. H.
+  doi: 10.1111/j.1467-9868.2007.00593.x
+  issue: '3'
+  journal: 'Journal of the Royal Statistical Society Series B: Statistical Methodology'
+  page: 369-390
+  title: Bootstrapping Clustered Data
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '69'
+  year: 2007
+fmvss118:
+  authors:
+  - NHTSA
+  journal: National Highway Traffic Safety Administration, Washington, DC, USA
+  title: 'Federal motor vehicle safety standard No. 118: power-operated window, partition, and roof panel systems (49 CFR 571.118)'
+  type: standard
+  verified: 연도 확인 필요
+  year: 2011
+fu2020conflict:
+  authors:
+  - Fu, Ye
+  - Zhang, Daojuan
+  - Wang, Chonghua
+  - Luo, Xi
+  - Liu, Wenxin
+  - Luo, Tianjie
+  - Fang, Fuyang
+  doi: 10.1109/cac51589.2020.9327552
+  issue: null
+  journal: 2020 Chinese Automation Congress (CAC)
+  page: 3160-3166
+  title: Conflict Detection of Device Linkage Rules in Smart Home Systems
+  type: proceedings-article
+  verified: crossref 2026-11-01
+  volume: null
+  year: 2020
+halhoulmerabet2021intelligent:
+  authors:
+  - Halhoul Merabet, Ghezlane
+  - Essaaidi, Mohamed
+  - Ben Haddou, Mohamed
+  - Qolomany, Basheer
+  - Qadir, Junaid
+  - Anan, Muhammad
+  - Al-Fuqaha, Ala
+  - Abid, Mohamed Riduan
+  - Benhaddou, Driss
+  doi: 10.1016/j.rser.2021.110969
+  issue: null
+  journal: Renewable and Sustainable Energy Reviews
+  page: '110969'
+  title: 'Intelligent building control systems for thermal comfort and energy-efficiency: A systematic review of artificial intelligence-assisted techniques'
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '144'
+  year: 2021
+hersbach2020era:
+  authors:
+  - Hersbach, Hans
+  - Bell, Bill
+  - Berrisford, Paul
+  - Hirahara, Shoji
+  - Horányi, András
+  - Muñoz‐Sabater, Joaquín
+  - Nicolas, Julien
+  - Peubey, Carole
+  - Radu, Raluca
+  - Schepers, Dinand
+  - Simmons, Adrian
+  - Soci, Cornel
+  - Abdalla, Saleh
+  - Abellan, Xavier
+  - Balsamo, Gianpaolo
+  - Bechtold, Peter
+  - Biavati, Gionata
+  - Bidlot, Jean
+  - Bonavita, Massimo
+  - De Chiara, Giovanna
+  - Dahlgren, Per
+  - Dee, Dick
+  - Diamantakis, Michail
+  - Dragani, Rossana
+  - Flemming, Johannes
+  - Forbes, Richard
+  - Fuentes, Manuel
+  - Geer, Alan
+  - Haimberger, Leo
+  - Healy, Sean
+  - Hogan, Robin J.
+  - Hólm, Elías
+  - Janisková, Marta
+  - Keeley, Sarah
+  - Laloyaux, Patrick
+  - Lopez, Philippe
+  - Lupu, Cristina
+  - Radnoti, Gabor
+  - de Rosnay, Patricia
+  - Rozum, Iryna
+  - Vamborg, Freja
+  - Villaume, Sebastien
+  - Thépaut, Jean‐Noël
+  doi: 10.1002/qj.3803
+  issue: '730'
+  journal: Quarterly Journal of the Royal Meteorological Society
+  page: 1999-2049
+  title: The ERA5 global reanalysis
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '146'
+  year: 2020
+holm1979simple:
+  authors:
+  - Holm, Sture
+  issue: '2'
+  journal: Scandinavian Journal of Statistics
+  page: 65-70
+  title: A simple sequentially rejective multiple test procedure
+  type: journal-article
+  url: https://www.jstor.org/stable/4615733
+  verified: JSTOR 고정 주소 (Crossref DOI 없음)
+  volume: '6'
+  year: 1979
+hou2025occupancydriven:
+  authors:
+  - Hou, Fangli
+  - Cheng, Jack C.P.
+  - Ma, Jun
+  - Kwok, Helen H.L.
+  - Huang, Cong
+  - Wu, Zhaoji
+  doi: 10.1016/j.buildenv.2025.113501
+  issue: null
+  journal: Building and Environment
+  page: '113501'
+  title: Occupancy-driven HVAC control optimization via LSTM and deep reinforcement learning for enhanced indoor air quality, thermal comfort and energy efficiency
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '284'
+  year: 2025
+jimnezraboso2021sinergym:
+  authors:
+  - Jiménez-Raboso, Javier
+  - Campoy-Nieves, Alejandro
+  - Manjavacas-Lucas, Antonio
+  - Gómez-Romero, Juan
+  - Molina-Solana, Miguel
+  doi: 10.1145/3486611.3488729
+  issue: null
+  journal: Proceedings of the 8th ACM International Conference on Systems for Energy-Efficient Buildings, Cities, and Transportation
+  page: 319-323
+  title: Sinergym
+  type: proceedings-article
+  verified: crossref 2026-11-01
+  volume: null
+  year: 2021
+kma_asos:
+  authors:
+  - Korea Meteorological Administration
+  journal: KMA Open API, Seoul, Republic of Korea
+  title: ASOS hourly surface observations, Seoul station (108), 2021-2025
+  type: dataset
+  verified: 데이터 취득 2026-10
+  year: 2026
+kostat2025timeuse:
+  authors:
+  - Statistics Korea
+  journal: Statistics Korea, Daejeon, Republic of Korea
+  title: 2024 time use survey results (press release)
+  type: report
+  url: https://www.korea.kr/briefing/policyBriefingView.do?newsId=156721673
+  verified: 보도자료 2025-07-28
+  year: 2025
+kumkam2025comparative:
+  authors:
+  - Kumkam, Supakit
+  - Trinuruk, Piyatida
+  - Chaiwiwatworakul, Pipat
+  - Saito, Kiyoshi
+  doi: 10.1016/j.jobe.2025.113776
+  issue: null
+  journal: Journal of Building Engineering
+  page: '113776'
+  title: A comparative analysis of reinforcement learning and model predictive control for HVAC system optimization
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '112'
+  year: 2025
+macenski2022robot:
+  authors:
+  - Macenski, Steven
+  - Foote, Tully
+  - Gerkey, Brian
+  - Lalancette, Chris
+  - Woodall, William
+  doi: 10.1126/scirobotics.abm6074
+  issue: '66'
+  journal: Science Robotics
+  page: eabm6074
+  title: 'Robot Operating System 2: Design, architecture, and uses in the wild'
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '7'
+  year: 2022
+mckee2020deep:
+  authors:
+  - McKee, Evan
+  - Du, Yan
+  - Li, Fangxing
+  - Munk, Jeffrey
+  - Johnston, Travis
+  - Kurte, Kuldeep
+  - Kotevska, Olivera
+  - Amasyali, Kadir
+  - Zandi, Helia
+  doi: 10.1109/pesgm41954.2020.9281893
+  issue: null
+  journal: 2020 IEEE Power &amp; Energy Society General Meeting (PESGM)
+  page: 1-5
+  title: Deep Reinforcement Learning for Residential HVAC Control with Consideration of Human Occupancy
+  type: proceedings-article
+  verified: crossref 2026-11-01
+  volume: null
+  year: 2020
+mei2017energyefficient:
+  authors:
+  - Mei, Jun
+  - Xia, Xiaohua
+  doi: 10.1016/j.apenergy.2017.03.076
+  issue: null
+  journal: Applied Energy
+  page: 439-452
+  title: Energy-efficient predictive control of indoor thermal comfort and air quality in a direct expansion air conditioning system
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '195'
+  year: 2017
+mulayim2025comparative:
+  authors:
+  - Mulayim, Ozan Baris
+  - Pergantis, Elias N.
+  - Reyes Premer, Levi D.
+  - Chen, Bingqing
+  - Qu, Guannan
+  - Kircher, Kevin J.
+  - Bergés, Mario
+  journal: arXiv preprint arXiv:2510.01475
+  title: Comparative field deployment of reinforcement learning and model predictive control for residential HVAC
+  type: preprint
+  url: https://arxiv.org/abs/2510.01475
+  verified: arXiv 확인 2026-11-01 (v2 2026-07-16)
+  year: 2025
+nosek2018preregistration:
+  authors:
+  - Nosek, Brian A.
+  - Ebersole, Charles R.
+  - DeHaven, Alexander C.
+  - Mellor, David T.
+  doi: 10.1073/pnas.1708274114
+  issue: '11'
+  journal: Proceedings of the National Academy of Sciences
+  page: 2600-2606
+  title: The preregistration revolution
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '115'
+  year: 2018
+nvidia_isaacsim:
+  authors:
+  - NVIDIA
+  journal: NVIDIA Corporation, Santa Clara, CA, USA
+  title: Isaac Sim documentation
+  type: software
+  url: https://docs.isaacsim.omniverse.nvidia.com/
+  verified: 버전 확인 필요
+  year: 2026
+satish2012co:
+  authors:
+  - Satish, Usha
+  - Mendell, Mark J.
+  - Shekhar, Krishnamurthy
+  - Hotchi, Toshifumi
+  - Sullivan, Douglas
+  - Streufert, Siegfried
+  - Fisk, William J.
+  doi: 10.1289/ehp.1104789
+  issue: '12'
+  journal: Environmental Health Perspectives
+  page: 1671-1677
+  title: Is CO2 an Indoor Pollutant? Direct Effects of Low-to-Moderate CO2 Concentrations on Human Decision-Making Performance
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '120'
+  year: 2012
+sorgato2016effect:
+  authors:
+  - Sorgato, M.J.
+  - Melo, A.P.
+  - Lamberts, R.
+  doi: 10.1016/j.enbuild.2016.09.059
+  issue: null
+  journal: Energy and Buildings
+  page: 1-13
+  title: The effect of window opening ventilation control on residential building energy consumption
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '133'
+  year: 2016
+stoffel2024reallife:
+  authors:
+  - Stoffel, Phillip
+  - Berktold, Max
+  - Müller, Dirk
+  doi: 10.1016/j.enbuild.2024.113895
+  issue: null
+  journal: Energy and Buildings
+  page: '113895'
+  title: Real-life data-driven model predictive control for building energy systems comparing different machine learning models
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '305'
+  year: 2024
+stopps2021residential:
+  authors:
+  - Stopps, Helen
+  - Touchie, Marianne F.
+  doi: 10.1016/j.enbuild.2021.110834
+  issue: null
+  journal: Energy and Buildings
+  page: '110834'
+  title: 'Residential smart thermostat use: An exploration of thermostat programming, environmental attitudes, and the influence of smart controls on energy savings'
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '238'
+  year: 2021
+sun2024threat:
+  authors:
+  - Sun, Dongming
+  - Hu, Liang
+  - Wu, Gang
+  - Xing, Yongheng
+  - Hu, Juncheng
+  - Wang, Feng
+  doi: 10.1109/jiot.2024.3362950
+  issue: '10'
+  journal: IEEE Internet of Things Journal
+  page: 18320-18334
+  title: Threat Detection in Trigger-Action Programming Rules of Smart Home With Heterogeneous Information Network Model
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '11'
+  year: 2024
+ur2014practical:
+  authors:
+  - Ur, Blase
+  - McManus, Elyse
+  - Pak Yong Ho, Melwyn
+  - Littman, Michael L.
+  doi: 10.1145/2556288.2557420
+  issue: null
+  journal: Proceedings of the SIGCHI Conference on Human Factors in Computing Systems
+  page: 803-812
+  title: Practical trigger-action programming in the smart home
+  type: proceedings-article
+  verified: crossref 2026-11-01
+  volume: null
+  year: 2014
+vidlak2021sensorless:
+  authors:
+  - Vidlak, Michal
+  - Gorel, Lukas
+  - Makys, Pavol
+  - Stano, Michal
+  doi: 10.3390/en14175359
+  issue: '17'
+  journal: Energies
+  page: '5359'
+  title: Sensorless Speed Control of Brushed DC Motor Based at New Current Ripple Component Signal Processing
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '14'
+  year: 2021
+vivian2024comparison:
+  authors:
+  - Vivian, J.
+  - Prataviera, E.
+  - Gastaldello, N.
+  - Zarrella, A.
+  doi: 10.1016/j.jobe.2024.108583
+  issue: null
+  journal: Journal of Building Engineering
+  page: '108583'
+  title: A comparison between grey-box models and neural networks for indoor air temperature prediction in buildings
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '84'
+  year: 2024
+wang2020reinforcement:
+  authors:
+  - Wang, Zhe
+  - Hong, Tianzhen
+  doi: 10.1016/j.apenergy.2020.115036
+  issue: null
+  journal: Applied Energy
+  page: '115036'
+  title: 'Reinforcement learning for building controls: The opportunities and challenges'
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '269'
+  year: 2020
+wang2023comparison:
+  authors:
+  - Wang, Dan
+  - Zheng, Wanfu
+  - Wang, Zhe
+  - Wang, Yaran
+  - Pang, Xiufeng
+  - Wang, Wei
+  doi: 10.1016/j.applthermaleng.2023.120430
+  issue: null
+  journal: Applied Thermal Engineering
+  page: '120430'
+  title: Comparison of reinforcement learning and model predictive control for building energy system optimization
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '228'
+  year: 2023
+wang2023mf:
+  authors:
+  - Wang, Man
+  - Lin, Borong
+  doi: 10.1016/j.buildenv.2023.110816
+  issue: null
+  journal: Building and Environment
+  page: '110816'
+  title: 'MF^2: Model-free reinforcement learning for modeling-free building HVAC control with data-driven environment construction in a residential building'
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '244'
+  year: 2023
+who2021aqg:
+  authors:
+  - World Health Organization
+  journal: World Health Organization, Geneva, Switzerland
+  title: 'WHO global air quality guidelines: particulate matter (PM2.5 and PM10), ozone, nitrogen dioxide, sulfur dioxide and carbon monoxide'
+  type: report
+  url: https://www.who.int/publications/i/item/9789240034228
+  verified: WHO 공식 페이지
+  year: 2021
+xing2024millimeterwave:
+  authors:
+  - Xing, Zhixuan
+  - Chen, Penghui
+  - Wang, Jun
+  - Bai, Yujing
+  - Song, Jinhao
+  - Tian, Liuyang
+  doi: 10.3390/rs16142572
+  issue: '14'
+  journal: Remote Sensing
+  page: '2572'
+  title: Millimeter-Wave Radar Detection and Localization of a Human in Indoor Complex Environments
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '16'
+  year: 2024
+zhang2022building:
+  authors:
+  - Zhang, Huiliang
+  - Seal, Sayani
+  - Wu, Di
+  - Bouffard, Francois
+  - Boulet, Benoit
+  doi: 10.1109/access.2022.3156581
+  issue: null
+  journal: IEEE Access
+  page: 27853-27862
+  title: 'Building Energy Management With Reinforcement Learning and Model Predictive Control: A Survey'
+  type: journal-article
+  verified: crossref 2026-11-01
+  volume: '10'
+  year: 2022

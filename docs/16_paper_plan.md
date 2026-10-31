@@ -59,11 +59,31 @@
 | 7 Discussion | 데이터가 적을 때 구조화된 협조가 결과를 좌우 · 평가 장치가 찾아낸 결함 · 한계 | — |
 | 8 Conclusions | 문단 | — |
 
-## 4. 받아야 할 정보 (사용자)
-- 저자 순서 · 영문 이름 · 소속(학과 · 기관 · 주소 · 국가) · 교신저자 · 직위 · 이메일
-- 감사의 글(연구비 · 지원) 유무
+## 4. 저자 (사용자 결정 2026-11-01)
+- 제목: **1번** — *Cooperative control of a low-cost sensor–actuator network for conflicting indoor goals in single-room dwellings* · 구성안 §3 그대로
+- 저자 순서: **Heon-Gyu Lee**\* (교신 · 제1) · Tae-Min Park · Ji-Ho Park — 머리글 'H.-G. Lee et al.'
+- 소속 · 직위 · 이메일: **자리표시 [University] · [Address] · [Title] · [E-mail]** — 투고 전에 채움 (발표 덱: 임베디드소프트웨어학과)
+- 감사의 글: 미정 (투고 전 확인)
+
+## 5. 투고처 병행 검토 (사용자 결정 2026-11-01 — 'SSS 그대로 두고 다른 학술지도 검토')
+
+**SSS 범위 점검 (Crossref · 2005–2026 · 질의 8개)** — 검색된 SSS 논문은 구조 건전성 모니터링 · 구조물 무선 센서망 · MR 댐퍼 진동 제어가 대부분.
+'smart building' = 구조물. 실내 환경 · HVAC · 스마트홈 제어 논문은 2016 이후 확인 안 됨 → 심사 전 반려 위험 큼.
+
+| 학술지 | 출판사 | 범위 | IF | APC | 비고 |
+|---|---|---|---|---|---|
+| Smart Structures and Systems | Techno-Press | 낮음 | — | 미확인 | 현재 목표 · 양식 확보 |
+| Journal of Sensor and Actuator Networks | MDPI | 높음 (센서 · 액추에이터 네트워크) | 확인 필요 | 확인 필요 | OA |
+| Sensors | MDPI | 중 (스마트홈 IoT 특집 이력) | 3.5 (2024) | CHF 2,600 | OA |
+| Buildings | MDPI | 중 (건물 운영) | 3.1 (2024) | ~CHF 2,600 (확인 필요) | OA |
+| Advances in Building Energy Research | Taylor & Francis | 높음 ('intelligent control of buildings') | ~2.7 (2025) | 하이브리드 | |
+| Journal of Building Engineering | Elsevier | 중 (새로움 문턱 높음) | ~7–8 | 하이브리드 | |
+
+원고는 SSS 양식으로 쓰고, 학술지를 바꾸면 양식만 다시 맞춘다 (내용은 그대로).
 
 ## 변경 이력
 | 날짜 | 버전 | 내용 |
 |---|---|---|
+| 2026-11-01 | v0.3 | §5 투고처 병행 검토 · SSS 범위 점검 근거 |
+| 2026-11-01 | v0.2 | 제목 1번 · 구성안 확정 · 저자 순서 · 표기 · 교신저자 |
 | 2026-11-01 | v0.1 | 사용자 결정 · 양식 교차 검증 · 구성안 (본문 작성 전) |
